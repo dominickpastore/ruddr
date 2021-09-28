@@ -9,11 +9,13 @@ import notifiers
 import updaters
 
 
+log = logging.getLogger('ruddr')
+
+
 class RuddrException(Exception):
     """Base class for all Ruddr exceptions except PublishError, which is never
-    raised by Ruddr."""
-    #TODO Main entry point should have handlers for all RuddrException that
-    # logs the error and then exits
+    raised by Ruddr. Whenever this is raised, a message should be logged first.
+    """
 
 
 class _IPJSONEncoder(json.JSONEncoder):
@@ -35,7 +37,7 @@ def _decode_ips(d):
             try:
                 d['ipv4'] = ipaddress.IPv4Address(d['ipv4'])
             except ValueError:
-                logging.warning("Malformed IPv4 in addrfile: %s. Ignoring.",
+                log.warning("Malformed IPv4 in addrfile: %s. Ignoring.",
                                 self.addrfile, e)
                 d['ipv4'] = None
     if 'ipv6' in d:
@@ -43,7 +45,7 @@ def _decode_ips(d):
             try:
                 d['ipv6'] = ipaddress.IPv6Interface(d['ipv6']).network
             except ValueError:
-                logging.warning("Malformed IPv6 network in addrfile: %s. "
+                log.warning("Malformed IPv6 network in addrfile: %s. "
                                 "Ignoring.", self.addrfile, e)
                 d['ipv6'] = None
     return d
@@ -53,11 +55,12 @@ class DDNSManager:
     """Manages the rest of the Ruddr system. Creates notifiers and updaters and
     manages the addrfile.
 
-    :param configfile: Path to the configuration file
+    :param config: A :class:`~ruddr.ConfigReader` with the configuration to
+                   use
     """
 
-    def __init__(self, configfile='/etc/ruddr.conf'):
-        self.config = config.ConfigReader(configfile)
+    def __init__(self, config):
+        self.config = config
 
         #: Addrfile path
         self.addrfile = self.config.main['addrfile']
@@ -149,6 +152,16 @@ class DDNSManager:
         """
         return self.notifiers[name]
 
+    def run(self):
+        """Start running all notifiers.
+
+        :raises NotifierSetupError: when a notifier fails to start.
+        """
+        #TODO Just run check_persistent() on all notifiers? How to wait and
+        # eventually exit gracefully?
+
+    #TODO A way to do check_once for all notifiers?
+
     def _read_addrfile(self):
         """Read the addrfile in. If it cannot be read or is malformed, log and
         return without touching :attr:`self.addresses`."""
@@ -156,25 +169,25 @@ class DDNSManager:
             with open(self.addrfile, 'r') as f:
                 addresses = json.load(f, object_hook=_decode_ips)
         except json.JSONDecodeError as e:
-            logging.warning("Malformed JSON in addrfile %s at (%d:%d). Will "
-                            "recreate.", self.addrfile, e.lineno, e.colno)
+            log.warning("Malformed JSON in addrfile %s at (%d:%d). Will "
+                        "recreate.", self.addrfile, e.lineno, e.colno)
             return
         except OSError as e:
-            logging.warning("Could not read addrfile %s (%s). Will attempt to "
-                            "recreate.", self.addrfile, e.strerror)
+            log.warning("Could not read addrfile %s (%s). Will attempt to "
+                        "recreate.", self.addrfile, e.strerror)
             return
         if not isinstance(self.addrs, dict):
-            logging.warning("Addrfile %s has unexpected JSON structure. Will "
-                            "recreate.", self.addrfile)
+            log.warning("Addrfile %s has unexpected JSON structure. Will "
+                        "recreate.", self.addrfile)
             return
 
         # Check that each key contains a properly formed dict (only keys ipv4
         # and ipv6, values are None or appropriate type of address)
         for name, addrs in list(addresses.items()):
             if not isinstance(addrs, dict):
-                logging.warning("Addrfile %s has unexpected JSON structure for"
-                                " key %s. Will recreate that key.",
-                                self.addrfile, name)
+                log.warning("Addrfile %s has unexpected JSON structure for "
+                            "key %s. Will recreate that key.",
+                            self.addrfile, name)
                 addresses[name] = {'ipv4': None, 'ipv6': None}
                 continue
             key_count = 0
@@ -182,24 +195,24 @@ class DDNSManager:
                 key_count += 1
                 if not (addrs['ipv4'] is None or
                         isinstance(addrs['ipv4'], ipaddress.IPv4Address)):
-                    logging.warning("Addrfile %s has unexpected JSON structure"
-                                    " for key %s. Will recreate that key.",
-                                    self.addrfile, name)
+                    log.warning("Addrfile %s has unexpected JSON structure "
+                                "for key %s. Will recreate that key.",
+                                self.addrfile, name)
                     addresses[name] = {'ipv4': None, 'ipv6': None}
                     continue
             if 'ipv6' in addrs:
                 key_count += 1
                 if not (addrs['ipv6'] is None or
                         isinstance(addrs['ipv6'], ipaddress.IPv6Network)):
-                    logging.warning("Addrfile %s has unexpected JSON structure"
-                                    " for key %s. Will recreate that key.",
-                                    self.addrfile, name)
+                    log.warning("Addrfile %s has unexpected JSON structure "
+                                "for key %s. Will recreate that key.",
+                                self.addrfile, name)
                     addresses[name] = {'ipv4': None, 'ipv6': None}
                     continue
             if len(addrs) > key_count:
-                logging.warning("Addrfile %s has unexpected JSON structure for"
-                                " key %s. Will recreate that key.",
-                                self.addrfile, name)
+                log.warning("Addrfile %s has unexpected JSON structure for "
+                            "key %s. Will recreate that key.",
+                            self.addrfile, name)
                 addresses[name] = {'ipv4': None, 'ipv6': None}
 
         self.addresses = addresses
@@ -212,8 +225,8 @@ class DDNSManager:
                 json.dump(f, self.addresses, cls=IPJSONEncoder,
                           sort_keys=True, indent=4)
         except OSError as e:
-            logging.error("Could not write addrfile %s: %s",
-                          self.addrfile, e.strerror)
+            log.error("Could not write addrfile %s: %s",
+                      self.addrfile, e.strerror)
 
     def addrfile_get_ipv4(self, name):
         """Get the IPv4 entry from the addrfile for the named updater.
@@ -288,3 +301,31 @@ class DDNSManager:
             self.addresses[name] = {'ipv4': None, 'ipv6': addr}
 
         self._write_addrfile()
+
+
+def main(argv):
+    """Main entry point when run as a standalone program"""
+    #TODO parse args for config_filename and logging verbosity
+    config = config.ConfigReader(config_filename)
+    manager = DDNSManager(config)
+
+    # Set up logging handler
+    logfile = config.get('log', 'syslog')
+    if logfile == 'syslog':
+        log_handler = logging.handlers.SysLogHandler()
+    else:
+        log_handler = logging.FileHandler(logfile)
+    log.addHandler(log_handler)
+
+    try:
+        manager.run()
+    except RuddrException:
+        # Exception happened, but generated within Ruddr, so it should be
+        # sufficiently logged. Just exit.
+        sys.exit(1)
+    except:
+        log.critical("Uncaught exception!", exc_info=True)
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main(sys.argv)

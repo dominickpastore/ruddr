@@ -2,7 +2,7 @@
 
 import configparser
 
-from manager import RuddrException
+from .manager import RuddrException
 
 
 DEFAULT_ADDRFILE = '/var/lib/misc/ruddr.addrfile'

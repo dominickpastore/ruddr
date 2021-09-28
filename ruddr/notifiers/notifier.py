@@ -6,6 +6,7 @@ import threading
 import types
 
 from ..config import ConfigError
+from ..manager import RuddrException
 
 
 class NotifyError(Exception):
@@ -13,6 +14,11 @@ class NotifyError(Exception):
     scheduled method in a :class:`~ruddr.ScheduledNotifier` to signal an error.
     In the latter case, the method will be rescheduled using the failure
     interval."""
+
+
+class NotifierSetupError(RuddrException):
+    """Raised by a notifier when there is a fatal error during setup for
+    persistent checks"""
 
 
 class Notifier:
@@ -27,7 +33,7 @@ class Notifier:
         self.name = name
 
         #: Logger (see standard :mod:`logging` module)
-        self.log = logging.getLogger(f'notifier.{self.name}')
+        self.log = logging.getLogger(f'ruddr.notifier.{self.name}')
 
         self.ipv4_updaters = []
         self.ipv6_updaters = []
@@ -136,11 +142,25 @@ class Notifier:
 
         Must be overridden by subclasses."""
 
-    def check_persistent(self):
+    def start(self):
         """Begin ongoing IP address notifications. Should do the first check
-        immediately.
+        immediately. Further checks should run in a separate thread or
+        otherwise be asynchronous.
 
-        Must be overridden by subclasses."""
+        Must be overridden by subclasses.
+
+        :raises NotifierSetupError: when there is a nonrecoverable error
+                                    preventing notifier startup. Causes
+                                    Ruddr to exit gracefully with a failure
+                                    status.
+        """
+
+    def stop(self):
+        """Halt ongoing IP address notifications. Clean up gracefully and stop
+        any non-daemon threads so Python may exit.
+
+        Must be overridden by subclasses.
+        """
 
 
 class Scheduled:
@@ -197,8 +217,8 @@ class Scheduled:
                 self.fail_interval *= 2
                 if self.fail_interval > obj.fail_max_interval:
                     self.fail_interval = obj.fail_max_interval
-            obj.log.info("Scheduled invocation for seq %d failed. Retrying in "
-                         "~%d minutes.", seq, self.fail_interval)
+            obj.log.info("(Failed. Will retry in %d seconds.)",
+                         seq, self.fail_interval)
             retry_delay = self.fail_interval
         else:
             self.fail_interval = None
@@ -208,6 +228,7 @@ class Scheduled:
         if retry_delay > 0:
             timer = threading.Timer(retry_delay, self._run_scheduled,
                                     args=(seq, obj, *args), kwargs=kwargs)
+            timer.daemon = True
             timer.start()
 
 

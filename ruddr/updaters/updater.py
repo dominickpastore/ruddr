@@ -77,6 +77,7 @@ class _Retry:
                          retry_delay // 60)
             timer = threading.Timer(retry_delay, self.retry,
                                     args=(seq, obj, *args), kwargs=kwargs)
+            timer.daemon = True
             timer.start()
 
 
@@ -95,7 +96,7 @@ class Updater:
         self.name = name
 
         #: Logger (see standard :mod:`logging` module)
-        self.log = logging.getLogger(f'updater.{self.name}')
+        self.log = logging.getLogger(f'ruddr.updater.{self.name}')
 
         self.manager = manager
 

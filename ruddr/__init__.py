@@ -6,6 +6,6 @@ updaters.
 
 from config import ConfigError, ConfigReader
 from manager import RuddrException, DDNSManager
-from notifiers import (NotifyError, Notifier, SchedulerNotifier, Scheduled,
-        get_iface_addrs)
+from notifiers import (Notifier, SchedulerNotifier, Scheduled, get_iface_addrs,
+                       NotifyError, NotifierSetupError)
 from updaters import PublishError, Updater
