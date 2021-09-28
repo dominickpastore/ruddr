@@ -3,6 +3,7 @@
 import importlib
 import ipaddress
 import json
+import sys
 
 import config
 import notifiers
@@ -90,6 +91,7 @@ class DDNSManager:
                 try:
                     notifier_class = notifiers.notifiers[notifier_type]
                 except KeyError:
+                    #TODO Use ruddr.notifiers entry points
                     raise config.ConfigError("No built-in notifier of type %s"
                                              % notifier_type) from None
             else:
@@ -127,6 +129,7 @@ class DDNSManager:
                 try:
                     updater_class = updaters.updaters[updater_type]
                 except KeyError:
+                    #TODO Use ruddr.updaters entry points
                     raise config.ConfigError("No built-in updater of type %s" %
                                              updater_type) from None
             else:
@@ -152,12 +155,21 @@ class DDNSManager:
         """
         return self.notifiers[name]
 
-    def run(self):
+    def start(self):
         """Start running all notifiers.
 
         :raises NotifierSetupError: when a notifier fails to start.
         """
-        #TODO Just run check_persistent() on all notifiers? How to wait and
+        self.log.info("Starting all notifiers...")
+        success = True
+        for notifier in self.notifiers.values():
+            try:
+                notifier.start()
+            except NotifierSetupError:
+                pass #TODO
+
+        self.log.info("All notifiers started.")
+        #TODO Just run start() on all notifiers? How to wait and
         # eventually exit gracefully?
 
     #TODO A way to do check_once for all notifiers?
@@ -303,9 +315,12 @@ class DDNSManager:
         self._write_addrfile()
 
 
-def main(argv):
+def main(argv=None):
     """Main entry point when run as a standalone program"""
     #TODO parse args for config_filename and logging verbosity
+    if argv is None:
+        argv=sys.argv
+
     config = config.ConfigReader(config_filename)
     manager = DDNSManager(config)
 
@@ -328,4 +343,4 @@ def main(argv):
         sys.exit(1)
 
 if __name__ == '__main__':
-    main(sys.argv)
+    main()

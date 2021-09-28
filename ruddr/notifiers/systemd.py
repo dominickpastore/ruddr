@@ -1,6 +1,5 @@
 """Ruddr notifier that listens for updates from systemd-networkd over DBus"""
 
-#TODO add to setup.py for [systemd] requirements
 from gi.repository import GLib
 from gi.repository import Gio
 import ipaddress
