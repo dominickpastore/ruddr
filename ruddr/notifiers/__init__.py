@@ -1,7 +1,6 @@
 """Build in notifiers and the notifier base class"""
 
-from .notifier import (Notifier, SchedulerNotifier, Scheduled, NotifyError
-                       NotifierSetupError)
+from .notifier import Notifier, SchedulerNotifier, Scheduled
 from ._get_iface_addrs import get_iface_addrs
 
 #TODO create these
@@ -14,8 +13,6 @@ notifiers = {
 }
 
 __all__ = [
-    'NotifyError',
-    'NotifierSetupError',
     'Notifier',
     'SchedulerNotifier',
     'Scheduled',

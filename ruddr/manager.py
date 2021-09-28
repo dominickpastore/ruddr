@@ -6,17 +6,12 @@ import json
 import sys
 
 import config
+from .exceptions import RuddrException
 import notifiers
 import updaters
 
 
 log = logging.getLogger('ruddr')
-
-
-class RuddrException(Exception):
-    """Base class for all Ruddr exceptions except PublishError, which is never
-    raised by Ruddr. Whenever this is raised, a message should be logged first.
-    """
 
 
 class _IPJSONEncoder(json.JSONEncoder):

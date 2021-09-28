@@ -6,9 +6,9 @@ import ipaddress
 import socket
 
 from ..config import ConfigError
+from ..exceptions import NotifyError, NotifierSetupError
 from ._get_iface_addrs import get_iface_addrs
-from .notifier import (SchedulerNotifier, Scheduled, NotifyError,
-                       NotifierSetupError)
+from .notifier import SchedulerNotifier, Scheduled
 
 
 class SystemdNotifier(SchedulerNotifier):

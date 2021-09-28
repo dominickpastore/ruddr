@@ -1,6 +1,6 @@
 """Built in updaters and the updater base class"""
 
-from .updater import PublishError, Updater
+from .updater import Updater
 
 from . import gandi
 from . import he
@@ -10,4 +10,4 @@ updaters = {
     'he': he.HEUpdater,
 }
 
-__all__ = ['Updater', 'PublishError', 'updaters']
+__all__ = ['Updater', 'updaters']

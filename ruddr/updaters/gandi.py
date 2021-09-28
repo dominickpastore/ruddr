@@ -6,8 +6,8 @@ from pprint import pprint
 import re
 import requests
 
-from ..config import ConfigError
-from .updater import Updater, PublishError
+from ..exceptions import ConfigError, PublishError
+from .updater import Updater
 
 
 class GandiUpdater(Updater):

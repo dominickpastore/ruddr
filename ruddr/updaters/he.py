@@ -2,8 +2,7 @@
 
 import requests
 
-from ..config import ConfigError
-from .updater import PublishError
+from ..exceptions import ConfigError, PublishError
 
 
 class HEUpdater:

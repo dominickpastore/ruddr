@@ -5,12 +5,7 @@ import logging
 import threading
 import types
 
-from ..config import ConfigError
-
-
-class PublishError(Exception):
-    """Updaters should raise when an attempt to publish an update fails. Doing
-    so triggers the retry mechanism."""
+from ..exceptions import ConfigError, PublishError
 
 
 class _Retry:

@@ -2,14 +2,10 @@
 
 import configparser
 
-from .manager import RuddrException
+from .exceptions import RuddrException, ConfigError
 
 
 DEFAULT_ADDRFILE = '/var/lib/misc/ruddr.addrfile'
-
-
-class ConfigError(RuddrException):
-    """Raised when the configuration is malformed or has other errors"""
 
 
 class ConfigReader:
