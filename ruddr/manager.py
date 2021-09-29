@@ -1,5 +1,6 @@
 """DDNS Manager: Initializes notifiers and updaters and manages the addrfile"""
 
+import argparse
 import importlib
 import ipaddress
 import json
@@ -338,27 +339,55 @@ class DDNSManager:
         self._write_addrfile()
 
 
+def parse_args(argv):
+    """Parse command line arguments
+
+    :param argv: Either ``None`` or a list of arguments
+    :returns: a :class:`argparse.Namespace` containing the parsed arguments
+    """
+    parser = argparse.ArgumentParser(description="Robotic Updater for "
+                                     "Dynamic DNS Records")
+    parser.add_argument("-1", "--check-once", action="store_true",
+                        help="Check and update all IP addresses a single time")
+    parser.add_argument("-c", "--configfile", default="/etc/ruddr.conf",
+                        help="Path to the config file")
+    parser.add_argument("-d", "--debug-logs", action="store_true",
+                        help="Increase verbosity of logging significantly")
+    parser.add_argument("-s", "--stderr", action="store_true",
+                        help="Log to stderr instead of syslog or file")
+    return parser.parse_args(argv)
+
+
 def main(argv=None):
     """Main entry point when run as a standalone program"""
-    #TODO parse args for config_filename, logging verbosity, whether to check
-    # once, or not daemonize
-    if argv is None:
-        argv=sys.argv
-
-    config = config.ConfigReader(config_filename)
+    args = parse_args(argv)
+    config = config.ConfigReader(args.configfile)
 
     # Set up logging handler
-    logfile = config.get('log', 'syslog')
+    if args.stderr:
+        logfile = 'stderr'
+    else:
+        logfile = config.get('log', 'syslog')
     if logfile == 'syslog':
         log_handler = logging.handlers.SysLogHandler()
-    if logfile == 'stdout':
+    if logfile == 'stderr':
         log_handler = logging.StreamHandler()
     else:
         log_handler = logging.FileHandler(logfile)
     log.addHandler(log_handler)
+    if args.debug_logs:
+        log.setLevel(logging.DEBUG)
+    else:
+        log.setLevel(logging.INFO)
 
     # Start up the actual DDNS code
     manager = DDNSManager(config)
+    if args.check_once:
+        try:
+            manager.check_once()
+        except RuddrException:
+            sys.exit(1)
+        return
     try:
         manager.start()
     except RuddrException:
