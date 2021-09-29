@@ -147,6 +147,9 @@ class Notifier:
         """Halt ongoing IP address notifications. Clean up gracefully and stop
         any non-daemon threads so Python may exit.
 
+        This should not raise any exceptions, even if called before
+        :meth:`start` or after :meth:`start` fails.
+
         Must be overridden by subclasses.
         """
 

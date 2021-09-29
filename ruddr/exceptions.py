@@ -1,10 +1,11 @@
 """All Ruddr exceptions"""
 
 class RuddrException(Exception):
-    """Base class for all Ruddr exceptions except PublishError, which is never
-    raised by Ruddr. Whenever this is raised, a message should be logged first.
+    """Base class for all Ruddr exceptions except PublishError (which should
+    never be uncaught within Ruddr when raised). Whenever this is raised, a
+    message should be logged first.
     """
-class NotifyError(Exception):
+class NotifyError(RuddrException):
     """Raised by a notifier's :meth:`~ruddr.Notifier.check_once` method or a
     scheduled method in a :class:`~ruddr.ScheduledNotifier` to signal an error.
     In the latter case, the method will be rescheduled using the failure

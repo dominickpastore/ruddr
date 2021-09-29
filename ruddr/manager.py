@@ -3,10 +3,12 @@
 import importlib
 import ipaddress
 import json
+import signal
 import sys
+import time
 
 import config
-from .exceptions import RuddrException
+from .exceptions import RuddrException, NotifierSetupError
 import notifiers
 import updaters
 
@@ -68,8 +70,6 @@ class DDNSManager:
         # Creates self.notifiers and self.updaters as dicts
         self._create_notifiers()
         self._create_updaters()
-
-        #TODO Make notifiers start
 
     def _create_notifiers(self):
         """Initialize the notifiers"""
@@ -156,18 +156,46 @@ class DDNSManager:
         :raises NotifierSetupError: when a notifier fails to start.
         """
         self.log.info("Starting all notifiers...")
-        success = True
-        for notifier in self.notifiers.values():
+
+        for name, notifier in self.notifiers.items():
             try:
                 notifier.start()
             except NotifierSetupError:
-                pass #TODO
+                self.log.error("Notifier %s failed to start. Stopping all "
+                               "notifiers.", name)
+                for notifier in self.notifiers.values():
+                    notifier.stop()
+                raise
 
         self.log.info("All notifiers started.")
-        #TODO Just run start() on all notifiers? How to wait and
-        # eventually exit gracefully?
 
-    #TODO A way to do check_once for all notifiers?
+    def check_once(self):
+        """Do a single notify from all notifiers.
+
+        :raises NotifyError: if any notifier fails to notify.
+        """
+        self.log.info("Checking once for all notifiers...")
+
+        exc = None
+        for name, notifier in self.notifiers.items():
+            try:
+                notifier.check_once()
+            except NotifierSetupError as e:
+                self.log.error("Notifier %s failed to check.",
+                               name, exc_info=True)
+                if exc is None:
+                    exc = e
+        if exc is not None:
+            raise exc
+
+        self.log.info("Check for all notifiers complete.")
+
+    def stop(self):
+        """Stop all running notifiers."""
+        self.log.info("Stopping all notifiers...")
+        for notifier in self.notifiers.values():
+            notifier.stop()
+        self.log.info("All notifiers stopped.")
 
     def _read_addrfile(self):
         """Read the addrfile in. If it cannot be read or is malformed, log and
@@ -312,23 +340,27 @@ class DDNSManager:
 
 def main(argv=None):
     """Main entry point when run as a standalone program"""
-    #TODO parse args for config_filename and logging verbosity
+    #TODO parse args for config_filename, logging verbosity, whether to check
+    # once, or not daemonize
     if argv is None:
         argv=sys.argv
 
     config = config.ConfigReader(config_filename)
-    manager = DDNSManager(config)
 
     # Set up logging handler
     logfile = config.get('log', 'syslog')
     if logfile == 'syslog':
         log_handler = logging.handlers.SysLogHandler()
+    if logfile == 'stdout':
+        log_handler = logging.StreamHandler()
     else:
         log_handler = logging.FileHandler(logfile)
     log.addHandler(log_handler)
 
+    # Start up the actual DDNS code
+    manager = DDNSManager(config)
     try:
-        manager.run()
+        manager.start()
     except RuddrException:
         # Exception happened, but generated within Ruddr, so it should be
         # sufficiently logged. Just exit.
@@ -336,6 +368,17 @@ def main(argv=None):
     except:
         log.critical("Uncaught exception!", exc_info=True)
         sys.exit(1)
+
+    #TODO notify systemd
+
+    # Wait for SIGINT (^C) or SIGTERM
+    def handle_signals(sig, frame):
+        log.info("Received signal:", signal.strsignal(sig))
+        manager.stop()
+    signal.signal(SIGNAL.SIGINT, handle_signals)
+    signal.signal(SIGNAL.SIGTERM, handle_signals)
+    while True:
+        time.sleep(60)
 
 if __name__ == '__main__':
     main()
