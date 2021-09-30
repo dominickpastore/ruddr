@@ -1,16 +1,21 @@
 """Build in notifiers and the notifier base class"""
 
 from .notifier import Notifier, SchedulerNotifier, Scheduled
-from ._get_iface_addrs import get_iface_addrs
+from ._getifaceaddrs import get_iface_addrs
 
-#TODO create these
-from . import systemd
+#TODO create this
 from . import web
 
 notifiers = {
-    'systemd': systemd.SystemdNotifier,
     'web': web.WebNotifier,
 }
+
+try:
+    from . import systemd
+except ImportError:
+    pass
+else:
+    notifiers['systemd'] = systemd.SystemdNotifier
 
 __all__ = [
     'Notifier',

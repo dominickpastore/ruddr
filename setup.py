@@ -26,8 +26,7 @@ setup(
     ],
     python_requires='>=3.6',
     extras_require={
-        'systemd': ['systemd'],
-        'networkd': ['PyGObject'],
+        'systemd': ['PyGObject'],   # Systemd notifier
     },
 
     entry_points={
