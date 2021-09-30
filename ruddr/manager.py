@@ -8,10 +8,11 @@ import signal
 import sys
 import time
 
-import config
+from . import config
 from .exceptions import RuddrException, NotifierSetupError
-import notifiers
-import updaters
+from . import notifiers
+from . import sdnotify
+from . import updaters
 
 
 log = logging.getLogger('ruddr')
@@ -398,11 +399,13 @@ def main(argv=None):
         log.critical("Uncaught exception!", exc_info=True)
         sys.exit(1)
 
-    #TODO notify systemd
+    # Notify systemd, if applicable
+    sdnotify.ready()
 
     # Wait for SIGINT (^C) or SIGTERM
     def handle_signals(sig, frame):
         log.info("Received signal:", signal.strsignal(sig))
+        sdnotify.stopping()
         manager.stop()
     signal.signal(SIGNAL.SIGINT, handle_signals)
     signal.signal(SIGNAL.SIGTERM, handle_signals)
