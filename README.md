@@ -40,6 +40,8 @@ TODO More sections
 License
 -------
 
+TODO add license notice to files
+
 Copyright &copy; 2021 Dominick C. Pastore
 
 [docs]: https://ruddr.dcpx.org/

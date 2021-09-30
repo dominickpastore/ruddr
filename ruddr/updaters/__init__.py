@@ -4,10 +4,13 @@ from .updater import Updater
 
 from . import gandi
 from . import he
+#TODO Add this
+#from . import standard
 
 updaters = {
     'gandi': gandi.GandiUpdater,
     'he': he.HEUpdater,
+    #'standard': standard.StandardUpdater,
 }
 
 __all__ = ['Updater']

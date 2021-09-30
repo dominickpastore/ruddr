@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-with open("README.rst", "r") as f:
+with open("README.md", "r") as f:
     long_description = f.read()
 
 setup(
@@ -10,7 +10,7 @@ setup(
     author_email='dominickpastore@dcpx.org',
     description='Robotic Updater for Dynamic DNS Records',
     long_description=long_description,
-    long_description_content_type='text/x-rst',
+    long_description_content_type='text/markdown',
     url='https://github.com/dominickpastore/ruddr/',
     license='Copyright (c) 2021 Dominick C. Pastore. All rights reserved.',
     classifiers=[

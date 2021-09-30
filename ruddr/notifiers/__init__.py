@@ -1,15 +1,17 @@
-"""Build in notifiers and the notifier base class"""
+"""Built in notifiers and the notifier base class"""
 
 from .notifier import Notifier, SchedulerNotifier, Scheduled
 from ._getifaceaddrs import get_iface_addrs
 
 from . import timed
-#TODO create this
-from . import web
+#TODO create these
+#from . import web
+#from . import static
 
 notifiers = {
     'timed': timed.TimedNotifier,
-    'web': web.WebNotifier,
+    #'web': web.WebNotifier,
+    #'static': static.StaticNotifier,
 }
 
 # systemd notifier only works if PyGObject is installed
