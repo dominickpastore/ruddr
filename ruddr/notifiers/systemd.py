@@ -7,7 +7,7 @@ import socket
 
 from ..config import ConfigError
 from ..exceptions import NotifyError, NotifierSetupError
-from ._get_iface_addrs import get_iface_addrs
+from ._getifaceaddrs import get_iface_addrs
 from .notifier import SchedulerNotifier, Scheduled
 
 
@@ -96,9 +96,6 @@ class SystemdNotifier(SchedulerNotifier):
             self.log.error("Interface %s does not exist", self.iface)
             raise NotifyError("Interface %s does not exist" %
                               self.iface) from None
-        except NotImplementedError as e:
-            self.log.error(str(e))
-            raise NotifyError("Could not look up address") from e
 
         ipv4_addressed = True
         ipv6_addressed = True

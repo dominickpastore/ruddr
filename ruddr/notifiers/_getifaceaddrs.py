@@ -1,57 +1,43 @@
 """Helper function for notifiers to look up IP addresses for the current
 system's interfaces"""
 
-import sys
+# Netifaces is no longer currently maintained (looking for a new maintainer).
+# But the last release was in 2021 and it's not that complex, especially the
+# address lookup part, which hasn't been modified in several releases.
+#
+# If this gets to be a problem, a possible alternative is using ctypes or
+# similar to call getifaddrs(3) directly, but that's basically what netifaces
+# does already, in native C (and actually, it also has alternative
+# implementations for Windows, AIX, and Solaris, which don't have getifaddrs).
+#
+# Some more information on this at:
+# https://stackoverflow.com/questions/20743709/get-ipv6-addresses-in-linux-using-ioctl
+
 import ipaddress
-
-#TODO Add netifaces to setup.py. It's not currently maintained, but it's not
-# that complex (especially the address lookup part, which hasn't been modified
-# in several releases)
-try:
-    import netifaces
-except ImportError:
-    pass
+import netifaces
+import sys
 
 
-if 'netifaces' in sys.modules:
-    def _get_iface_addrs(if_name):
-        """Lookup current addresses for the named interface.
+def _get_iface_addrs(if_name):
+    """Lookup current addresses for the named interface.
 
-        :param if_name: Name of the address to look up
-        :return: A 2-tuple containing a list of IPV4Address followed by a list
-                 of IPV6Address.
-        :raises ValueError: if there is not interface with the given name.
-        """
-        addresses = netifaces.ifaddresses(if_name)
-        ipv4 = [a['addr'] for a in addresses[netifaces.AF_INET]]
-        ipv6 = [a['addr'] for a in addresses[netifaces.AF_INET6]]
+    :param if_name: Name of the address to look up
+    :return: A 2-tuple containing a list of IPV4Address followed by a list
+             of IPV6Address.
+    :raises ValueError: if there is not interface with the given name.
+    """
+    addresses = netifaces.ifaddresses(if_name)
+    ipv4 = [a['addr'] for a in addresses[netifaces.AF_INET]]
+    ipv6 = [a['addr'] for a in addresses[netifaces.AF_INET6]]
 
-        # ipaddress.IPv6Address gets upset when there is %ifacename at the end
-        # of an address in Python < 3.9. Chop it off.
-        ipv6 = [a.partition('%')[0] for a in ipv6]
+    # ipaddress.IPv6Address gets upset when there is %ifacename at the end
+    # of an address in Python < 3.9. Chop it off.
+    ipv6 = [a.partition('%')[0] for a in ipv6]
 
-        ipv4 = [ipaddress.IPv4Address(a) for a in ipv4]
-        ipv6 = [ipaddress.IPv6Address(a) for a in ipv6]
+    ipv4 = [ipaddress.IPv4Address(a) for a in ipv4]
+    ipv6 = [ipaddress.IPv6Address(a) for a in ipv6]
 
-        return (ipv4, ipv6)
-elif ...: #TODO Check if can use getifaddrs (https://stackoverflow.com/questions/20743709/get-ipv6-addresses-in-linux-using-ioctl)
-    import ctypes
-    libc = ctypes.CDLL(ctypes.util.find_library('c'))
-
-    def _get_iface_addrs(if_name):
-        """Lookup current addresses for the named interface.
-
-        :param if_name: Name of the address to look up
-        :return: A 2-tuple containing a list of IPV4Address followed by a list
-                 of IPV6Address.
-        :raises ValueError: if there is not interface with the given name.
-        """
-        #TODO https://gist.github.com/dominickpastore/513d33444316166d4a5dbbafdf1b428d
-else:
-    def _get_iface_addrs(if_name):
-        raise NotImplementedError("None of the ways to look up interface "
-                                  "addresses are available. Try installing "
-                                  "the 'netifaces' package.")
+    return (ipv4, ipv6)
 
 
 def get_iface_addrs(if_name, omit_private=True, omit_link_local=True):
