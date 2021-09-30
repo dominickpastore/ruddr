@@ -10,4 +10,4 @@ updaters = {
     'he': he.HEUpdater,
 }
 
-__all__ = ['Updater', 'updaters']
+__all__ = ['Updater']
