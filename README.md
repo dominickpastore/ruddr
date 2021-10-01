@@ -34,6 +34,34 @@ notifiers and updaters
 For more information about the built-in updaters and notifiers or writing your
 own, see the [full documentation][docs].
 
+Installation from PyPI
+----------------------
+
+Ruddr is available on PyPI under the name [`ruddr`][PyPI]. Basic installation
+works similarly to any other Python package:
+
+    pip install ruddr
+
+Ruddr is now installed. You can continue to configuration.
+
+**Note:** If you would like to use the `systemd` notifier, you need to install
+with the `systemd` extra, as it has extra dependencies:
+
+    pip install ruddr[systemd]
+
+If the `systemd` extra does not install, see the [full documentation][docs].
+You may be missing some non-Python dependencies, and there are extra steps for
+virtual environments. TODO Note this stuff in docs
+
+Basic Usage and Configuration
+-----------------------------
+
+TODO How to set up config file (just basics and link to full docs)
+TODO How to do a single update manually
+TODO How to run in "daemon" mode
+TODO How to use sample systemd unit file
+TODO (Is this all too much for the readme?)
+
 TODO More sections
 ------------------
 
@@ -46,5 +74,6 @@ Copyright &copy; 2021 Dominick C. Pastore
 
 [docs]: https://ruddr.dcpx.org/
 [GitHub]: https://github.com/dominickpastore/ruddr
+[PyPI]: TODO
 [changelog]: https://github.com/dominickpastore/ruddr/blob/master/CHANGELOG.md
 [issues]: https://github.com/dominickpastore/ruddr/issues

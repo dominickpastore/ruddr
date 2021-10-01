@@ -27,6 +27,7 @@ setup(
     python_requires='>=3.6',
     extras_require={
         'systemd': ['PyGObject'],   # Systemd notifier
+        'docs': ['sphinx']
     },
 
     entry_points={
