@@ -31,6 +31,8 @@ the fact that hosts are not likely behind network address translation (NAT).
 Quick Links
 -----------
 
+.. TODO PyPI
+
 - `This documentation <https://ruddr.dcpx.org/>`_
 - `GitHub, README <https://github.com/dominickpastore/ruddr>`_
 - `Changelog
@@ -43,6 +45,7 @@ Table of Contents
    :maxdepth: 2
 
    installation
+   howitworks
    usage
    notifiers
    updaters

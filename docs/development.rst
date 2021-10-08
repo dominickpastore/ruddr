@@ -26,7 +26,7 @@ Development on Ruddr Itself
 Installation for Development
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. TODO
+.. TODO Installing from repository
 
 Running Tests
 ~~~~~~~~~~~~~
@@ -36,7 +36,7 @@ Running Tests
 Generating Docs
 ~~~~~~~~~~~~~~~
 
-.. TODO
+.. TODO Install with .[docs]
 
 Contributions
 -------------

@@ -1,6 +1,10 @@
 Configuration and Usage
 =======================
 
+.. note::
+   If you have not already done so, you should read :doc:`howitworks` before
+   continuing.
+
 Configuration File
 ------------------
 

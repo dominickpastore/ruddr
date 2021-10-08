@@ -40,18 +40,13 @@ Installation from PyPI
 Ruddr is available on PyPI under the name [`ruddr`][PyPI]. Basic installation
 works similarly to any other Python package:
 
-    pip install ruddr
+    pip3 install ruddr
 
 Ruddr is now installed. You can continue to configuration.
 
-**Note:** If you would like to use the `systemd` notifier, you need to install
-with the `systemd` extra, as it has extra dependencies:
-
-    pip install ruddr[systemd]
-
-If the `systemd` extra does not install, see the [full documentation][docs].
-You may be missing some non-Python dependencies, and there are extra steps for
-virtual environments. TODO Note this stuff in docs
+**Note:** If you would like to use the `systemd` notifier, there are extra
+steps. See the installation instructions in the [full documentation][docs] for
+details.
 
 Basic Usage and Configuration
 -----------------------------
