@@ -5,7 +5,7 @@ with open("README.md", "r") as f:
 
 setup(
     name='ruddr',
-    version='0.1.0',
+    version='0.0.0dev0',
     author='Dominick C. Pastore',
     author_email='dominickpastore@dcpx.org',
     description='Robotic Updater for Dynamic DNS Records',
