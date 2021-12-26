@@ -5,8 +5,7 @@ from gi.repository import Gio
 import ipaddress
 import socket
 
-from ..config import ConfigError
-from ..exceptions import NotifyError, NotifierSetupError
+from ..exceptions import NotifyError, NotifierSetupError, ConfigError
 from ._getifaceaddrs import get_iface_addrs
 from .notifier import SchedulerNotifier, Scheduled
 

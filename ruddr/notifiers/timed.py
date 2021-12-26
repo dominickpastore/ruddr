@@ -3,8 +3,7 @@ schedule"""
 
 import ipaddress
 
-from ..config import ConfigError
-from ..exceptions import NotifyError
+from ..exceptions import NotifyError, ConfigError
 from ._getifaceaddrs import get_iface_addrs
 from .notifier import SchedulerNotifier, Scheduled
 
@@ -64,7 +63,7 @@ class TimedNotifier(SchedulerNotifier):
         # retry, it returns to the regular check interval.
         try:
             self.fail_min_interval = int(config.get('retry_min_interval',
-                                                    '10')
+                                                    '10'))
         except ValueError:
             self.log.critical("'retry_min_interval' config option must be an "
                               "integer")
@@ -72,7 +71,7 @@ class TimedNotifier(SchedulerNotifier):
                               "notifier must be an integer") from None
         try:
             self.fail_max_interval = int(config.get('retry_max_interval',
-                                                    '600')
+                                                    '600'))
         except ValueError:
             self.log.critical("'retry_max_interval' config option must be an "
                               "integer")
