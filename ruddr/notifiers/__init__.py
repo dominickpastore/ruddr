@@ -4,14 +4,13 @@ from .notifier import Notifier, SchedulerNotifier, Scheduled
 from ._getifaceaddrs import get_iface_addrs
 
 from . import timed
-#TODO create these
 #from . import web
-#from . import static
+from . import static
 
 notifiers = {
     'timed': timed.TimedNotifier,
     #'web': web.WebNotifier,
-    #'static': static.StaticNotifier,
+    'static': static.StaticNotifier,
 }
 
 # systemd notifier only works if PyGObject is installed
