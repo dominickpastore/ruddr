@@ -69,6 +69,6 @@ Copyright &copy; 2021 Dominick C. Pastore
 
 [docs]: https://ruddr.dcpx.org/
 [GitHub]: https://github.com/dominickpastore/ruddr
-[PyPI]: TODO
+[PyPI]: https://pypi.org/project/ruddr/
 [changelog]: https://github.com/dominickpastore/ruddr/blob/master/CHANGELOG.md
 [issues]: https://github.com/dominickpastore/ruddr/issues
