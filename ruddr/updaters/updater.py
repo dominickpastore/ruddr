@@ -185,10 +185,9 @@ class Updater:
         not match the current address, call the subclass' publish function,
         update the addrfile if successful, and retry if not.
 
-        :param address: :class:`IPv4Address` to update with, or None to
-                        unpublish if possible
+        :param address: :class:`IPv4Address` to update with
         """
-        if address is not None and address == self.ipv4:
+        if address == self.ipv4:
             self.log.info("Skipping update as %s is current address",
                           address.exploded)
             return
@@ -219,10 +218,9 @@ class Updater:
         not match the current prefix, call the subclass' publish function,
         update the addrfile if successful, and retry if not.
 
-        :param address: :class:`IPv6Network` to update with, or None to
-                        unpublish if possible
+        :param address: :class:`IPv6Network` to update with
         """
-        if address is not None and address == self.ipv6:
+        if address == self.ipv6:
             self.log.info("Skipping update as %s is current address",
                           address.compressed)
             return
@@ -252,14 +250,10 @@ class Updater:
         only be called if an update contains a new address or a previous update
         failed.
 
-        May also be called with ``None`` to request unpublishing the current
-        address, if possible.
-
         Must be implemented by subclasses if they support IPv4 updates. Be sure
         to raise :exc:`~ruddr.PublishError` when publishing fails!
 
-        :param address: :class:`IPv4Address` to publish, or ``None`` to request
-                        unpublishing
+        :param address: :class:`IPv4Address` to publish
         :raise PublishError` when publishing fails
         """
         raise NotImplementedError("IPv4 publish function not provided")
@@ -269,14 +263,10 @@ class Updater:
         only be called if an update contains a new address or a previous update
         failed.
 
-        May also be called with ``None`` to request unpublishing the current
-        address, if possible.
-
         Must be implemented by subclasses if they support IPv6 updates. Be sure
         to raise :exc:`~ruddr.PublishError` when publishing fails!
 
-        :param network: :class:`IPv6Network` with the prefix to publish, or
-                        ``None`` to request unpublishing
+        :param network: :class:`IPv6Network` with the prefix to publish
         :raise PublishError` when publishing fails
         """
         raise NotImplementedError("IPv6 publish function not provided")

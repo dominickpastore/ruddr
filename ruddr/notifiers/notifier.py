@@ -39,15 +39,18 @@ class Notifier:
         #   Like ipv4_required, but for IPv6. Defaults to false since IPv6
         #   support in networks generally isn't universal.
         #
-        # - unset_missing_addr: default false
-        #   When set, if the notifier can't obtain an address that isn't
-        #   required but isn't skipped, it will instruct the updater to
-        #   "unpublish" the address. This is intended for a host that is mobile
-        #   and may not always have IPv6 addressing, for example.
-        #   This option is experimental.
-        #   (Ideas: Store unset IPv6s in the addrfile so they can be re-set
-        #   later. Warn that the addrfile does not act like a cache in that
-        #   case. But this isn't necessary if prefix is 128.)
+        # - skip_* options override *_required options
+        #
+        # Configuration suggestions:
+        #
+        # - Most people *can* get away with using the defaults, but it's best
+        #   to be explicit if possible.
+        #
+        # - If IPv6 is known to be available, setting ipv6_required ensures
+        #   that Ruddr will retry when it can't get a current IPv6 address.
+        #
+        # - If IPv6 is known to NOT be available, setting skip_ipv6 tells
+        #   Ruddr not to waste time trying to determine an IPv6 address.
 
         try:
             self._skip_ipv4 = (config.get('skip_ipv4', 'false').lower()
@@ -82,16 +85,6 @@ class Notifier:
                               "false/no/0)")
             raise ConfigError(f"'ipv6_required' option for {self.name} must"
                               "be boolean (true/yes/1/false/no/0)")
-
-        try:
-            self._unset_missing_addr = (
-                config.get('unset_missing_addr', 'true').lower()
-                in ('true', 'on', '1'))
-        except ValueError:
-            self.log.critical("'unset_missing_addr' must be boolean (true/yes/"
-                              "1/false/no/0)")
-            raise ConfigError(f"'unset_missing_addr' option for {self.name} "
-                              "must be boolean (true/yes/1/false/no/0)")
 
         self.ipv4_updaters = []
         self.ipv6_updaters = []
@@ -144,16 +137,8 @@ class Notifier:
 
         :param address: The (possibly) new :class:`IPv4Address`
         """
-        if address is None:
-            if self._unset_missing_addr:
-                self.log.debug("Notifier %s notifying no IPv4", self.name)
-            else:
-                self.log.debug("Notifier %s found no IPv4. Not notifying",
-                               self.name)
-                return
-        else:
-            self.log.debug("Notifier %s notifying attached updaters of IPv4 %s",
-                           self.name, address.exploded)
+        self.log.debug("Notifier %s notifying attached updaters of IPv4 %s",
+                       self.name, address.exploded)
         for updater in self.ipv4_updaters:
             updater(address)
 
@@ -164,16 +149,8 @@ class Notifier:
         :param address: The :class:`IPv6Network` representing the (possibly)
                         new prefix
         """
-        if address is None:
-            if self._unset_missing_addr:
-                self.log.debug("Notifier %s notifying no IPv6", self.name)
-            else:
-                self.log.debug("Notifier %s found no IPv6. Not notifying",
-                               self.name)
-                return
-        else:
-            self.log.debug("Notifier %s notifying attached updaters of IPv6 %s",
-                           self.name, address.compressed)
+        self.log.debug("Notifier %s notifying attached updaters of IPv6 %s",
+                       self.name, address.compressed)
         for updater in self.ipv6_updaters:
             updater(address)
 
@@ -329,7 +306,7 @@ class SchedulerNotifier(Notifier):
     """An abstract notifier with the ability to schedule checks (or other
     tasks) to happen on regular intervals and retry when failed.
 
-    Decorating a function with the ``@self.Scheduled`` decorator makes it
+    Decorating a function with the ``@Scheduled`` decorator makes it
     a scheduled function.
 
     Instance attributes :attr:`success_interval`, :attr:`fail_min_interval`,

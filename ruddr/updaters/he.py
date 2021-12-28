@@ -49,8 +49,6 @@ class HEUpdater(Updater):
                                    'https://ipv4.tunnelbroker.net/nic/update')
 
     def publish_ipv4(self, address):
-        if address is None:
-            self.log.info("HE updater cannot publish IPv4")
         params = {'hostname': self.tunnel,
                   'myip': address.exploded}
         try:

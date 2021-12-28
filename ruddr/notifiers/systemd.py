@@ -131,12 +131,6 @@ class SystemdNotifier(SchedulerNotifier):
             raise NotifyError("Interface %s has no address assigned" %
                               self.iface)
 
-        # Notify for any missing wanted but unneeded addresses
-        if got_ipv4 is False and not self.need_ipv4():
-            self.notify_ipv4(None)
-        if got_ipv6 is False and not self.need_ipv6():
-            self.notify_ipv6(None)
-
         # Error for any missing wanted and needed addresses
         if self.need_ipv4() and not got_ipv4:
             raise NotifyError("Interface %s has no IPv4 assigned" %
