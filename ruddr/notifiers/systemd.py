@@ -1,4 +1,5 @@
 """Ruddr notifier that listens for updates from systemd-networkd over DBus"""
+import threading
 
 from gi.repository import GLib
 from gi.repository import Gio
@@ -88,6 +89,7 @@ class SystemdNotifier(SchedulerNotifier):
     def check_once(self):
         self.log.info("Checking IP addresses.")
 
+        # Look up the interface and get the current assigned addresses
         try:
             omit_private = not self.allow_private
             ipv4s, ipv6s = get_iface_addrs(self.iface, omit_private)
@@ -96,36 +98,52 @@ class SystemdNotifier(SchedulerNotifier):
             raise NotifyError("Interface %s does not exist" %
                               self.iface) from None
 
-        ipv4_addressed = True
-        ipv6_addressed = True
-        if self.need_ipv4():
+        # None if not wanted, otherwise True if assigned, False if not assigned
+        got_ipv4 = None
+        got_ipv6 = None
+
+        if self.want_ipv4():
             try:
                 ipv4 = ipv4s[0]
             except IndexError:
+                got_ipv4 = False
                 self.log.info("Interface %s has no IPv4 assigned",
-                                 self.iface)
-                ipv4_addressed = False
+                              self.iface)
             else:
+                got_ipv4 = True
                 self.notify_ipv4(ipv4)
 
-        if self.need_ipv6():
+        if self.want_ipv6():
             try:
                 ipv6 = ipv6s[0]
             except IndexError:
+                got_ipv6 = False
                 self.log.info("Interface %s has no IPv6 assigned",
-                                 self.iface)
-                ipv6_addressed = False
+                              self.iface)
             else:
                 ipv6 = ipaddress.IPv6Interface(
                     (ipv6, self.ipv6_prefix)).network
+                got_ipv6 = True
                 self.notify_ipv6(ipv6)
 
-        if not ipv4_addressed:
+        # Error if no wanted address was found
+        if not (got_ipv4 or got_ipv6):
+            raise NotifyError("Interface %s has no address assigned" %
+                              self.iface)
+
+        # Notify for any missing wanted but unneeded addresses
+        if got_ipv4 is False and not self.need_ipv4():
+            self.notify_ipv4(None)
+        if got_ipv6 is False and not self.need_ipv6():
+            self.notify_ipv6(None)
+
+        # Error for any missing wanted and needed addresses
+        if self.need_ipv4() and not got_ipv4:
             raise NotifyError("Interface %s has no IPv4 assigned" %
-                              self.iface) from None
-        if not ipv6_addressed:
+                              self.iface)
+        if self.need_ipv6() and not got_ipv6:
             raise NotifyError("Interface %s has no IPv6 assigned" %
-                              self.iface) from None
+                              self.iface)
 
     @Scheduled
     def _check_and_notify(self):
@@ -193,17 +211,17 @@ class SystemdNotifier(SchedulerNotifier):
         See https://lazka.github.io/pgi-docs/Gio-2.0/callbacks.html#Gio.DBusSignalCallback
         """
         # Extract parameters from GLib.Variant
-        tpye_, changed, invalidated = parameters.unpack()
+        type_, changed, invalidated = parameters.unpack()
         self.log.debug("Received signal: type=%r, changed=%r, invalidated=%r, "
-                       "path=%r", type_, changed, invalidated, path)
+                       "path=%r", type_, changed, invalidated, object_path)
 
         # Check if we care about this property change
         if type_ != 'org.freedesktop.network1.Link':
             self.log.debug("Ignoring signal for type we don't care about.")
             return
-        if not path.startswith('/org/freedesktop/network1/link/_3'):
+        if not object_path.startswith('/org/freedesktop/network1/link/_3'):
             self.log.debug("Unexpected path for org.freedesktop.network1.Link "
-                           "object: %s Ignoring signal.", path)
+                           "object: %s Ignoring signal.", object_path)
             return
         pass
 
@@ -213,7 +231,7 @@ class SystemdNotifier(SchedulerNotifier):
         # character. E.g. index 12 would be .../_312 since "1" is ASCII 0x31.
         # Conveniently, the digits 0-9 are 0x30-0x39, so we can just chop off
         # the "_3".
-        _, _, iface_idx = path.rpartition('/')
+        _, _, iface_idx = object_path.rpartition('/')
         iface_idx = int(iface_idx[2:])
 
         self._handle_network_change(iface_idx, changed, invalidated)
@@ -242,7 +260,7 @@ class SystemdNotifier(SchedulerNotifier):
                              None)
         self.log.debug("Subscribed to PropertiesChanged DBus signal")
 
-        self.mainloop = glib.MainLoop()
+        self.mainloop = GLib.MainLoop()
         self.log.debug("Starting main loop")
         self.mainloop.run()
         self.log.debug("Main loop stopped.")
@@ -255,7 +273,7 @@ class SystemdNotifier(SchedulerNotifier):
 
         # Start monitoring DBus
         self.log.debug("First notify complete. Starting to monitor DBus.")
-        thread = threading.Thread(target=self._setup_dbus)
+        thread = threading.Thread(target=self._dbus_listen)
         thread.start()
 
     def stop(self):

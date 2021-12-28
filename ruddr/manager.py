@@ -4,6 +4,8 @@ import argparse
 import importlib
 import ipaddress
 import json
+import logging
+import logging.handlers
 import signal
 import sys
 import time
@@ -32,22 +34,18 @@ def _decode_ips(d):
     """Object hook that decodes IP addresses. Raises a ValueError if the value
     of an 'ipv4' key cannot be converted to an IPv4Address or the value of an
     'ipv6' key cannot be converted to an IPv6Address."""
-    if 'ipv4' in d:
-        if d['ipv4'] is not None:
-            try:
-                d['ipv4'] = ipaddress.IPv4Address(d['ipv4'])
-            except ValueError:
-                log.warning("Malformed IPv4 in addrfile: %s. Ignoring.",
-                                self.addrfile, e)
-                d['ipv4'] = None
-    if 'ipv6' in d:
-        if d['ipv6'] is not None:
-            try:
-                d['ipv6'] = ipaddress.IPv6Interface(d['ipv6']).network
-            except ValueError:
-                log.warning("Malformed IPv6 network in addrfile: %s. "
-                                "Ignoring.", self.addrfile, e)
-                d['ipv6'] = None
+    if 'ipv4' in d and d['ipv4'] is not None:
+        try:
+            d['ipv4'] = ipaddress.IPv4Address(d['ipv4'])
+        except ValueError as e:
+            log.warning("Malformed IPv4 in addrfile: %s. Ignoring.", e)
+            d['ipv4'] = None
+    if 'ipv6' in d and d['ipv6'] is not None:
+        try:
+            d['ipv6'] = ipaddress.IPv6Interface(d['ipv6']).network
+        except ValueError as e:
+            log.warning("Malformed IPv6 network in addrfile: %s. Ignoring.", e)
+            d['ipv6'] = None
     return d
 
 
@@ -72,6 +70,8 @@ class DDNSManager:
         # Creates self.notifiers and self.updaters as dicts
         self._create_notifiers()
         self._create_updaters()
+
+        self._discard_unused_notifiers()
 
     def _create_notifiers(self):
         """Initialize the notifiers"""
@@ -145,6 +145,13 @@ class DDNSManager:
             updater = updater_class(name, self, self.config.main, config)
             self.updaters[name] = updater
 
+    def _discard_unused_notifiers(self):
+        """Remove notifiers that are not attached to an updater"""
+        for name in list(self.notifiers.keys()):
+            if not (self.notifiers[name].want_ipv4() or
+                    self.notifiers[name].want_ipv6()):
+                del self.notifiers[name]
+
     def get_notifier(self, name):
         """Retrieve a notifier by name.
 
@@ -157,47 +164,47 @@ class DDNSManager:
 
         :raises NotifierSetupError: when a notifier fails to start.
         """
-        self.log.info("Starting all notifiers...")
+        log.info("Starting all notifiers...")
 
         for name, notifier in self.notifiers.items():
             try:
                 notifier.start()
             except NotifierSetupError:
-                self.log.error("Notifier %s failed to start. Stopping all "
-                               "notifiers.", name)
+                log.error("Notifier %s failed to start. Stopping all "
+                          "notifiers.", name)
                 for notifier in self.notifiers.values():
                     notifier.stop()
                 raise
 
-        self.log.info("All notifiers started.")
+        log.info("All notifiers started.")
 
     def check_once(self):
         """Do a single notify from all notifiers.
 
         :raises NotifyError: if any notifier fails to notify.
         """
-        self.log.info("Checking once for all notifiers...")
+        log.info("Checking once for all notifiers...")
 
         exc = None
         for name, notifier in self.notifiers.items():
             try:
                 notifier.check_once()
             except NotifierSetupError as e:
-                self.log.error("Notifier %s failed to check.",
-                               name, exc_info=True)
+                log.error("Notifier %s failed to check.",
+                          name, exc_info=True)
                 if exc is None:
                     exc = e
         if exc is not None:
             raise exc
 
-        self.log.info("Check for all notifiers complete.")
+        log.info("Check for all notifiers complete.")
 
     def stop(self):
         """Stop all running notifiers."""
-        self.log.info("Stopping all notifiers...")
+        log.info("Stopping all notifiers...")
         for notifier in self.notifiers.values():
             notifier.stop()
-        self.log.info("All notifiers stopped.")
+        log.info("All notifiers stopped.")
 
     def _read_addrfile(self):
         """Read the addrfile in. If it cannot be read or is malformed, log and
@@ -213,7 +220,7 @@ class DDNSManager:
             log.warning("Could not read addrfile %s (%s). Will attempt to "
                         "recreate.", self.addrfile, e.strerror)
             return
-        if not isinstance(self.addrs, dict):
+        if not isinstance(addresses, dict):
             log.warning("Addrfile %s has unexpected JSON structure. Will "
                         "recreate.", self.addrfile)
             return
@@ -259,7 +266,7 @@ class DDNSManager:
         do not raise an exception."""
         try:
             with open(self.addrfile, 'w') as f:
-                json.dump(f, self.addresses, cls=IPJSONEncoder,
+                json.dump(self.addresses, f, cls=_IPJSONEncoder,
                           sort_keys=True, indent=4)
         except OSError as e:
             log.error("Could not write addrfile %s: %s",
@@ -362,13 +369,13 @@ def parse_args(argv):
 def main(argv=None):
     """Main entry point when run as a standalone program"""
     args = parse_args(argv)
-    config = config.ConfigReader(args.configfile)
+    conf = config.ConfigReader(args.configfile)
 
     # Set up logging handler
     if args.stderr:
         logfile = 'stderr'
     else:
-        logfile = config.get('log', 'syslog')
+        logfile = conf.main.get('log', 'syslog')
     if logfile == 'syslog':
         log_handler = logging.handlers.SysLogHandler()
     if logfile == 'stderr':
@@ -382,7 +389,7 @@ def main(argv=None):
         log.setLevel(logging.INFO)
 
     # Start up the actual DDNS code
-    manager = DDNSManager(config)
+    manager = DDNSManager(conf)
     if args.check_once:
         try:
             manager.check_once()
@@ -407,8 +414,8 @@ def main(argv=None):
         log.info("Received signal:", signal.strsignal(sig))
         sdnotify.stopping()
         manager.stop()
-    signal.signal(SIGNAL.SIGINT, handle_signals)
-    signal.signal(SIGNAL.SIGTERM, handle_signals)
+    signal.signal(signal.SIGINT, handle_signals)
+    signal.signal(signal.SIGTERM, handle_signals)
     while True:
         time.sleep(60)
 

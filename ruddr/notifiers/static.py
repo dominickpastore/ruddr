@@ -7,7 +7,7 @@ from .notifier import Notifier
 
 
 class StaticNotifier(Notifier):
-"""Ruddr notifier that returns a statically-configured IP address"""
+    """Ruddr notifier that returns a statically-configured IP address"""
 
     def __init__(self, name, config):
         super().__init__(name, config)
@@ -54,9 +54,9 @@ class StaticNotifier(Notifier):
         # set. The Notifier superclass already checked ipv4_ready() and
         # ipv6_ready().
 
-        if self.need_ipv4():
+        if self.want_ipv4():
             self.notify_ipv4(self.ipv4)
-        if self.need_ipv6():
+        if self.want_ipv6():
             self.notify_ipv6(self.ipv6)
 
     def start(self):

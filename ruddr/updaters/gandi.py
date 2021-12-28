@@ -94,6 +94,8 @@ class GandiUpdater(Updater):
             method_f = requests.get
         elif method == 'PUT':
             method_f = requests.put
+        elif method == 'DELETE':
+            method_f = requests.delete
         url = self.endpoint + api
         try:
             if params is None and data is None:
@@ -107,17 +109,17 @@ class GandiUpdater(Updater):
             r.raise_for_status()
         except requests.exceptions.HTTPError:
             self.log.error("Received HTTP %d when trying to %s %s:\n%s",
-                           r.status_code, method, endpoint, r.text)
+                           r.status_code, method, url, r.text)
             return None
         except requests.exceptions.RequestException as e:
-            self.log.error("Could not %s %s: %s", method, endpoint, e)
+            self.log.error("Could not %s %s: %s", method, url, e)
             return None
 
         try:
             obj = r.json()
-        except JSONDecodeError as e:
+        except JSONDecodeError:
             self.log.error("Could not parse JSON response from %s %s:\n%s",
-                           method, endpoint, r.text)
+                           method, url, r.text)
             return None
         return obj
 
@@ -130,14 +132,14 @@ class GandiUpdater(Updater):
         api = '/domains'
         response = self._api_request('GET', api)
         if response is None:
-            raise PublishError("Could not fetch zones for updater %s" %r
+            raise PublishError("Could not fetch zones for updater %s" %
                                self.name)
         try:
             result = [rec['fqdn'] for rec in response]
-        except KeyError, TypeError:
+        except (KeyError, TypeError):
             self.log.error("Unknown response structure from %s %s:\n%s",
                            'GET', api, pprint(response))
-            raise PublishError("Could not fetch zones for updater %s" %r
+            raise PublishError("Could not fetch zones for updater %s" %
                                self.name)
         return result
 
@@ -165,7 +167,7 @@ class GandiUpdater(Updater):
             self.log.error("Invalid IPv4 from %s %s:\n%s",
                            'GET', api, pprint(response))
             return None
-        except KeyError, TypeError:
+        except (KeyError, TypeError):
             self.log.error("Unknown response structure from %s %s:\n%s",
                            'GET', api, pprint(response))
             return None
@@ -195,7 +197,7 @@ class GandiUpdater(Updater):
             self.log.error("Invalid IPv6 from %s %s:\n%s",
                            'GET', api, pprint(response))
             return None
-        except KeyError, TypeError:
+        except (KeyError, TypeError):
             self.log.error("Unknown response structure from %s %s:\n%s",
                            'GET', api, pprint(response))
             return None
@@ -214,7 +216,7 @@ class GandiUpdater(Updater):
         """
         api = f'/domains/{zone}/records/{name}/A'
         data = {'rrset_values': [ip.exploded], 'rrset_ttl': 1800}
-        response = self._api_request('PUT', api, headers, data=data)
+        response = self._api_request('PUT', api, data=data)
         if response is None:
             return False
         self.log.info("Updated IPv4 for %s.%s to %s", name, zone, ip.exploded)
@@ -235,7 +237,45 @@ class GandiUpdater(Updater):
         api = f'/domains/{zone}/records/{name}/AAAA'
         ip_list = [ip.compressed for ip in ip_list]
         data = {'rrset_values': ip_list, 'rrset_ttl': 1800}
-        response = self._api_request('PUT', api, headers, data=data)
+        response = self._api_request('PUT', api, data=data)
+        if response is None:
+            return False
+        self.log.info("Updated IPv6s for %s.%s to %s", name, zone,
+                      [ip.compressed for ip in ip_list])
+        return True
+
+    def delete_a_record(self, zone, name):
+        """Delete the A records for the given domain and subdomain (``'@'`` for
+        the domain itself).
+
+        :param zone: The domain name whose zone to fetch records from
+        :param name: The subdomain to delete the A record for
+
+        :return: `True` if successful, `False` and logs errors if unsuccessful
+        """
+        #TODO Code below is from put_a_record. Modify to delete a records.
+        api = f'/domains/{zone}/records/{name}/A'
+        data = {'rrset_values': [ip.exploded], 'rrset_ttl': 1800}
+        response = self._api_request('PUT', api, data=data)
+        if response is None:
+            return False
+        self.log.info("Updated IPv4 for %s.%s to %s", name, zone, ip.exploded)
+        return True
+
+    def delete_aaaa_records(self, zone, name, ip_list):
+        """Delete the AAAA records for the given domain and subdomain (``'@'``
+        for the domain itself).
+
+        :param zone: The domain name whose zone to fetch records from
+        :param name: The subdomain to delete AAAA records for
+
+        :return: `True` if successful, `False` and logs errors if unsuccessful
+        """
+        #TODO Code below is from put_aaaa_records. Modify to delete aaaa recs.
+        api = f'/domains/{zone}/records/{name}/AAAA'
+        ip_list = [ip.compressed for ip in ip_list]
+        data = {'rrset_values': ip_list, 'rrset_ttl': 1800}
+        response = self._api_request('PUT', api, data=data)
         if response is None:
             return False
         self.log.info("Updated IPv6s for %s.%s to %s", name, zone,
@@ -265,6 +305,7 @@ class GandiUpdater(Updater):
         return result
 
     def publish_ipv4(self, address):
+        #TODO Handle when network is None
         zone_subdomains = self._get_subdomain_zones()
 
         success = True
@@ -304,6 +345,9 @@ class GandiUpdater(Updater):
         return net6[host]
 
     def publish_ipv6(self, network):
+        #TODO Handle when network is None
+        #TODO Actually, this doesn't work so well. Can't delete the existing
+        # records because then we lose the host part. Just pretend?
         zone_subdomains = self._get_subdomain_zones()
 
         success = True

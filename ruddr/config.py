@@ -2,8 +2,6 @@
 
 import configparser
 
-from .exceptions import RuddrException, ConfigError
-
 
 DEFAULT_ADDRFILE = '/var/lib/misc/ruddr.addrfile'
 

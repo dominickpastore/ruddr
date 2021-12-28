@@ -156,7 +156,6 @@ class Updater:
 
         return (ipv4_notifier, ipv6_notifier)
 
-
     def _attach_notifiers(self, global_config, config):
         """Attach this updater to the configured notifier(s)"""
         ipv4_notifier_name, ipv6_notifier_name = self._get_notifier_names(
@@ -178,7 +177,7 @@ class Updater:
                 raise ConfigError("Notifier %s does not exist" %
                                   ipv6_notifier_name) from None
             else:
-                ipv4_notifier.attach_ipv6_updater(self.update_ipv6)
+                ipv6_notifier.attach_ipv6_updater(self.update_ipv6)
 
     @_Retry
     def update_ipv4(self, address):
@@ -186,9 +185,10 @@ class Updater:
         not match the current address, call the subclass' publish function,
         update the addrfile if successful, and retry if not.
 
-        :param address: :class:`IPv4Address` to update with
+        :param address: :class:`IPv4Address` to update with, or None to
+                        unpublish if possible
         """
-        if address == self.ipv4:
+        if address is not None and address == self.ipv4:
             self.log.info("Skipping update as %s is current address",
                           address.exploded)
             return
@@ -196,19 +196,22 @@ class Updater:
         # Set current address to None before publishing. If publishing fails,
         # current address is indeterminate.
         self.ipv4 = None
-        manager.addrfile_set_ipv4(self.name, None)
+        self.manager.addrfile_set_ipv4(self.name, None)
 
         try:
             self.publish_ipv4(address)
         except PublishError:
-            self.log.error("Failed to publish address %s", address.exploded)
+            if address is None:
+                self.log.error("Failed to unpublish IPv4 address")
+            else:
+                self.log.error("Failed to publish address %s", address)
             raise
         except NotImplementedError:
             self.log.debug("Updater does not implement IPv4 updates")
             return
 
         self.ipv4 = address
-        manager.addrfile_set_ipv4(self.name, address)
+        self.manager.addrfile_set_ipv4(self.name, address)
 
     @_Retry
     def update_ipv6(self, address):
@@ -216,9 +219,10 @@ class Updater:
         not match the current prefix, call the subclass' publish function,
         update the addrfile if successful, and retry if not.
 
-        :param address: :class:`IPv6Network` to update with
+        :param address: :class:`IPv6Network` to update with, or None to
+                        unpublish if possible
         """
-        if address == self.ipv6:
+        if address is not None and address == self.ipv6:
             self.log.info("Skipping update as %s is current address",
                           address.compressed)
             return
@@ -226,29 +230,36 @@ class Updater:
         # Set current address to None before publishing. If publishing fails,
         # current address is indeterminate.
         self.ipv6 = None
-        manager.addrfile_set_ipv6(self.name, None)
+        self.manager.addrfile_set_ipv6(self.name, None)
 
         try:
             self.publish_ipv6(address)
         except PublishError:
-            self.log.error("Failed to publish address %s", address.compressed)
+            if address is None:
+                self.log.error("Failed to unpublish IPv6 address")
+            else:
+                self.log.error("Failed to publish address %s", address)
             raise
         except NotImplementedError:
             self.log.debug("Updater does not implement IPv6 updates")
             return
 
         self.ipv6 = address
-        manager.addrfile_set_ipv6(self.name, address)
+        self.manager.addrfile_set_ipv6(self.name, address)
 
     def publish_ipv4(self, address):
         """Publish a new IPv4 address to the appropriate DDNS provider. Will
         only be called if an update contains a new address or a previous update
         failed.
 
+        May also be called with ``None`` to request unpublishing the current
+        address, if possible.
+
         Must be implemented by subclasses if they support IPv4 updates. Be sure
         to raise :exc:`~ruddr.PublishError` when publishing fails!
 
-        :param address: :class:`IPv4Address` to publish
+        :param address: :class:`IPv4Address` to publish, or ``None`` to request
+                        unpublishing
         :raise PublishError` when publishing fails
         """
         raise NotImplementedError("IPv4 publish function not provided")
@@ -258,10 +269,14 @@ class Updater:
         only be called if an update contains a new address or a previous update
         failed.
 
+        May also be called with ``None`` to request unpublishing the current
+        address, if possible.
+
         Must be implemented by subclasses if they support IPv6 updates. Be sure
         to raise :exc:`~ruddr.PublishError` when publishing fails!
 
-        :param network: :class:`IPv6Network` with the prefix to publish
+        :param network: :class:`IPv6Network` with the prefix to publish, or
+                        ``None`` to request unpublishing
         :raise PublishError` when publishing fails
         """
         raise NotImplementedError("IPv6 publish function not provided")

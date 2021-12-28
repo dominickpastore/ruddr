@@ -5,8 +5,7 @@ import logging
 import threading
 import types
 
-from ..exceptions import (RuddrException, NotifyError, NotifierSetupError,
-                          ConfigError)
+from ..exceptions import NotifyError, ConfigError
 
 
 class Notifier:
@@ -22,6 +21,77 @@ class Notifier:
 
         #: Logger (see standard :mod:`logging` module)
         self.log = logging.getLogger(f'ruddr.notifier.{self.name}')
+
+        # Configuration options for all Notifiers:
+        #
+        # - skip_ipv4: default false
+        #   If true, this notifier never checks or notifies for IPv4 addresses.
+        #   Use when there is no IPv4 networking.
+        #
+        # - skip_ipv6: default false
+        #   Like skip_ipv4, but for IPv6
+        #
+        # - ipv4_required: default true
+        #   When true, failure to obtain the current IPv4 address is an error.
+        #   When false, lack of IPv4 address is considered normal.
+        #
+        # - ipv6_required: default false
+        #   Like ipv4_required, but for IPv6. Defaults to false since IPv6
+        #   support in networks generally isn't universal.
+        #
+        # - unset_missing_addr: default false
+        #   When set, if the notifier can't obtain an address that isn't
+        #   required but isn't skipped, it will instruct the updater to
+        #   "unpublish" the address. This is intended for a host that is mobile
+        #   and may not always have IPv6 addressing, for example.
+        #   This option is experimental.
+        #   (Ideas: Store unset IPv6s in the addrfile so they can be re-set
+        #   later. Warn that the addrfile does not act like a cache in that
+        #   case. But this isn't necessary if prefix is 128.)
+
+        try:
+            self._skip_ipv4 = (config.get('skip_ipv4', 'false').lower()
+                                   in ('true', 'on', '1'))
+        except ValueError:
+            self.log.critical("'skip_ipv4' must be boolean (true/yes/1/"
+                              "false/no/0)")
+            raise ConfigError(f"'skip_ipv4' option for {self.name} must"
+                              "be boolean (true/yes/1/false/no/0)")
+        try:
+            self._skip_ipv6 = (config.get('skip_ipv6', 'false').lower()
+                                   in ('true', 'on', '1'))
+        except ValueError:
+            self.log.critical("'skip_ipv6' must be boolean (true/yes/1/"
+                              "false/no/0)")
+            raise ConfigError(f"'skip_ipv6' option for {self.name} must"
+                              "be boolean (true/yes/1/false/no/0)")
+
+        try:
+            self._ipv4_required = (config.get('ipv4_required', 'true').lower()
+                                   in ('true', 'on', '1'))
+        except ValueError:
+            self.log.critical("'ipv4_required' must be boolean (true/yes/1/"
+                              "false/no/0)")
+            raise ConfigError(f"'ipv4_required' option for {self.name} must"
+                              "be boolean (true/yes/1/false/no/0)")
+        try:
+            self._ipv6_required = (config.get('ipv6_required', 'false').lower()
+                                   in ('true', 'on', '1'))
+        except ValueError:
+            self.log.critical("'ipv6_required' must be boolean (true/yes/1/"
+                              "false/no/0)")
+            raise ConfigError(f"'ipv6_required' option for {self.name} must"
+                              "be boolean (true/yes/1/false/no/0)")
+
+        try:
+            self._unset_missing_addr = (
+                config.get('unset_missing_addr', 'true').lower()
+                in ('true', 'on', '1'))
+        except ValueError:
+            self.log.critical("'unset_missing_addr' must be boolean (true/yes/"
+                              "1/false/no/0)")
+            raise ConfigError(f"'unset_missing_addr' option for {self.name} "
+                              "must be boolean (true/yes/1/false/no/0)")
 
         self.ipv4_updaters = []
         self.ipv6_updaters = []
@@ -69,13 +139,21 @@ class Notifier:
         self.ipv6_updaters.append(updater)
 
     def notify_ipv4(self, address):
-        """Sublasses must call this to notify all the attached IPv4 updaters of
+        """Subclasses must call this to notify all the attached IPv4 updaters of
         a (possibly) new IPv4 address.
 
         :param address: The (possibly) new :class:`IPv4Address`
         """
-        self.log.debug("Notifier %s notifying attached updaters of IPv4 %s",
-                       self.name, address.exploded)
+        if address is None:
+            if self._unset_missing_addr:
+                self.log.debug("Notifier %s notifying no IPv4", self.name)
+            else:
+                self.log.debug("Notifier %s found no IPv4. Not notifying",
+                               self.name)
+                return
+        else:
+            self.log.debug("Notifier %s notifying attached updaters of IPv4 %s",
+                           self.name, address.exploded)
         for updater in self.ipv4_updaters:
             updater(address)
 
@@ -86,26 +164,50 @@ class Notifier:
         :param address: The :class:`IPv6Network` representing the (possibly)
                         new prefix
         """
-        self.log.debug("Notifier %s notifying attached updaters of IPv6 %s",
-                       self.name, address.compressed)
+        if address is None:
+            if self._unset_missing_addr:
+                self.log.debug("Notifier %s notifying no IPv6", self.name)
+            else:
+                self.log.debug("Notifier %s found no IPv6. Not notifying",
+                               self.name)
+                return
+        else:
+            self.log.debug("Notifier %s notifying attached updaters of IPv6 %s",
+                           self.name, address.compressed)
         for updater in self.ipv6_updaters:
             updater(address)
 
-    def need_ipv4(self):
-        """Sublasses should call this to determine if IPv4 addresses need to be
-        reported.
+    def want_ipv4(self):
+        """Subclasses should call this to determine whether to check for
+        current IPv4 addresses at all.
 
         :return: True or False
         """
-        return len(self.ipv4_updaters) > 0
+        return (not self._skip_ipv4) and len(self.ipv4_updaters) > 0
+
+    def want_ipv6(self):
+        """Subclasses should call this to determine whether to check for
+        current IPv6 addresses at all.
+
+        :return: True or False
+        """
+        return (not self._skip_ipv6) and len(self.ipv6_updaters) > 0
+
+    def need_ipv4(self):
+        """Subclasses should call this to determine if a lack of IPv4 addressing
+        is an error.
+
+        :return: True or False
+        """
+        return self.want_ipv4() and self._ipv4_required
 
     def need_ipv6(self):
-        """Sublasses should call this to determine if IPv6 prefixes need to be
-        reported.
+        """Subclasses should call this to determine if a lack of IPv6 addressing
+        is an error.
 
         :return: True or False
         """
-        return len(self.ipv6_updaters) > 0
+        return self.want_ipv6() and self._ipv6_required
 
     def ipv4_ready(self):
         """Check if all configuration required for IPv4 checks is present.
@@ -236,7 +338,7 @@ class SchedulerNotifier(Notifier):
 
     Whenever a scheduled function is invoked, whether explicitly or by prior
     scheduling, the timer for the next scheduled invocation is reset according
-    to the configured intervals and whether or not it was successful.
+    to the configured intervals and whether it was successful.
 
     Constructor parameters match :class:`~ruddr.Notifier`.
     """

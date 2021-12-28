@@ -3,9 +3,10 @@
 import requests
 
 from ..exceptions import ConfigError, PublishError
+from .updater import Updater
 
 
-class HEUpdater:
+class HEUpdater(Updater):
     """Ruddr updater for the IPv4 address at Hurricane Electric's tunnel broker
 
     :param name: Name of the updater (from config section heading)
@@ -48,6 +49,8 @@ class HEUpdater:
                                    'https://ipv4.tunnelbroker.net/nic/update')
 
     def publish_ipv4(self, address):
+        if address is None:
+            self.log.info("HE updater cannot publish IPv4")
         params = {'hostname': self.tunnel,
                   'myip': address.exploded}
         try:
@@ -55,8 +58,8 @@ class HEUpdater:
             r.raise_for_status()
         except requests.exceptions.HTTPError as e:
             self.log.error("Received HTTP %d when trying to update tunnel %s "
-                            "client ipv4 to %s:\n%s", r.status_code,
-                            self.tunnel, address.exploded, r.text)
+                           "client ipv4 to %s:\n%s", r.status_code,
+                           self.tunnel, address.exploded, r.text)
             raise PublishError("Updater %s got HTTP %d for %s" % (
                 self.name, r.status_code, self.endpoint)) from e
         except requests.exceptions.RequestException as e:
@@ -80,3 +83,6 @@ class HEUpdater:
                            r.text, self.tunnel, address.exploded)
             raise PublishError("Updater %s got response from server: %s" %
                                (self.name, r.text))
+
+    def publish_ipv6(self, network):
+        self.log.debug("HE updater ignoring an IPv6 update")

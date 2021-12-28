@@ -103,6 +103,7 @@ class TimedNotifier(SchedulerNotifier):
     def check_once(self):
         self.log.info("Checking IP addresses.")
 
+        # Look up the interface and get the current assigned addresses
         try:
             omit_private = not self.allow_private
             ipv4s, ipv6s = get_iface_addrs(self.iface, omit_private)
@@ -111,36 +112,52 @@ class TimedNotifier(SchedulerNotifier):
             raise NotifyError("Interface %s does not exist" %
                               self.iface) from None
 
-        ipv4_addressed = True
-        ipv6_addressed = True
-        if self.need_ipv4():
+        # None if not wanted, otherwise True if assigned, False if not assigned
+        got_ipv4 = None
+        got_ipv6 = None
+
+        if self.want_ipv4():
             try:
                 ipv4 = ipv4s[0]
             except IndexError:
+                got_ipv4 = False
                 self.log.info("Interface %s has no IPv4 assigned",
-                                 self.iface)
-                ipv4_addressed = False
+                              self.iface)
             else:
+                got_ipv4 = True
                 self.notify_ipv4(ipv4)
 
-        if self.need_ipv6():
+        if self.want_ipv6():
             try:
                 ipv6 = ipv6s[0]
             except IndexError:
+                got_ipv6 = False
                 self.log.info("Interface %s has no IPv6 assigned",
-                                 self.iface)
-                ipv6_addressed = False
+                              self.iface)
             else:
                 ipv6 = ipaddress.IPv6Interface(
                     (ipv6, self.ipv6_prefix)).network
+                got_ipv6 = True
                 self.notify_ipv6(ipv6)
 
-        if not ipv4_addressed:
+        # Error if no wanted address was found
+        if not (got_ipv4 or got_ipv6):
+            raise NotifyError("Interface %s has no address assigned" %
+                              self.iface)
+
+        # Notify for any missing wanted but unneeded addresses
+        if got_ipv4 is False and not self.need_ipv4():
+            self.notify_ipv4(None)
+        if got_ipv6 is False and not self.need_ipv6():
+            self.notify_ipv6(None)
+
+        # Error for any missing wanted and needed addresses
+        if self.need_ipv4() and not got_ipv4:
             raise NotifyError("Interface %s has no IPv4 assigned" %
-                              self.iface) from None
-        if not ipv6_addressed:
+                              self.iface)
+        if self.need_ipv6() and not got_ipv6:
             raise NotifyError("Interface %s has no IPv6 assigned" %
-                              self.iface) from None
+                              self.iface)
 
     @Scheduled
     def _check_and_notify(self):

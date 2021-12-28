@@ -127,8 +127,15 @@ class WebNotifier(SchedulerNotifier):
     def check_once(self):
         self.log.info("Checking IP addresses.")
 
-        got_ipv4 = True
-        if self.need_ipv4():
+        # None if not wanted, otherwise True if assigned, False if not assigned
+        got_ipv4 = None
+        got_ipv6 = None
+        # True if there is an HTTP error, suggesting something went wrong
+        # rather than this host not being reachable at its old address
+        err_ipv4 = False
+        err_ipv6 = False
+
+        if self.want_ipv4():
             with FamilyRestriction(socket.AF_INET):
                 try:
                     r = requests.get(self.url4, timeout=self.timeout4)
@@ -137,11 +144,13 @@ class WebNotifier(SchedulerNotifier):
                     self.log.error("Received HTTP %d from %s: %s",
                                    r.status_code, self.url4, r.text)
                     got_ipv4 = False
+                    err_ipv4 = True
                 except requests.exceptions.RequestException as e:
                     self.log.error("Could not get IPv4 from %s: %s",
                                    self.url4, e)
                     got_ipv4 = False
                 else:
+                    got_ipv4 = True
                     ipv4_text = r.text
             if got_ipv4:
                 try:
@@ -153,8 +162,7 @@ class WebNotifier(SchedulerNotifier):
                 else:
                     self.notify_ipv4(ipv4)
 
-        got_ipv6 = True
-        if self.need_ipv6():
+        if self.want_ipv6():
             with FamilyRestriction(socket.AF_INET6):
                 try:
                     r = requests.get(self.url6, timeout=self.timeout6)
@@ -163,11 +171,13 @@ class WebNotifier(SchedulerNotifier):
                     self.log.error("Received HTTP %d from %s: %s",
                                    r.status_code, self.url6, r.text)
                     got_ipv6 = False
+                    err_ipv6 = True
                 except requests.exceptions.RequestException as e:
                     self.log.error("Could not get IPv6 from %s: %s",
                                    self.url6, e)
                     got_ipv6 = False
                 else:
+                    got_ipv6 = True
                     ipv6_text = r.text
             if got_ipv6:
                 try:
@@ -180,10 +190,30 @@ class WebNotifier(SchedulerNotifier):
                 else:
                     self.notify_ipv6(ipv6)
 
-        if not got_ipv4:
-            raise NotifyError(f"Could not get IPv4 address from {self.url4}")
-        if not got_ipv6:
-            raise NotifyError(f"Could not get IPv6 address from {self.url6}")
+        # Raise for HTTP errors
+        if err_ipv4:
+            raise NotifyError(f"HTTP error for IPv4 in {self.name} notifier")
+        if err_ipv6:
+            raise NotifyError(f"HTTP error for IPv6 in {self.name} notifier")
+
+        # Error if no wanted address was found
+        if not (got_ipv4 or got_ipv6):
+            raise NotifyError(f"Could not get any IP address for {self.name} "
+                              "notifier")
+
+        # Notify for any missing wanted but unneeded addresses
+        if got_ipv4 is False and not self.need_ipv4():
+            self.notify_ipv4(None)
+        if got_ipv6 is False and not self.need_ipv6():
+            self.notify_ipv6(None)
+
+        # Error for any missing wanted and needed addresses
+        if self.need_ipv4() and not got_ipv4:
+            raise NotifyError(f"Could not get IPv4 address for {self.name} "
+                              "notifier")
+        if self.need_ipv6() and not got_ipv6:
+            raise NotifyError(f"Could not get IPv6 address for {self.name} "
+                              "notifier")
 
     @Scheduled
     def _check_and_notify(self):
