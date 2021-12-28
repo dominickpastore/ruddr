@@ -326,15 +326,26 @@ class GandiUpdater(Updater):
                     success = False
                     continue
 
+                # Prefix == 128 is a special case
+                if network.prefixlen == 128:
+                    new_ip = network[0]
+                    self.log.debug("Setting %s.%s AAAA record to prefix-128"
+                                   "address %s", subdomain, zone, new_ip)
+                    if not self.put_aaaa_records(zone, subdomain, [new_ip]):
+                        success = False
+                    continue
+
                 # Update all the prefixes
-                this_aaaa = aaaa_records[subdomain]
                 new_ips = []
                 changed = False
-                for aaaa in this_aaaa:
+                for aaaa in aaaa_records[subdomain]:
                     if aaaa in network:
-                        new_ips.append(aaaa)
+                        if aaaa not in new_ips:
+                            new_ips.append(aaaa)
                     else:
-                        new_ips.append(self.replace_prefix(network, aaaa))
+                        new_ip = self.replace_prefix(network, aaaa)
+                        if new_ip not in new_ips:
+                            new_ips.append(new_ip)
                         changed = True
 
                 # Publish the updates
