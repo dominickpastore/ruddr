@@ -27,7 +27,8 @@ setup(
     python_requires='>=3.6',
     extras_require={
         'systemd': ['PyGObject'],   # Systemd notifier
-        'docs': ['sphinx']
+        'docs': ['sphinx'],
+        'test': ['pytest', 'flake8']
     },
 
     entry_points={

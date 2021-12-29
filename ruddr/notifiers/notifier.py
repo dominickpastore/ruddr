@@ -54,37 +54,37 @@ class Notifier:
 
         try:
             self._skip_ipv4 = (config.get('skip_ipv4', 'false').lower()
-                                   in ('true', 'on', '1'))
+                                   in ('true', 'on', 'yes', '1'))
         except ValueError:
-            self.log.critical("'skip_ipv4' must be boolean (true/yes/1/"
-                              "false/no/0)")
+            self.log.critical("'skip_ipv4' must be boolean (true/yes/on/1/"
+                              "false/no/off/0)")
             raise ConfigError(f"'skip_ipv4' option for {self.name} must"
-                              "be boolean (true/yes/1/false/no/0)")
+                              "be boolean (true/yes/on/1/false/no/off/0)")
         try:
             self._skip_ipv6 = (config.get('skip_ipv6', 'false').lower()
-                                   in ('true', 'on', '1'))
+                                   in ('true', 'on', 'yes', '1'))
         except ValueError:
-            self.log.critical("'skip_ipv6' must be boolean (true/yes/1/"
-                              "false/no/0)")
+            self.log.critical("'skip_ipv6' must be boolean (true/yes/on/1/"
+                              "false/no/off/0)")
             raise ConfigError(f"'skip_ipv6' option for {self.name} must"
-                              "be boolean (true/yes/1/false/no/0)")
+                              "be boolean (true/yes/on/1/false/no/off/0)")
 
         try:
             self._ipv4_required = (config.get('ipv4_required', 'true').lower()
-                                   in ('true', 'on', '1'))
+                                   in ('true', 'on', 'yes', '1'))
         except ValueError:
-            self.log.critical("'ipv4_required' must be boolean (true/yes/1/"
-                              "false/no/0)")
+            self.log.critical("'ipv4_required' must be boolean (true/yes/on/1/"
+                              "false/no/off/0)")
             raise ConfigError(f"'ipv4_required' option for {self.name} must"
-                              "be boolean (true/yes/1/false/no/0)")
+                              "be boolean (true/yes/on/1/false/no/off/0)")
         try:
             self._ipv6_required = (config.get('ipv6_required', 'false').lower()
-                                   in ('true', 'on', '1'))
+                                   in ('true', 'on', 'yes', '1'))
         except ValueError:
-            self.log.critical("'ipv6_required' must be boolean (true/yes/1/"
-                              "false/no/0)")
+            self.log.critical("'ipv6_required' must be boolean (true/yes/on/1/"
+                              "false/no/off/0)")
             raise ConfigError(f"'ipv6_required' option for {self.name} must"
-                              "be boolean (true/yes/1/false/no/0)")
+                              "be boolean (true/yes/on/1/false/no/off/0)")
 
         self.ipv4_updaters = []
         self.ipv6_updaters = []
