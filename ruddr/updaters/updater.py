@@ -86,7 +86,7 @@ class Updater:
     :param config: Dict of config options for this updater
     """
 
-    def __init__(self, name, manager, global_config, config):
+    def __init__(self, name, manager, config):
         #: Updater name (from config section heading)
         self.name = name
 
@@ -99,85 +99,6 @@ class Updater:
         self.ipv4 = manager.addrfile_get_ipv4(self.name)
         #: Most recent IPv6Address successfully updated
         self.ipv6 = manager.addrfile_get_ipv6(self.name)
-
-        self._attach_notifiers(global_config, config)
-
-    def _get_notifier_names(self, global_config, config):
-        """Get the notifier name(s) from the config"""
-        ipv4_notifier = None
-        ipv6_notifier = None
-        try:
-            ipv4_notifier = config['notifier4']
-        except KeyError:
-            pass
-        try:
-            ipv6_notifier = config['notifier6']
-        except KeyError:
-            pass
-        if ipv4_notifier is None:
-            try:
-                ipv4_notifier = config['notifier']
-            except KeyError:
-                pass
-        if ipv6_notifier is None:
-            try:
-                ipv6_notifier = config['notifier']
-            except KeyError:
-                pass
-        # If any notifiers are configured in the section for this updater,
-        # ignore any globally configured notifiers
-        if ipv4_notifier is not None or ipv6_notifier is not None:
-            return (ipv4_notifier, ipv6_notifier)
-
-        if ipv4_notifier is None:
-            try:
-                ipv4_notifier = global_config['notifier4']
-            except KeyError:
-                pass
-        if ipv6_notifier is None:
-            try:
-                ipv6_notifier = global_config['notifier6']
-            except KeyError:
-                pass
-        if ipv4_notifier is None:
-            try:
-                ipv4_notifier = global_config['notifier']
-            except KeyError:
-                pass
-        if ipv6_notifier is None:
-            try:
-                ipv6_notifier = global_config['notifier']
-            except KeyError:
-                pass
-        if ipv4_notifier is None and ipv6_notifier is None:
-            raise ConfigError("No notifier is configured for updater %s and "
-                              "there are no default notifiers configured"
-                              % self.name)
-
-        return (ipv4_notifier, ipv6_notifier)
-
-    def _attach_notifiers(self, global_config, config):
-        """Attach this updater to the configured notifier(s)"""
-        ipv4_notifier_name, ipv6_notifier_name = self._get_notifier_names(
-            global_config, config)
-
-        if ipv4_notifier_name is not None:
-            try:
-                ipv4_notifier = self.manager.get_notifier(ipv4_notifier_name)
-            except KeyError:
-                raise ConfigError("Notifier %s does not exist" %
-                                  ipv4_notifier_name) from None
-            else:
-                ipv4_notifier.attach_ipv4_updater(self.update_ipv4)
-
-        if ipv6_notifier_name is not None:
-            try:
-                ipv6_notifier = self.manager.get_notifier(ipv6_notifier_name)
-            except KeyError:
-                raise ConfigError("Notifier %s does not exist" %
-                                  ipv6_notifier_name) from None
-            else:
-                ipv6_notifier.attach_ipv6_updater(self.update_ipv6)
 
     @_Retry
     def update_ipv4(self, address):

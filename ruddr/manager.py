@@ -10,8 +10,8 @@ import signal
 import sys
 import time
 
-from . import config
-from .exceptions import RuddrException, NotifierSetupError
+from . import configuration
+from .exceptions import RuddrException, NotifierSetupError, ConfigError
 from . import notifiers
 from . import sdnotify
 from . import updaters
@@ -81,28 +81,27 @@ class DDNSManager:
             try:
                 notifier_type = config['type']
             except KeyError:
-                raise config.ConfigError("Notifier %s requires a type"
-                                         % name) from None
+                raise ConfigError("Notifier %s requires a type"
+                                  % name) from None
 
             if module is None:
                 try:
                     notifier_class = notifiers.notifiers[notifier_type]
                 except KeyError:
-                    #TODO Use ruddr.notifiers entry points
-                    raise config.ConfigError("No built-in notifier of type %s"
-                                             % notifier_type) from None
+                    # TODO Use ruddr.notifiers entry points
+                    raise ConfigError("No built-in notifier of type %s"
+                                      % notifier_type) from None
             else:
                 try:
                     imported = importlib.import_module(module)
                 except ImportError:
-                    raise config.ConfigError("Notifier module %s cannot be "
-                                             "imported" % module) from None
+                    raise ConfigError("Notifier module %s cannot be imported" %
+                                      module) from None
                 try:
                     notifier_class = getattr(imported, notifier_type)
                 except AttributeError:
-                    raise config.ConfigError(
-                        "Notifier module %s has not class %s" %
-                        (module, notifier_type)) from None
+                    raise ConfigError("Notifier module %s has not class %s" %
+                                      (module, notifier_type)) from None
 
             notifier = notifier_class(name, config)
             self.notifiers[name] = notifier
@@ -119,31 +118,79 @@ class DDNSManager:
             try:
                 updater_type = config['type']
             except KeyError:
-                raise config.ConfigError("Updater %s requires a type" % name) \
-                    from None
+                raise ConfigError("Updater %s requires a type"
+                                  % name) from None
 
             if module is None:
                 try:
                     updater_class = updaters.updaters[updater_type]
                 except KeyError:
-                    #TODO Use ruddr.updaters entry points
-                    raise config.ConfigError("No built-in updater of type %s" %
-                                             updater_type) from None
+                    # TODO Use ruddr.updaters entry points
+                    raise ConfigError("No built-in updater of type %s" %
+                                      updater_type) from None
             else:
                 try:
                     imported = importlib.import_module(module)
                 except ImportError:
-                    raise config.ConfigError("Updater module %s cannot be "
-                                             "imported" % module) from None
+                    raise ConfigError("Updater module %s cannot be imported"
+                                      % module) from None
                 try:
                     updater_class = getattr(imported, updater_type)
                 except AttributeError:
-                    raise config.ConfigError(
-                        "Updater module %s has not class %s" %
-                        (module, updater_type)) from None
+                    raise ConfigError("Updater module %s has not class %s" %
+                                      (module, updater_type)) from None
 
-            updater = updater_class(name, self, self.config.main, config)
+            updater = updater_class(name, self, config)
+            self._attach_updater_notifier(updater, config)
             self.updaters[name] = updater
+
+    def _attach_updater_notifier(self, updater, config):
+        """Attach the given :class:`~ruddr.Updater` to its notifier(s)
+
+        :param updater: The :class:`~ruddr.Updater` to be attached
+        :param config: That :class:`~ruddr.Updater`'s config
+        """
+        # Get notifiers from this updater's config section, if present
+        ipv4_notifier_name = config.get('notifier4')
+        ipv6_notifier_name = config.get('notifier6')
+        if ipv4_notifier_name is None:
+            ipv4_notifier_name = config.get('notifier')
+        if ipv6_notifier_name is None:
+            ipv6_notifier_name = config.get('notifier')
+
+        if ipv4_notifier_name is None and ipv6_notifier_name is None:
+            # No notifier in this updater's config section. Use globally
+            # configured notifiers.
+            ipv4_notifier_name = self.config.main.get('notifier4')
+            ipv6_notifier_name = self.config.main.get('notifier6')
+            if ipv4_notifier_name is None:
+                ipv4_notifier_name = self.config.main.get('notifier')
+            if ipv6_notifier_name is None:
+                ipv6_notifier_name = self.config.main.get('notifier')
+
+        if ipv4_notifier_name is None and ipv6_notifier_name is None:
+            raise ConfigError("No notifier is configured for updater %s and "
+                              "there are no default notifiers configured" %
+                              updater.name)
+
+        # Attach IPv4 notifier, if configured
+        if ipv4_notifier_name is not None:
+            try:
+                ipv4_notifier = self.notifiers[ipv4_notifier_name]
+            except KeyError:
+                raise ConfigError("Notifier %s does not exist" %
+                                  ipv4_notifier_name) from None
+            else:
+                ipv4_notifier.attach_ipv4_updater(updater.update_ipv4)
+
+        if ipv6_notifier_name is not None:
+            try:
+                ipv6_notifier = self.notifiers[ipv6_notifier_name]
+            except KeyError:
+                raise ConfigError("Notifier %s does not exist" %
+                                  ipv6_notifier_name) from None
+            else:
+                ipv6_notifier.attach_ipv6_updater(updater.update_ipv6)
 
     def _discard_unused_notifiers(self):
         """Remove notifiers that are not attached to an updater"""
@@ -151,13 +198,6 @@ class DDNSManager:
             if not (self.notifiers[name].want_ipv4() or
                     self.notifiers[name].want_ipv6()):
                 del self.notifiers[name]
-
-    def get_notifier(self, name):
-        """Retrieve a notifier by name.
-
-        :raises KeyError: if the notifier does not exist.
-        """
-        return self.notifiers[name]
 
     def start(self):
         """Start running all notifiers.
@@ -172,8 +212,8 @@ class DDNSManager:
             except NotifierSetupError:
                 log.error("Notifier %s failed to start. Stopping all "
                           "notifiers.", name)
-                for notifier in self.notifiers.values():
-                    notifier.stop()
+                for running_notifier in self.notifiers.values():
+                    running_notifier.stop()
                 raise
 
         log.info("All notifiers started.")
@@ -369,7 +409,7 @@ def parse_args(argv):
 def main(argv=None):
     """Main entry point when run as a standalone program"""
     args = parse_args(argv)
-    conf = config.ConfigReader(args.configfile)
+    conf = configuration.ConfigReader(args.configfile)
 
     # Set up logging handler
     if args.stderr:

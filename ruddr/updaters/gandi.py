@@ -15,7 +15,6 @@ class GandiUpdater(Updater):
 
     :param name: Name of the updater (from config section heading)
     :param manager: The DDNSManager
-    :param global_config: Dict of ``[ruddr]`` config options
     :param config: Dict of config options for this updater
     """
 
@@ -23,8 +22,8 @@ class GandiUpdater(Updater):
     # delimited by dots) is valid
     _fqdn_part_re = re.compile('[A-Za-z]([-A-Za-z0-9]*[A-Za-z0-9])?')
 
-    def __init__(self, name, manager, global_config, config):
-        super().__init__(name, manager, global_config, config)
+    def __init__(self, name, manager, config):
+        super().__init__(name, manager, config)
 
         # Validate FQDNs and store as list of (subdomain, domain) tuples
         try:

@@ -11,12 +11,11 @@ class HEUpdater(Updater):
 
     :param name: Name of the updater (from config section heading)
     :param manager: The DDNSManager
-    :param global_config: Dict of ``[ruddr]`` config options
     :param config: Dict of config options for this updater
     """
 
-    def __init__(self, name, manager, global_config, config):
-        super().__init__(name, manager, global_config, config)
+    def __init__(self, name, manager, config):
+        super().__init__(name, manager, config)
 
         # HE tunnel ID
         try:

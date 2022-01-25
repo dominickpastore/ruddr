@@ -4,7 +4,7 @@ Top-level module, containing classes and objects useful to custom notifiers and
 updaters.
 """
 
-from .config import ConfigReader
+from .configuration import ConfigReader
 from .exceptions import (RuddrException, ConfigError, NotifyError,
                          NotifierSetupError, PublishError)
 from .manager import DDNSManager
