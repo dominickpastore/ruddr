@@ -86,12 +86,12 @@ class Notifier:
             raise ConfigError(f"'ipv6_required' option for {self.name} must"
                               "be boolean (true/yes/on/1/false/no/off/0)")
 
-        self.ipv4_update_funcs = []
-        self.ipv6_update_funcs = []
+        self._ipv4_update_funcs = []
+        self._ipv6_update_funcs = []
 
     def attach_ipv4_updater(self, update_func):
-        """Attach an IPv4 update function to this notifier. Generally called
-        by an updater to provide its update function to the notifier.
+        """Attach an IPv4 update function to this notifier. No effect if IPv4
+        is skipped for this notifier.
 
         :param update_func: A callable that accepts an :class:`IPv4Address` to
                             be called whenever the IPv4 address might have been
@@ -101,18 +101,22 @@ class Notifier:
                             it fails), but this function should not block
                             longer than a single update attempt.
         """
+        if self._skip_ipv4:
+            self.log.info("Not attaching updater to notifier %s for skipped "
+                          "IPv4", self.name)
+            return
         self.log.debug("Attaching %s (IPv4) to notifier %s",
                        update_func.__name__, self.name)
-        if len(self.ipv4_update_funcs) == 0 and not self.ipv4_ready():
+        if len(self._ipv4_update_funcs) == 0 and not self.ipv4_ready():
             self.log.critical("Cannot use as IPv4 notifier without required "
                               "IPv4 config")
             raise ConfigError("Notifier %s cannot be an IPv4 notifier without "
                               "required IPv4 config" % self.name)
-        self.ipv4_update_funcs.append(update_func)
+        self._ipv4_update_funcs.append(update_func)
 
     def attach_ipv6_updater(self, update_func):
-        """Attach an IPv6 update function to this notifier. Generally called
-        by an updater to provide its update function to the notifier.
+        """Attach an IPv6 update function to this notifier. No effect if IPv6
+        is skipped for this notifier.
 
         :param update_func: A callable that accepts an :class:`IPv6Network` to
                             be called whenever the IPv6 prefix might have been
@@ -122,14 +126,18 @@ class Notifier:
                             it fails), but this function should not block
                             longer than a single update attempt.
         """
+        if self._skip_ipv6:
+            self.log.info("Not attaching updater to notifier %s for skipped "
+                          "IPv6", self.name)
+            return
         self.log.debug("Attaching %s (IPv6) to notifier %s",
                        update_func.__name__, self.name)
-        if len(self.ipv6_update_funcs) == 0 and not self.ipv6_ready():
+        if len(self._ipv6_update_funcs) == 0 and not self.ipv6_ready():
             self.log.critical("Cannot use as IPv6 notifier without required "
                               "IPv4 config")
             raise ConfigError("Notifier %s cannot be an IPv6 notifier without "
                               "required IPv6 config" % self.name)
-        self.ipv6_update_funcs.append(update_func)
+        self._ipv6_update_funcs.append(update_func)
 
     def notify_ipv4(self, address):
         """Subclasses must call this to notify all the attached IPv4 updaters of
@@ -141,7 +149,7 @@ class Notifier:
         """
         self.log.debug("Notifier %s notifying attached updaters of IPv4 %s",
                        self.name, address.exploded)
-        for update_func in self.ipv4_update_funcs:
+        for update_func in self._ipv4_update_funcs:
             update_func(address)
 
     def notify_ipv6(self, address):
@@ -155,7 +163,7 @@ class Notifier:
         """
         self.log.debug("Notifier %s notifying attached updaters of IPv6 %s",
                        self.name, address.compressed)
-        for update_func in self.ipv6_update_funcs:
+        for update_func in self._ipv6_update_funcs:
             update_func(address)
 
     def want_ipv4(self):
@@ -164,7 +172,9 @@ class Notifier:
 
         :return: True or False
         """
-        return (not self._skip_ipv4) and len(self.ipv4_update_funcs) > 0
+        # Will be true if no updaters are configured, or they weren't attached
+        # because skip_ipv4
+        return len(self._ipv4_update_funcs) > 0
 
     def want_ipv6(self):
         """Subclasses should call this to determine whether to check for
@@ -172,7 +182,9 @@ class Notifier:
 
         :return: True or False
         """
-        return (not self._skip_ipv6) and len(self.ipv6_update_funcs) > 0
+        # Will be true if no updaters are configured, or they weren't attached
+        # because skip_ipv6
+        return len(self._ipv6_update_funcs) > 0
 
     def need_ipv4(self):
         """Subclasses should call this to determine if a lack of IPv4 addressing
