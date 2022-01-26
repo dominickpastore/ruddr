@@ -1,5 +1,11 @@
 import ruddr
 
+# TODO NOTES: Some of these tests involve the manager as well. In some cases
+#   (e.g. update same address currently assigned) we can mock the manager and
+#   just provide the addrfile functions. Others are meant to test the actual
+#   manager's addrfile functionality (e.g. update same address after restart
+#   manager). Arguably, this second type of test should go in test_manager.py.
+
 # TODO test basic updates
 
 # TODO test update same address currently assigned
