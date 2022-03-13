@@ -15,7 +15,7 @@ class MockUpdater(Updater):
         self.published_addresses.append(network)
 
 
-class MockNotifier(Notifier):
+class FakeNotifier(Notifier):
     """A simple notifier that notifies on demand"""
     # Note: Tests can trigger notifying by calling .notify_ipv4() and
     # .notify_ipv6() directly
