@@ -8,5 +8,5 @@ from .configuration import ConfigReader
 from .exceptions import (RuddrException, ConfigError, NotifyError,
                          NotifierSetupError, PublishError)
 from .manager import DDNSManager
-from .notifiers import Notifier, SchedulerNotifier, Scheduled, get_iface_addrs
+from .notifiers import Notifier, ScheduledNotifier, get_iface_addrs
 from .updaters import Updater

@@ -1,9 +1,7 @@
 """Base class for Ruddr notifiers"""
 
-import functools
 import logging
 import threading
-import types
 
 from ..exceptions import NotifyError, ConfigError
 
@@ -54,7 +52,7 @@ class Notifier:
 
         try:
             self._skip_ipv4 = (config.get('skip_ipv4', 'false').lower()
-                                   in ('true', 'on', 'yes', '1'))
+                               in ('true', 'on', 'yes', '1'))
         except ValueError:
             self.log.critical("'skip_ipv4' must be boolean (true/yes/on/1/"
                               "false/no/off/0)")
@@ -62,7 +60,7 @@ class Notifier:
                               "be boolean (true/yes/on/1/false/no/off/0)")
         try:
             self._skip_ipv6 = (config.get('skip_ipv6', 'false').lower()
-                                   in ('true', 'on', 'yes', '1'))
+                               in ('true', 'on', 'yes', '1'))
         except ValueError:
             self.log.critical("'skip_ipv6' must be boolean (true/yes/on/1/"
                               "false/no/off/0)")
@@ -249,89 +247,18 @@ class Notifier:
         """
 
 
-class Scheduled:
-    """Use as a decorator ``@Scheduled`` to make a method of a
-    :class:`~ruddr.ScheduledNotifier` into a scheduled method.
-    """
-
-    def __init__(self, func):
-        functools.update_wrapper(self, func)
-        self.func = func
-        self.seq = 0
-        self.fail_interval = None
-        self.lock = threading.RLock()
-
-    # Emulate binding behavior in normal functions that become methods.
-    # See https://docs.python.org/3/howto/descriptor.html#functions-and-methods
-    # (Without this, the 'self' argument is not passed through)
-    def __get__(self, obj, obj_cls=None):
-        if obj is None:
-            # This check should not be necessary in this case...it only
-            # evaluates to True when calling a decorated method that's not
-            # @staticmethod and not @classmethod using the class name
-            # (e.g. Class.my_func()). But it's here just in case.
-            return self
-        return types.MethodType(self, obj)
-
-    def __call__(self, obj, *args, **kwargs):
-        with self.lock:
-            self.seq += 1
-            self.fail_interval = None
-            obj.log.debug("(Schedule seq: %d)", self.seq)
-            self._wrapper(self.seq, obj, *args, **kwargs)
-
-    def _run_scheduled(self, seq, obj, *args, **kwargs):
-        """Do a scheduled invocation of the function. If any run has happened
-        in the meantime (identified by the current sequence number being
-        greater than ours), abort."""
-        with self.lock:
-            if self.seq > seq:
-                obj.log.debug("(Invocation for schedule seq %d aborted due to "
-                              "new invocation in the meantime.", seq)
-            else:
-                obj.log.debug("(Next invocation for schedule seq: %d)", seq)
-                self._wrapper(seq, obj, *args, **kwargs)
-
-    def _wrapper(self, seq, obj, *args, **kwargs):
-        """Run the function and schedule its next invocation"""
-        try:
-            self.func(obj, *args, **kwargs)
-        except NotifyError:
-            if self.fail_interval is None:
-                self.fail_interval = obj.fail_min_interval
-            else:
-                self.fail_interval *= 2
-                if self.fail_interval > obj.fail_max_interval:
-                    self.fail_interval = obj.fail_max_interval
-            obj.log.info("(Failed. Will retry in %d seconds.)",
-                         seq, self.fail_interval)
-            retry_delay = self.fail_interval
-        else:
-            self.fail_interval = None
-            retry_delay = obj.success_interval
-            obj.log.debug("(Invocation success for schedule seq: %d)", seq)
-
-        if retry_delay > 0:
-            timer = threading.Timer(retry_delay, self._run_scheduled,
-                                    args=(seq, obj, *args), kwargs=kwargs)
-            timer.daemon = True
-            timer.start()
-
-
-class SchedulerNotifier(Notifier):
-    """An abstract notifier with the ability to schedule checks (or other
-    tasks) to happen on regular intervals and retry when failed.
-
-    Decorating a function with the ``@Scheduled`` decorator makes it
-    a scheduled function.
+class ScheduledNotifier(Notifier):
+    """An abstract notifier that schedules checks to happen at regular
+    intervals and retry when failed.
 
     Instance attributes :attr:`success_interval`, :attr:`fail_min_interval`,
     and :attr:`fail_max_interval` can be modified by subclasses to control the
     timing.
 
-    Whenever a scheduled function is invoked, whether explicitly or by prior
-    scheduling, the timer for the next scheduled invocation is reset according
-    to the configured intervals and whether it was successful.
+    Single checks can be done with :meth:`check_once`. But, after the notifier
+    is started, extra checks can be done with :meth:`check`, which
+    automatically handles scheduling the next check according to the
+    success/failure intervals and whether the check succeeded.
 
     Constructor parameters match :class:`~ruddr.Notifier`.
     """
@@ -356,3 +283,115 @@ class SchedulerNotifier(Notifier):
         #: the maximum interval is reached, it will remain constant until the
         #: next successful invocation.
         self.fail_max_interval = 86400
+
+        # The following are used for scheduling checks
+        self._seq = 0   # Increments every time check() is called
+        self._timer = None
+        self._fail_interval = None
+        self._lock = threading.RLock()
+
+    def check_once(self):
+        """Check the IP address a single time and notify immediately.
+
+        Must be overridden by subclasses.
+
+        :raises NotifyError: if the check fails.
+
+        This function can be called by the manager to do a single check, but
+        in :class:`~ruddr.ScheduledNotifier`, this same function is called to
+        perform each scheduled check (by default—override
+        :meth:`check_scheduled` to change that).
+
+        When called as part of a scheduled check, raising
+        :class:`~ruddr.NotifyError` or not determines whether to schedule the
+        next check using the success or failure interval."""
+
+    def check_scheduled(self):
+        """Do a scheduled IP address check. By default, this calls
+        :meth:`check_once`, but it can be overridden if that is not suitable.
+
+        Raising :class:`~ruddr.NotifyError` or not determines whether to
+        schedule the next check using the success or failure interval.
+
+        Note that if a subclass needs to do an extra check (for example, the
+        :class:`~ruddr.notifiers.systemd.SystemdNotifier` when it gets a DBus
+        message from systemd-networkd), it should call :meth:`check` instead.
+        That will ensure the next call is scheduled properly, which would not
+        happen just by calling this method directly.
+
+        :raises NotifyError: if the check fails.
+        """
+        self.check_once()
+
+    def _run_check_and_schedule(self, seq):
+        """Do a scheduled invocation of :meth:`_check_and_schedule`. Meant to
+        be used as the target of a :class:`~threading.Timer`."""
+        with self._lock:
+            if self._seq > seq:
+                self.log.debug("(Invocation for schedule seq %d aborted due "
+                               "to new invocation in the meantime.)", seq)
+            else:
+                self.log.debug("(Next invocation for schedule seq: %d)", seq)
+                self._check_and_schedule(seq)
+
+    def _check_and_schedule(self, seq):
+        """Run :meth:`check_scheduled` and schedule its next invocation"""
+        try:
+            self.check_scheduled()
+        except NotifyError:
+            if self._fail_interval is None:
+                self._fail_interval = self.fail_min_interval
+            else:
+                self._fail_interval *= 2
+                if self._fail_interval > self.fail_max_interval:
+                    self._fail_interval = self.fail_max_interval
+            self.log.info("(Seq %d failed. Will retry in %d seconds.)",
+                          seq, self._fail_interval)
+            retry_delay = self._fail_interval
+        else:
+            self._fail_interval = None
+            retry_delay = self.success_interval
+            self.log.debug("(Invocation success for schedule seq: %d)", seq)
+
+        if retry_delay > 0:
+            timer = threading.Timer(retry_delay,
+                                    self._run_check_and_schedule,
+                                    args=(seq,))
+            timer.daemon = True
+            self._timer = timer
+            timer.start()
+
+    def check(self):
+        """Check the IP address and schedule the next check according to
+        whether the check was successful and the success/failure intervals.
+
+        This is the method to call if a subclass needs to do an extra check
+        (for example, the :class:`~ruddr.notifiers.systemd.SystemdNotifier`
+        when it gets a DBus message from systemd-networkd). That will ensure
+        the next check is scheduled properly.
+
+        If the most recent checks failed, the failure interval resets back to
+        the minimum whenever this is called.
+        """
+        with self._lock:
+            # Must still use sequence numbers to prevent race conditions (e.g.:
+            # check is called and enters critical section, then timer expires
+            # before code below runs. Then, _run_check_and_schedule() will run
+            # but block entering its own critical section. The code below will
+            # then continue, but it's too late to cancel the timer since it
+            # already expired.)
+            if self._timer is not None:
+                self._timer.cancel()
+            self._seq += 1
+            self.log.debug("(Schedule seq: %d)", self._seq)
+            self._fail_interval = None
+            self._check_and_schedule(self._seq)
+
+    def start(self):
+        self.log.info("Starting notifier")
+        # Do the first check, which also schedules future checks
+        self.check()
+
+    def stop(self):
+        self.log.info("Stopping notifier")
+        self._timer.cancel()

@@ -7,10 +7,10 @@ import requests
 
 from ..exceptions import NotifyError, ConfigError
 from ..restrictfamily import FamilyRestriction
-from .notifier import SchedulerNotifier, Scheduled
+from .notifier import ScheduledNotifier
 
 
-class WebNotifier(SchedulerNotifier):
+class WebNotifier(ScheduledNotifier):
     """Ruddr notifier that checks the IP address using a what-is-my-ip-style
     website"""
 
@@ -208,18 +208,3 @@ class WebNotifier(SchedulerNotifier):
         if self.need_ipv6() and not got_ipv6:
             raise NotifyError(f"Could not get IPv6 address for {self.name} "
                               "notifier")
-
-    @Scheduled
-    def _check_and_notify(self):
-        """Check the current address of the selected interface and notify.
-        Does the same thing as :meth:`check_once`, but with retries and
-        automatically schedules the next check."""
-        self.check_once()
-
-    def start(self):
-        self.log.info("Starting notifier")
-        # Do first check, which also triggers scheduling for future checks.
-        self._check_and_notify()
-
-    def stop(self):
-        self.log.debug("Nothing to stop for WebNotifier")

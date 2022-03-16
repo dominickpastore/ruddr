@@ -5,10 +5,10 @@ import ipaddress
 
 from ..exceptions import NotifyError, ConfigError
 from ._getifaceaddrs import get_iface_addrs
-from .notifier import SchedulerNotifier, Scheduled
+from .notifier import ScheduledNotifier
 
 
-class TimedNotifier(SchedulerNotifier):
+class TimedNotifier(ScheduledNotifier):
     """Ruddr notifier that checks the IP address of a local interface on a
     schedule"""
 
@@ -152,18 +152,3 @@ class TimedNotifier(SchedulerNotifier):
         if self.need_ipv6() and not got_ipv6:
             raise NotifyError("Interface %s has no IPv6 assigned" %
                               self.iface)
-
-    @Scheduled
-    def _check_and_notify(self):
-        """Check the current address of the selected interface and notify.
-        Does the same thing as :meth:`check_once`, but with retries and
-        automatically schedules the next check."""
-        self.check_once()
-
-    def start(self):
-        self.log.info("Starting notifier")
-        # Do first check, which also triggers scheduling for future checks.
-        self._check_and_notify()
-
-    def stop(self):
-        self.log.debug("Nothing to stop for TimedNotifier")

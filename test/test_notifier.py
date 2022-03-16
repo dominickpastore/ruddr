@@ -201,12 +201,23 @@ def test_multiple_updaters(notifier_factory, updater_factory):
     ]
 
 
-# TODO timed notifier retries after failed notify, then not again after
-#  successful
+# TODO ScheduledNotifier retries after failed notify, then not again (at least
+#  not right away) after successful notify
 
 
-# TODO timed notifier does not retry after failed notify and then immediate
-#  manual successful notify
+# TODO ScheduledNotifier retries after failed notify, then retries after a
+#  longer delay after a second failed notify, then not again (at least not
+#  right away) after successful notify
 
 
-# TODO timed notifier repeats notify with success interval
+# TODO ScheduledNotifier retries after failed notify, then retries after a
+#  longer delay after a second failed notify, then retries after a shorter
+#  delay after a failed manual check(), then not again (at least not right
+#  away) after successful notify
+
+
+# TODO ScheduledNotifier does not retry (at least not right away) after failed
+#  notify and then immediate manual successful notify
+
+
+# TODO ScheduledNotifier repeats notify with success interval

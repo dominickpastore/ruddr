@@ -1,6 +1,6 @@
 """Built in notifiers and the notifier base class"""
 
-from .notifier import Notifier, SchedulerNotifier, Scheduled
+from .notifier import Notifier, ScheduledNotifier
 from ._getifaceaddrs import get_iface_addrs
 
 from . import timed
@@ -23,7 +23,6 @@ else:
 
 __all__ = [
     'Notifier',
-    'SchedulerNotifier',
-    'Scheduled',
+    'ScheduledNotifier',
     'get_iface_addrs',
 ]

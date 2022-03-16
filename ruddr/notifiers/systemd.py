@@ -8,10 +8,10 @@ import socket
 
 from ..exceptions import NotifyError, NotifierSetupError, ConfigError
 from ._getifaceaddrs import get_iface_addrs
-from .notifier import SchedulerNotifier, Scheduled
+from .notifier import ScheduledNotifier
 
 
-class SystemdNotifier(SchedulerNotifier):
+class SystemdNotifier(ScheduledNotifier):
     """Ruddr notifier that listens for updates from systemd-networkd over DBus
     """
 
@@ -139,13 +139,6 @@ class SystemdNotifier(SchedulerNotifier):
             raise NotifyError("Interface %s has no IPv6 assigned" %
                               self.iface)
 
-    @Scheduled
-    def _check_and_notify(self):
-        """Check the current address of the selected interface and notify.
-        Does the same thing as :meth:`check_once`, but with retries and
-        automatically schedules the next check."""
-        self.check_once()
-
     def _handle_network_change(self, iface_idx, changed, invalidated):
         """Act on a PropertiesChanged signal for a network interface by
         checking if it's the interface we care about, then checking for the
@@ -155,7 +148,7 @@ class SystemdNotifier(SchedulerNotifier):
         :param changed: Dict of the changed property names and new values
         :param invalidated: List of changed property names without values (this
                             should not be necessary for
-                            :class:`SystemdNotifier`'s purposes.
+                            :class:`SystemdNotifier`'s purposes).
         """
 
         # In an ideal world, we would want to inspect the changed properties
@@ -185,10 +178,11 @@ class SystemdNotifier(SchedulerNotifier):
         # Check if interface is the one we care about, check address and send
         # update if so
         if iface_name == self.iface:
-            self._check_and_notify()
+            self.check()
 
-    def _handle_propchange(self, connection, sender_name, object_path,
-                           interface_name, signal_name, parameters, user_data):
+    def _handle_properties_changed(self, connection, sender_name, object_path,
+                                   interface_name, signal_name, parameters,
+                                   user_data):
         """Handle a PropertiesChanged signal. Do nothing if it's not on a type
         we care about (org.freedesktop.network1.link). Otherwise, extract the
         useful info and start a potential notify.
@@ -219,8 +213,8 @@ class SystemdNotifier(SchedulerNotifier):
             return
         pass
 
-        # Extract interface index from signal path (DBus names cannot start
-        # with a numeral. Since interface indicies do, systemd substitutes
+        # Extract interface index from signal path: DBus names cannot start
+        # with a numeral. Since interface indices do, systemd substitutes
         # "_xx" for the first digit, where "xx" is the codepoint for that
         # character. E.g. index 12 would be .../_312 since "1" is ASCII 0x31.
         # Conveniently, the digits 0-9 are 0x30-0x39, so we can just chop off
@@ -250,7 +244,7 @@ class SystemdNotifier(SchedulerNotifier):
                              None,
                              None,
                              Gio.DBusSignalFlags.NONE,
-                             self._handle_propchange,
+                             self._handle_properties_changed,
                              None)
         self.log.debug("Subscribed to PropertiesChanged DBus signal")
 
@@ -260,10 +254,7 @@ class SystemdNotifier(SchedulerNotifier):
         self.log.debug("Main loop stopped.")
 
     def start(self):
-        self.log.info("Starting notifier")
-        # Do first check. This also handles triggering future checks at the
-        # minimum interval.
-        self._check_and_notify()
+        super().start()
 
         # Start monitoring DBus
         self.log.debug("First notify complete. Starting to monitor DBus.")
@@ -271,6 +262,9 @@ class SystemdNotifier(SchedulerNotifier):
         thread.start()
 
     def stop(self):
+        super().stop()
+
+        # Stop monitoring DBus
         if self.mainloop is None:
             self.log.debug("Main loop not started, nothing to stop")
         else:
