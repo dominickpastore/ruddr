@@ -394,4 +394,5 @@ class ScheduledNotifier(Notifier):
 
     def stop(self):
         self.log.info("Stopping notifier")
-        self._timer.cancel()
+        if self._timer is not None:
+            self._timer.cancel()

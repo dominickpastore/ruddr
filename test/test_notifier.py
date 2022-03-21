@@ -1,5 +1,6 @@
 import pytest
 import ipaddress
+import time
 
 import mocks
 
@@ -201,23 +202,116 @@ def test_multiple_updaters(notifier_factory, updater_factory):
     ]
 
 
-# TODO ScheduledNotifier retries after failed notify, then not again (at least
-#  not right away) after successful notify
+def test_schedulednotifier_one_retry():
+    """Test ScheduledNotifier retries after failed notify, then not again until
+    success interval after a successful notify"""
+    notifier = mocks.MockScheduledNotifier(
+        'mock_notifier',
+        7, 1, 5,
+        (False, True, True)
+    )
+    notifier.start()
+    expected = (1, 7)
+    time.sleep(sum(expected) + 0.5)
+    notifier.stop()
+    assert all(-0.5 < a - e < 0.5 for a, e in zip(notifier.intervals, expected))
 
 
-# TODO ScheduledNotifier retries after failed notify, then retries after a
-#  longer delay after a second failed notify, then not again (at least not
-#  right away) after successful notify
+def test_schedulednotifier_two_retry():
+    """Test ScheduledNotifier retries after failed notify, then after a longer
+    delay after a second failed notify, then not again until the success
+    interval after a successful notify"""
+    notifier = mocks.MockScheduledNotifier(
+        'mock_notifier',
+        7, 1, 5,
+        (False, False, True, True)
+    )
+    notifier.start()
+    expected = (1, 2, 7)
+    time.sleep(sum(expected) + 0.5)
+    notifier.stop()
+    assert all(-0.5 < a - e < 0.5 for a, e in zip(notifier.intervals, expected))
 
 
-# TODO ScheduledNotifier retries after failed notify, then retries after a
-#  longer delay after a second failed notify, then retries after a shorter
-#  delay after a failed manual check(), then not again (at least not right
-#  away) after successful notify
+def test_schedulednotifier_many_retry():
+    """Test ScheduledNotifier retries after failed notify, continues retrying
+    after successively longer delays after repeated failures, then not again
+    until the success interval after a successful notify"""
+    notifier = mocks.MockScheduledNotifier(
+        'mock_notifier',
+        7, 1, 5,
+        (False, False, False, False, False, True, True)
+    )
+    notifier.start()
+    expected = (1, 2, 4, 5, 5, 7)
+    time.sleep(sum(expected) + 0.5)
+    notifier.stop()
+    assert all(-0.5 < a - e < 0.5 for a, e in zip(notifier.intervals, expected))
 
 
-# TODO ScheduledNotifier does not retry (at least not right away) after failed
-#  notify and then immediate manual successful notify
+def test_schedulednotifier_fail_and_manual_success():
+    """Test ScheduledNotifier does not check again until the success interval
+    after a failed notify and an immediate successful manual notify"""
+    notifier = mocks.MockScheduledNotifier(
+        'mock_notifier',
+        7, 1, 5,
+        (False, True, True)
+    )
+    notifier.start()
+    notifier.check()
+    expected = (0, 7)
+    time.sleep(sum(expected) + 0.5)
+    notifier.stop()
+    assert all(-0.5 < a - e < 0.5 for a, e in zip(notifier.intervals, expected))
 
 
-# TODO ScheduledNotifier repeats notify with success interval
+def test_schedulednotifier_two_fail_and_manual_fail():
+    """Test ScheduledNotifier retries after a failed notify, retries after a
+    longer delay after a second failed notify, then retries after a short
+    delay after a failed manual notify, then not again until the success
+    interval after a successful notify"""
+    notifier = mocks.MockScheduledNotifier(
+        'mock_notifier',
+        7, 1, 5,
+        (False, False, False, False, True, True)
+    )
+    notifier.start()
+    expected1 = (1, 2, 0.5)
+    time.sleep(sum(expected1))
+    notifier.check()
+    expected2 = (1, 7)
+    time.sleep(sum(expected2) + 0.5)
+    notifier.stop()
+    expected = expected1 + expected2
+    assert all(-0.5 < a - e < 0.5 for a, e in zip(notifier.intervals, expected))
+
+
+def test_schedulednotifier_success():
+    """Test ScheduledNotifier repeats successful notify after success
+    interval"""
+    notifier = mocks.MockScheduledNotifier(
+        'mock_notifier',
+        7, 1, 5,
+        (True, True, True)
+    )
+    notifier.start()
+    expected = (7, 7)
+    time.sleep(sum(expected) + 0.5)
+    notifier.stop()
+    assert all(-0.5 < a - e < 0.5 for a, e in zip(notifier.intervals, expected))
+
+
+def test_schedulednotifier_stop():
+    """Test ScheduledNotifier stops checking after stopped"""
+    notifier = mocks.MockScheduledNotifier(
+        'mock_notifier',
+        7, 1, 5,
+        (True, True, True)
+    )
+    notifier.start()
+    expected = (7,)
+    time.sleep(sum(expected) + 0.5)
+    notifier.stop()
+    time.sleep(7)
+    assert len(notifier.timestamps) == 2
+    assert all(-0.5 < a - e < 0.5 for a, e in zip(notifier.intervals, expected))

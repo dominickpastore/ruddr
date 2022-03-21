@@ -1,4 +1,6 @@
-from ruddr import Updater, Notifier
+import time
+
+from ruddr import Updater, Notifier, ScheduledNotifier, NotifyError
 
 
 class MockUpdater(Updater):
@@ -33,3 +35,31 @@ class FakeNotifier(Notifier):
 
     def ipv6_ready(self):
         return self._ipv6_ready
+
+
+class MockScheduledNotifier(ScheduledNotifier):
+    """A mock scheduled notifier that keeps track of when checks are scheduled
+    and retried"""
+
+    def __init__(self, name, success_interval, fail_min_interval,
+                 fail_max_interval, success_sequence):
+        super().__init__(name, dict())
+
+        self.success_interval = success_interval
+        self.fail_min_interval = fail_min_interval
+        self.fail_max_interval = fail_max_interval
+
+        self.success_sequence = list(success_sequence)
+
+        #: Keeps a list of timestamps for when each check happened
+        self.timestamps = []
+
+    @property
+    def intervals(self):
+        return [y - x for x, y in zip(self.timestamps, self.timestamps[1:])]
+
+    def check_once(self):
+        self.timestamps.append(time.monotonic())
+        success = self.success_sequence.pop(0)
+        if not success:
+            raise NotifyError
