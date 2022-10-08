@@ -58,7 +58,7 @@ An updater's job is to publish IP addresses to a dynamic DNS provider.
 Typically, there will be one updater per provider. There are different types of
 updaters depending on the protocol your dynamic DNS provider uses.
 
-In the example above, there is one updater that publishes to NoIP using the de
+In the example above, there is one updater that publishes to Dynu using the de
 facto standard /nic/update protocol and one updater that publishes to
 Afraid.org using the FreeDNS protocol native to that site.
 
