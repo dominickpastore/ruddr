@@ -11,6 +11,11 @@ import sys
 import time
 from typing import Optional, Any, Union, Dict
 
+if sys.version_info < (3, 10):
+    from importlib_metadata import entry_points
+else:
+    from importlib.metadata import entry_points
+
 from . import configuration
 from .exceptions import RuddrException, NotifierSetupError, ConfigError
 from . import notifiers
@@ -397,8 +402,13 @@ def _validate_updater_or_notifier_type(
         if type_ in existing:
             return True
         # Check if a ruddr entry point with this name exists
-        # TODO Check ruddr.notifiers or ruddr.updaters entry points
-        return False
+        discovered = entry_points(group=f"ruddr.{which}")
+        try:
+            entry_point = discovered[type_]
+        except KeyError:
+            return False
+        existing[type_] = entry_point.load()
+        return True
 
     # Check if already imported non-built-in
     if (module, type_) in existing:

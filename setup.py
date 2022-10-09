@@ -23,6 +23,7 @@ setup(
     install_requires=[
         'requests',
         'netifaces',
+        "importlib_metadata; python_version<'3.10'",
     ],
     python_requires='>=3.7',
     extras_require={
