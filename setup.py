@@ -12,7 +12,7 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/dominickpastore/ruddr/',
-    license='Copyright (c) 2021 Dominick C. Pastore. All rights reserved.',
+    license='Copyright (c) 2022 Dominick C. Pastore. All rights reserved.',
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: Other/Proprietary License",
@@ -24,7 +24,7 @@ setup(
         'requests',
         'netifaces',
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     extras_require={
         'systemd': ['PyGObject'],   # Systemd notifier
         'docs': ['sphinx'],

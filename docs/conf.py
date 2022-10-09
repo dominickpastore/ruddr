@@ -18,7 +18,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'Ruddr'
-copyright = ' Copyright 2021 Dominick C. Pastore'
+copyright = ' Copyright 2022 Dominick C. Pastore'
 author = 'Dominick C. Pastore'
 
 
