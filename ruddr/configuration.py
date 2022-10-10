@@ -165,23 +165,26 @@ class ConfigReader:
             try:
                 notifier4 = updater_config['notifier4']
             except KeyError:
-                try:
-                    notifier4 = updater_config['notifier']
-                except KeyError:
-                    notifier4 = g_notifier4
+                notifier4 = updater_config.get('notifier')
+            if notifier4 is not None and notifier4 not in config.notifiers:
+                raise ConfigError("Notifier %s does not exist" % notifier4)
 
             try:
                 notifier6 = updater_config['notifier6']
             except KeyError:
-                try:
-                    notifier6 = updater_config['notifier']
-                except KeyError:
-                    notifier6 = g_notifier6
+                notifier6 = updater_config.get('notifier')
+            if notifier6 is not None and notifier6 not in config.notifiers:
+                raise ConfigError("Notifier %s does not exist" % notifier6)
 
+            # If no notifiers configured for updater, use default notifiers
             if notifier4 is None and notifier6 is None:
-                raise ConfigError("No notifier is configured for updater %s "
-                                  "and there are no default notifiers "
-                                  "configured" % updater_name)
+                if g_notifier4 is None and g_notifier6 is None:
+                    raise ConfigError("No notifier is configured for updater "
+                                      "%s and there are no default notifiers "
+                                      "configured" % updater_name)
+                else:
+                    notifier4 = g_notifier4
+                    notifier6 = g_notifier6
 
             try:
                 del updater_config['notifier']

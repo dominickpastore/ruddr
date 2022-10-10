@@ -5,15 +5,289 @@ Configuration and Usage
    If you have not already done so, you should read :doc:`howitworks` before
    continuing.
 
-Configuration File
-------------------
+Ruddr must be configured before it can be used. After that, it's meant to be
+run as a service (e.g. with systemd), but it can be run in single-shot mode to
+do a single, immediate update as well.
 
-.. TODO necessary for any run
+Quick Start Guide
+-----------------
+
+If you want to get going in as little time as possible, start here.
+
+1. Write this configuration to ``/etc/ruddr.conf``::
+
+     [ruddr]
+     notifier = main
+
+     [notifier.main]
+     type = web
+     url = https://icanhazip.com/
+
+     [updater.main]
+     # Updater config here
+
+2. Paste in one of the updater configurations from the :doc:`updaters` page
+
+3. Set up Ruddr as a service using the instructions appropriate for your system
+   under :ref:`service`.
+
+You now have a basic Ruddr configuration working. Keep reading if you would
+like to learn more about Ruddr's features and how to tailor it to your needs.
+
+Configuration
+-------------
+
+Ruddr expects to find its configuration at ``/etc/ruddr.conf`` by default, but
+this can be changed with the ``-c``/``--configfile`` command line option (see
+:ref:`usage`).
+
+Here is a sample config::
+
+  [ruddr]
+  ## The addrfile is where Ruddr keeps track of the current address at each
+  ## DDNS provider. Uncomment this line if you want to change its location.
+  #addrfile = /var/lib/misc/ruddr.addrfile
+
+  ## Each updater must get its addresses from a particular notifier. You can
+  ## optionally set a default notifier here, and it will be used whenever an
+  ## updater doesn't specify its own notifier. (This is mainly useful if you
+  ## have several DDNS providers that all need to be updated from the same
+  ## source.)
+  #notifier = icanhazip
+
+  ## You can also set different default notifiers for IPv4 and IPv6.
+  #notifier4 = icanhazip
+  #notifier6 = wan_ip
+
+  [notifier.icanhazip]
+  ## Every notifier must specify a type, which determines how it obtains the
+  ## current IP address. For example, the web notifier checks a "what is my IP"
+  ## style website to get the current address. See the "Notifiers" section of
+  ## the documentation for a list of built-in notifier types and their
+  ## configuration options.
+  ##
+  ## Ruddr is extensible: If the notifier types that come with Ruddr do not
+  ## suit your needs, it supports installing additional notifiers from PyPI.
+  ## Or, you can even specify your own notifier class to import and the module
+  ## to import it from, like this:
+  ##
+  ##   module = mynotifier
+  ##   type = MyNotifierClass
+  type = web
+
+  ## Most notifiers will require extra config, like the URL for the web
+  ## notifier. See the "notifiers" page in the documentation for details on
+  ## the options available.
+  url = https://icanhazip.com/
+
+  [notifier.wan_ip]
+  type = timed
+  iface = eth0
+
+  [updater.dynu]
+  ## Every updater must specify a type as well, which determines the protocol
+  ## it uses to communicate with your DDNS provider. See the "Updaters" section
+  ## of the documentation for a list of built-in updater types and their
+  ## configuration options.
+  ##
+  ## As with notifiers, Ruddr allows you to install additional updaters from
+  ## PyPI, or you can specify your own updater class by naming the module it
+  ## should be imported from:
+  ##
+  ##  module = myupdater
+  ##  type = MyUpdaterClass
+  type = standard
+
+  ## Each updater can specify its own notifier, like below. Otherwise, it will
+  ## use the default notifier from the [ruddr] section.
+  notifier = icanhazip
+  ## You can also set different default notifiers for IPv4 and IPv6.
+  #notifier4 = icanhazip
+  #notifier6 = wan_ip
+
+  ## Most updaters will require extra config. See the "updaters" page in the
+  ## documentation for details on the options available.
+  server = api.dynu.com
+  username = ...
+  password = ...
+
+The basic format is similar to Microsoft INI files:
+
+- Options are grouped into sections. Each section starts with a ``[heading]``
+  in square brackets. There is a main section named ``[ruddr]`` and a section
+  for each notifier and updater.
+
+- Options are specified using a ``key=value`` or ``key: value`` syntax
+
+- Spaces are optional around the equals sign or colon and will be trimmed
+
+- Trailing spaces will be trimmed from the end of a line
+
+- Leading spaces are trimmed, but keys in a section should all have the same
+  level of indentation (otherwise they may be interpreted as multi=line values)
+
+- Values can span multiple lines by indenting them more than the key (though
+  this is rarely necessary). The indentation will be trimmed, but the resulting
+  value will contain newlines.
+
+- Lines starting with ``#`` or ``;`` are comments
+
+The sections below describe how to customize each part of the configuration.
+
+Notifiers
+~~~~~~~~~
+
+Notifiers monitor the current public IP address and "notify" when it has
+changed. Most Ruddr configurations will need only a single notifier, or perhaps
+a pair for IPv4 and IPv6.
+
+A notifier configuration looks like this::
+
+  [notifier.<name>]
+  module = <module>
+  type = <type>
+  <additional config>
+
+In the section heading, the notifier is given a unique name of your choice.
+
+The ``module`` and ``type`` options let you specify the notifier type, which
+determines how the current IP address is obtained. For example, the ``timed``
+notifier periodically checks the IP address assigned to the current machine,
+and the ``web`` notifier periodically checks a "what is my IP" style website.
+
+- Ruddr comes with a variety of built-in notifier types, described on the
+  :doc:`notifiers` page. The ``module`` option is not required when using
+  these.
+
+- Ruddr can be extended with notifiers from PyPI. Such notifiers will have
+  their own type name for use with the ``type`` option. The ``module`` option
+  is not required when using these. (If you are interested in publishing your
+  own notifier on PyPI, see the :doc:`development` page.)
+
+- You can develop your own notifier and have Ruddr import it. Specify the
+  class name of the notifier with ``type`` and the module name it can be
+  imported from with ``module``. See the :doc:`development` page for more info
+  on how to develop a notifier.
+
+Most notifiers will require some extra configuration specific to that type of
+notifier. For example, the ``timed`` notifier needs to know which network
+interface to get the IP address from, and the ``web`` notifier needs to be
+given the URL to query. See the :doc:`notifiers` page for lists of
+configuration options for the built-in notifiers.
+
+.. _updater_config:
+
+Updaters
+~~~~~~~~
+
+Updaters are the interface between Ruddr and your dynamic DNS provider.
+Most configurations will need only one, but if you have more than one provider,
+you will need an updater for each one.
+
+An updater configuration looks like this::
+
+  [updater.<name>]
+  module = <module>
+  type = <type>
+  notifier = <notifier name>
+  <additional config>
+
+In the section heading, the updater is given a unique name of your choice.
+
+As with notifiers, the ``module`` and ``type`` options let you specify the
+updater type. There are different types for different protocols, so typically,
+the type you choose will depend on your DDNS provider.
+
+- Ruddr comes with a variety of built-in updater types. The built-in updaters
+  cover a variety of popular DDNS services. See the :doc:`updaters` page for
+  more information on which type to pick and configuration examples. The
+  ``module`` option is not required when using a built-in updater type.
+
+- Ruddr can be extended with updaters from PyPI. Such updaters will have their
+  own type name for use with the ``type`` option. the ``module`` option is not
+  required when using these. (If you are interested in publishing your own
+  updater on PyPI, see the :doc:`development` page.)
+
+- If neither of those choices suit your needs, you can develop your own updater
+  and have Ruddr import it. Specify the class name of the updater with ``type``
+  and the module name it can be imported from with ``module``. See the
+  :doc:`development` page for more info on how to develop an updater.
+
+Next, each updater must be associated with a notifier (or optionally, a pair of
+notifiers, one for IPv4 and one for IPv6). Do this by setting the ``notifier``
+option equal to the name of the notifier. If you want to set different
+notifiers for the IPv4 and IPv6 address, use ``notifier4`` and ``notifier6``
+instead. **Note:** If you *only* want to check and update IPv4 addresses, use
+*only* ``notifier4``. The same goes for IPv6 addresses only and ``notifier6``.
+
+Alternatively, if you leave out all ``notifier``, ``notifier4``, and
+``notifier6`` options, Ruddr will use the default
+``notifier``/``notifier4``/``notifier6`` options from the ``[ruddr]`` section.
+
+Most updaters will require some extra configuration specific to that type of
+updater. For example, the ``standard`` updater needs a server address,
+username, and password. See the :doc:`updaters` page for lists of configuration
+options for the built-in updaters and sample configurations for popular DDNS
+providers.
+
+Global Config
+~~~~~~~~~~~~~
+
+The optional ``[ruddr]`` section contains a few configuration options that
+apply to Ruddr as a whole::
+
+  [ruddr]
+  addrfile = /var/lib/misc/ruddr.addrfile
+  notifier = <notifier name>
+  log = <file path or syslog or stderr>
+
+The ``addrfile`` option allows you to change the path to the addrfile, a file
+where Ruddr keeps track of the IP address currently published with each
+provider. The default is ``/var/lib/misc/ruddr.addrfile``.
+
+The ``notifier`` option allows you to specify a default notifier. This is the
+notifier that gets used for updaters that don't specify their own notifier. It
+can be useful if you have multiple updaters that all need to get their IP
+address from the same source. You can also use one or both of ``notifier4``
+and ``notifier6`` in place of ``notifier``, as described under
+:ref:`updater_config`. None of these options are required if your updaters all
+specify their own notifiers.
+
+The ``log`` option allows you to specify where Ruddr should log to. The choices
+are ``syslog`` (the default), ``stderr``, or a path to a logfile. (Note that
+the ``-s``/``--stderr`` command line option overrides this.)
+
+.. _usage:
 
 Usage
 -----
 
-.. TODO command line flags, single shot updates
+Normal usage of Ruddr involves configuring it to run as a service (see
+:ref:`service`); however, it can be run at the command line for debugging or
+for single-shot updates.
+
+After Ruddr is installed, the ``ruddr`` command is available to run it from the
+command line. If you installed it in a virtual environment, it will need to be
+activated first.
+
+There are a few command line options:
+
+``-h``/``--help``
+   Display all the command line options and exit.
+
+``-1``/``--single-shot``
+   Run in single shot mode. Do a single update and exit.
+
+``-c``/``--configfile``
+   Use the given config file instead of ``/etc/ruddr.conf``.
+
+``-d``/``--debug-logs``
+   Increase the verbosity of logging significantly.
+
+``-s``/``--stderr``
+   Log to stderr instead of the syslog or any configured logfile.
+
+.. _service:
 
 Running as a Service
 --------------------
@@ -21,11 +295,36 @@ Running as a Service
 Generally speaking, any system that can start a Python script at boot and
 ideally send a SIGTERM at shutdown can run Ruddr as a service. Instructions for
 setting this up with systemd, one of the most widely used init systems on Linux
-servers, are below. Hopefully, instructions for other systems will come soon.
+servers, are below.
 
-.. TODO info on contributing instructions and examples
+If you are familiar with setting up services on other systems, documentation
+contributions are welcome.
 
 Systemd
 ~~~~~~~
 
-.. TODO setting up a systemd service
+Create a new systemd unit file at ``/etc/systemd/system/ruddr.service``::
+
+  [Unit]
+  Description=Robotic Updater for Dynamic DNS Records
+  After=network.target
+
+  [Service]
+  Type=notify
+  ExecStart=ruddr
+  NotifyAccess=main
+
+  [Install]
+  WantedBy=multi-user.target
+
+**Note if using a virtual environment:** You will need to replace the
+``ExecStart`` line with something like this, where ``/path/to/venv/bin/python``
+is the full absolute path to the ``python`` executable in your virtual
+environment::
+
+  ExecStart=/path/to/venv/bin/python -m ruddr.manager
+
+Then, simply enable and start the service (as root or with ``sudo``)::
+
+  systemctl enable ruddr
+  systemctl start ruddr

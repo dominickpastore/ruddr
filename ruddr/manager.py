@@ -324,25 +324,6 @@ class DDNSManager:
         self._write_addrfile()
 
 
-def parse_args(argv):
-    """Parse command line arguments
-
-    :param argv: Either ``None`` or a list of arguments
-    :returns: a :class:`argparse.Namespace` containing the parsed arguments
-    """
-    parser = argparse.ArgumentParser(description="Robotic Updater for "
-                                     "Dynamic DNS Records")
-    parser.add_argument("-1", "--check-once", action="store_true",
-                        help="Check and update all IP addresses a single time")
-    parser.add_argument("-c", "--configfile", default="/etc/ruddr.conf",
-                        help="Path to the config file")
-    parser.add_argument("-d", "--debug-logs", action="store_true",
-                        help="Increase verbosity of logging significantly")
-    parser.add_argument("-s", "--stderr", action="store_true",
-                        help="Log to stderr instead of syslog or file")
-    return parser.parse_args(argv)
-
-
 def validate_notifier_type(module: Optional[str], type_: str) -> bool:
     """Check if an notifier type exists, importing it for :class:`DDNSManager`
     if it is not one of the built-in notifiers that comes with Ruddr
@@ -427,6 +408,25 @@ def _validate_updater_or_notifier_type(
     return True
 
 
+def parse_args(argv):
+    """Parse command line arguments
+
+    :param argv: Either ``None`` or a list of arguments
+    :returns: a :class:`argparse.Namespace` containing the parsed arguments
+    """
+    parser = argparse.ArgumentParser(description="Robotic Updater for "
+                                                 "Dynamic DNS Records")
+    parser.add_argument("-1", "--single-shot", action="store_true",
+                        help="Check and update all IP addresses a single time")
+    parser.add_argument("-c", "--configfile", default="/etc/ruddr.conf",
+                        help="Path to the config file")
+    parser.add_argument("-d", "--debug-logs", action="store_true",
+                        help="Increase verbosity of logging significantly")
+    parser.add_argument("-s", "--stderr", action="store_true",
+                        help="Log to stderr instead of syslog or file")
+    return parser.parse_args(argv)
+
+
 def main(argv=None):
     """Main entry point when run as a standalone program"""
     args = parse_args(argv)
@@ -457,7 +457,10 @@ def main(argv=None):
 
     # Start up the actual DDNS code
     manager = DDNSManager(conf)
-    if args.check_once:
+    if args.single_shot:
+        # TODO This seems like it may interfere with a running Ruddr. It should
+        #   potentially check if Ruddr is running and if so, send a signal to
+        #   have it do the check_once() itself.
         try:
             manager.check_once()
         except RuddrException:

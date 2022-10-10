@@ -14,6 +14,8 @@ Name: ``standard``
 
 .. TODO
 
+.. TODO Give sample configs for major providers
+
 Gandi Updater
 -------------
 

@@ -94,6 +94,22 @@ goes like this:
       so, Ruddr stores the new IP address for the next time step (a) runs. If
       not, Ruddr schedules a retry for later. [#updatefail]_
 
+Handling IPv6
+-------------
+
+IPv6 poses a new problem for dynamic DNS. Like with IPv4, most ISPs will not
+provide fixed addresses, or at least not without payment or a special
+agreement. However, unlike IPv4, IPv6 is not usually routed with NAT, meaning
+there is not one single public address covering your entire network. Typically,
+your ISP will assign you a prefix, and every device in your network will pick a
+public, globally-routable address with that prefix.
+
+Ruddr was designed to handle this situation. Notifiers only monitor the
+prefix portion of addresses, since that's the only part changed by the ISP.
+Updaters assume there may be multiple addresses to update, and they
+change only the prefix on each one. This way, even if you need to support IPv6,
+you can still have centralized DDNS management.
+
 .. rubric:: Footnotes
 
 .. [#updatefail] There's technically more nuance to this: When an update fails,
