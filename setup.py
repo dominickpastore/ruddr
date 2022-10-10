@@ -29,7 +29,11 @@ setup(
     extras_require={
         'systemd': ['PyGObject'],   # Systemd notifier
         'docs': ['sphinx'],
-        'test': ['pytest', 'flake8']
+        'test': [
+            'flake8',
+            'pytest',
+            'pytest-cov'
+        ]
     },
 
     entry_points={
