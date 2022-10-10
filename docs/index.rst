@@ -61,4 +61,4 @@ Index
 License
 -------
 
-Copyright © 2021 Dominick C. Pastore
+Copyright © 2022 Dominick C. Pastore

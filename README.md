@@ -65,7 +65,7 @@ License
 
 TODO add license notice to files
 
-Copyright &copy; 2021 Dominick C. Pastore
+Copyright &copy; 2022 Dominick C. Pastore
 
 [docs]: https://ruddr.dcpx.org/
 [GitHub]: https://github.com/dominickpastore/ruddr
