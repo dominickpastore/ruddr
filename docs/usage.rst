@@ -141,11 +141,16 @@ Notifiers monitor the current public IP address and "notify" when it has
 changed. Most Ruddr configurations will need only a single notifier, or perhaps
 a pair for IPv4 and IPv6.
 
-A notifier configuration looks like this::
+A notifier configuration looks like this (with non-mandatory options
+commented)::
 
   [notifier.<name>]
-  module = <module>
+  #module = <module>
   type = <type>
+  #skip_ipv4 = <true/false>
+  #skip_ipv6 = <true/false>
+  #ipv4_required = <true/false>
+  #ipv6_required = <true/false>
   <additional config>
 
 In the section heading, the notifier is given a unique name of your choice.
@@ -169,6 +174,41 @@ and the ``web`` notifier periodically checks a "what is my IP" style website.
   imported from with ``module``. See the :doc:`development` page for more info
   on how to develop a notifier.
 
+The ``skip_ipv4``, ``skip_ipv6``, ``ipv4_required``, and ``ipv6_required``
+options are used to control whether the notifier tries to fetch IPv4 and/or
+IPv6 addresses and if it should consider it a problem when it can't.
+
+.. note::
+   The default settings try to fetch both IPv4 and IPv6 addresses, but consider
+   it normal if only IPv4 works. That will work in a lot of situations, but if,
+   for example, you know IPv6 addressing should or should not be working on
+   your network, it's better to be explicit. It allows Ruddr to be more useful
+   with retry behavior, among other things.
+
+``skip_ipv4``
+   If set to true/on/yes/1, this notifier will not try to fetch IPv4 addresses.
+   (default false)
+
+``skip_ipv6``
+   If set to true/on/yes/1, this notifier will not try to fetch IPv6 addresses.
+   (default false)
+
+``ipv4_required``
+   If set to true/on/yes/1, this notifier will treat failure to obtain an IPv4
+   address as abnormal. If set to false/off/no/0, the notifier will not
+   consider it a problem. For example, if an IPv4 address cannot be obtained
+   when this is true, most notifier types will switch to a quick retry strategy
+   with exponential backoff. If this is false, the notifier will proceed as if
+   all is normal. (default true, ignored if ``skip_ipv4`` is true)
+
+``ipv6_required``
+   If set to true/on/yes/1, this notifier will treat failure to obtain an IPv6
+   address as abnormal. If set to false/off/no/0, the notifier will not
+   consider it a problem. For example, if an IPv6 address cannot be obtained
+   when this is true, most notifier types will switch to a quick retry strategy
+   with exponential backoff. If this is false, the notifier will proceed as if
+   all is normal. (default false, ignored if ``skip_ipv6`` is true)
+
 Most notifiers will require some extra configuration specific to that type of
 notifier. For example, the ``timed`` notifier needs to know which network
 interface to get the IP address from, and the ``web`` notifier needs to be
@@ -184,12 +224,13 @@ Updaters are the interface between Ruddr and your dynamic DNS provider.
 Most configurations will need only one, but if you have more than one provider,
 you will need an updater for each one.
 
-An updater configuration looks like this::
+An updater configuration looks like this (with non-mandatory options
+commented)::
 
   [updater.<name>]
-  module = <module>
+  #module = <module>
   type = <type>
-  notifier = <notifier name>
+  #notifier = <notifier name>
   <additional config>
 
 In the section heading, the updater is given a unique name of your choice.
@@ -217,8 +258,13 @@ Next, each updater must be associated with a notifier (or optionally, a pair of
 notifiers, one for IPv4 and one for IPv6). Do this by setting the ``notifier``
 option equal to the name of the notifier. If you want to set different
 notifiers for the IPv4 and IPv6 address, use ``notifier4`` and ``notifier6``
-instead. **Note:** If you *only* want to check and update IPv4 addresses, use
-*only* ``notifier4``. The same goes for IPv6 addresses only and ``notifier6``.
+instead.
+
+.. note::
+   If you *only* want to check and update IPv4 addresses, use *only*
+   ``notifier4``. The same goes for IPv6 addresses only and ``notifier6``.
+   Alternatively, you can specify ``skip_ipv4`` or ``skip_ipv6`` on the
+   notifier and use regular ``notifier`` in the updater.
 
 Alternatively, if you leave out all ``notifier``, ``notifier4``, and
 ``notifier6`` options, Ruddr will use the default

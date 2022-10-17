@@ -10,22 +10,25 @@ If none of the updaters below meet your needs, you can write your own.
 Standard Updater
 ----------------
 
-Name: ``standard``
+Type: ``standard``
 
 .. TODO
 
 .. TODO Give sample configs for major providers
 
+.. TODO When developing, allow existing addresses to be fetched either from DNS
+   (potentially with a configured server) or to be manually specified
+
 Gandi Updater
 -------------
 
-Name: ``gandi``
+Type: ``gandi``
 
 .. TODO
 
 HE Updaters
 -----------
 
-Name: ``he``
+Type: ``he``
 
 .. TODO

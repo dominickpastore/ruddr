@@ -3,10 +3,14 @@ For Developers
 
 .. TODO
 
+.. _notifier_dev:
+
 Writing Your Own Notifier
 -------------------------
 
 .. TODO
+
+.. _updater_dev:
 
 Writing Your Own Updater
 ------------------------
@@ -32,6 +36,10 @@ Running Tests
 ~~~~~~~~~~~~~
 
 .. TODO Currently only tests are for style. Install with .[test]
+
+.. TODO Run full test suite with tox. HTML coverage report generated.
+   Can also run individual tools: "flake8", "python setup.py check -m -s",
+   "pytest", "pytest --cov", "pytest --cov-report=html"
 
 Generating Docs
 ~~~~~~~~~~~~~~~
