@@ -95,7 +95,7 @@ class TimedNotifier(ScheduledNotifier):
         # Non-private addresses will still take precedence, and link-local
         # addresses are always ignored.
         self.allow_private = config.get('allow_private', 'no')
-        if self.allow_private.lower() in ('yes', 'true', 'on'):
+        if self.allow_private.lower() in ('yes', 'true', 'on', '1'):
             self.allow_private = True
         else:
             self.allow_private = False
