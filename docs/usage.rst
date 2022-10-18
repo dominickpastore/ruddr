@@ -134,6 +134,8 @@ The basic format is similar to Microsoft INI files:
 
 The sections below describe how to customize each part of the configuration.
 
+.. _notifier_config:
+
 Notifiers
 ~~~~~~~~~
 

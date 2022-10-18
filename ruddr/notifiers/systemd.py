@@ -83,7 +83,7 @@ class SystemdNotifier(ScheduledNotifier):
         else:
             self.allow_private = False
 
-        # Will store a reference to the GLib main loop so we can stop it later
+        # Will store a reference to the GLib main loop, so we can stop it later
         self.mainloop = None
 
     def check_once(self):
