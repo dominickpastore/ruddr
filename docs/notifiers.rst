@@ -100,8 +100,8 @@ change and Ruddr detecting the change.
 **Configuration options:**
 
 Note that the configuration options are exactly the same as the timed notifier,
-since it shares the same exact polling behavior when systemd-networkd does not
-notify of changed IP addresses.
+since it uses the same exact polling behavior between notifications from
+systemd-networkd.
 
 ``iface``
    The network interface whose address should be checked.
@@ -154,11 +154,104 @@ there are also plans to enhance its functionality (see `issue #9`_).
 
 .. _issue #9: https://github.com/dominickpastore/ruddr/issues/9
 
-.. TODO
+**Sample config (with defaults commented)**::
+
+    [notifier.main]
+    type = web
+    url = https://icanhazip.com/
+    #url6 = <default same as url>
+    #timeout = 10
+    #timeout6 = <default same as timeout>
+    #ipv6_prefix = 64
+    #interval = 10800
+    #retry_min_interval = 60
+    #retry_max_interval = 86400
+    #allow_private = no
+    #skip_ipv4 = no
+    #skip_ipv6 = no
+    #ipv4_required = yes
+    #ipv6_required = no
+
+**Configuration options:**
+
+``url``
+   The URL to request IP addresses from. Normally, both IPv4 and IPv6 addresses
+   will be requested from the same URL (by issuing separate requests over IPv4
+   and IPv6). If a different URL should be used for IPv4 and IPv6, specify the
+   IPv6 URL with ``url6``. Note that this option is mandatory, so if only IPv6
+   is needed, you should specify the URL here but add ``skip_ipv4 = true`` to
+   the configuration.
+
+``url6``
+   The URL to request IPv6 addresses from, if different from the URL to request
+   IPv4 addresses. Note that this option cannot be used without ``url``. If
+   only IPv6 is needed, you should use regular ``url`` but add
+   ``skip_ipv4 = true`` to the configuration.
+
+``timeout``
+   The number of seconds to wait for a response from the HTTP server. If the
+   server does not respond within this many seconds, Ruddr will abort the
+   attempt and go into retry mode.
+
+``timeout6``
+   The number of seconds to wait for a response from the HTTP server when
+   requesting the IPv6 address, if different from the timeout when requesting
+   the IPv4 address. If the server does not respond within this many seconds,
+   Ruddr will abort the attempt and go into retry mode.
+
+``ipv6_prefix``
+   Number of bits that make up the network prefix of the IPv6 address. This is
+   the part of the IPv6 address Ruddr will monitor for changes, and the part
+   that will be updated by any attached updaters. The bits after the prefix
+   will not be monitored, nor will they be changed by any attached notifier.
+   The default is 64, but note that many ISPs will delegate a larger block of
+   addresses (often an entire 56-bit prefix). You should check what prefix size
+   your ISP delegates. Note that this only applies to IPv6 addresses; Ruddr
+   always monitors and updates entire IPv4 addresses.
+
+``interval``
+   The number of seconds between IP address checks under normal conditions.
+
+``retry_min_interval``
+   If an IP address check fails (i.e. IPv4 address is not available when
+   ``ipv4_required`` is true or IPv6 address is not available when
+   ``ipv6_required`` is true), the notifier goes into retry mode with
+   exponential backoff. The first retry will occur ``retry_min_interval``
+   seconds later. The interval will double for each subsequent retry until
+   a retry fully succeeds or ``retry_max_interval`` is reached.
+
+``retry_max_interval``
+   When the retry interval reaches this duration in seconds, it remains
+   constant until a retry succeeds. See ``retry_min_interval`` for more
+   explanation.
 
 Static Notifier
 ---------------
 
 Type: ``static``
 
-.. TODO
+This is a basic notifier that always returns the address specified in its
+configuration. It is of limited use outside of testing purposes.
+
+**Sample config (with defaults commented)**::
+
+    [notifier.main]
+    type = static
+    ipv4 = 198.51.100.1
+    ipv6 = 2001:db8:0001::/48
+    #skip_ipv4 = no
+    #skip_ipv6 = no
+    #ipv4_required = yes
+    #ipv6_required = no
+
+**Configuration options:**
+
+Note that you must provide at least one of ``ipv4`` and ``ipv6``.
+
+``ipv4``
+   The IPv4 address that this notifier will always notify with.
+
+``ipv6``
+   The IPv6 network prefix that this notifier will always notify with. Note
+   that the prefix length is required, and all non-prefix bits of the address
+   must be zero.
