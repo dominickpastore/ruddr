@@ -39,7 +39,33 @@ associated with a domain name. If your domain name is registered with Gandi and
 you use their DNS services (marketed as "LiveDNS"), this updater is a great
 choice for you.
 
-.. TODO
+**Sample config for Gandi (with defaults commented)**::
+
+    [updater.main]
+    type = gandi
+    api_key = <your-api-key>
+    fqdns = example.com www.example.com
+    #endpoint = https://api.gandi.net/v5/livedns
+
+**Configuration options:**
+
+``api_key``
+    Your production LiveDNS API key. You can generate this by logging in to
+    https://account.gandi.net/ and navigating to the "Security" section.
+
+``fqdns``
+    A list of fully qualified domain names to update the A and AAAA records
+    for. Multiple domain names should be separated by whitespace (note: if
+    using newlines as a separator, lines after the first must be indented).
+    These may be your root domains (e.g. example.com), subdomains (e.g.
+    www.example.com), or any mixture of both.
+
+``endpoint``
+    The API endpoint to use, that is, the base URL for the LiveDNS API. This
+    should rarely need to be set explicitly, as it defaults to Gandi's
+    production LiveDNS API endpoint. (Gandi does not currently provide a
+    staging API environment as of September 16, 2021, but if they do in the
+    future, this option could be used to switch to that for testing purposes.)
 
 HE Updaters
 -----------
