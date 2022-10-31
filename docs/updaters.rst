@@ -1,16 +1,26 @@
 Updaters
 ========
 
-.. TODO description of what updaters do
+Updaters are the modules in Ruddr that interface with your dynamic DNS
+provider. Different providers use different protocols and APIs, which
+correspond with the various updater types available.
 
-If none of the updaters below meet your needs, you can write your own.
-
-.. TODO link "write your own" to the section on development page
+Sample configurations are provided for some popular DDNS providers. However, if
+none of the built-in updaters below are compatible with your provider, you can
+write your own. (see :ref:`updater_dev`).
 
 Standard Updater
 ----------------
 
 Type: ``standard``
+
+This updater is compatible with a wide variety of providers that mimic an API
+first introduced by DynDNS (dyn.com, now owned by Oracle). Despite the
+updater's name, the API is not officially standardized. However, it has
+effectively become a de facto standard. If your provider supports updates via a
+URL that looks like ``http[s]://<hostname>/nic/update?myip=<IP address>`` or
+``http[s]://<username>:<password>@<hostname>/nic/update?myip=<IP address>``,
+this is the updater to use.
 
 .. TODO
 
@@ -24,11 +34,21 @@ Gandi Updater
 
 Type: ``gandi``
 
+This updater uses Gandi's LiveDNS API to update the A and AAAA records
+associated with a domain name. If your domain name is registered with Gandi and
+you use their DNS services (marketed as "LiveDNS"), this updater is a great
+choice for you.
+
 .. TODO
 
 HE Updaters
 -----------
 
 Type: ``he``
+
+This is a niche updater for those who use Hurricane Electric's IPv6 tunnel
+broker service. The tunnel broker requires an up-to-date IPv4 address at all
+times, and this updater can be used to provide it. Since that is its only
+purpose, it ignores any IPv6 addresses supplied by a notifier.
 
 .. TODO
