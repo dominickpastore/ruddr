@@ -10,12 +10,12 @@ class HEUpdater(Updater):
     """Ruddr updater for the IPv4 address at Hurricane Electric's tunnel broker
 
     :param name: Name of the updater (from config section heading)
-    :param manager: The DDNSManager
+    :param addrfile: The :class:`~ruddr.Addrfile` object
     :param config: Dict of config options for this updater
     """
 
-    def __init__(self, name, manager, config):
-        super().__init__(name, manager, config)
+    def __init__(self, name, addrfile, config):
+        super().__init__(name, addrfile)
 
         # HE tunnel ID
         try:

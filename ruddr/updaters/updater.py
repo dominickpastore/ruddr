@@ -1,11 +1,12 @@
 """Base class for Ruddr updaters"""
 
 import functools
+import ipaddress
 import logging
 import threading
 import types
 
-from ..exceptions import ConfigError, PublishError
+from ..exceptions import PublishError
 
 
 class _Retry:
@@ -81,24 +82,17 @@ class Updater:
     a notifier, retries, and working with the addrfile.
 
     :param name: Name of the updater (from config section heading)
-    :param manager: The DDNSManager
-    :param global_config: Dict of ``[ruddr]`` config options
-    :param config: Dict of config options for this updater
+    :param addrfile: The :class:`~ruddr.Addrfile` object
     """
 
-    def __init__(self, name, manager, config):
+    def __init__(self, name, addrfile):
         #: Updater name (from config section heading)
         self.name = name
 
         #: Logger (see standard :mod:`logging` module)
         self.log = logging.getLogger(f'ruddr.updater.{self.name}')
 
-        self.manager = manager
-
-        #: Most recent IPv4Address successfully updated
-        self.ipv4 = manager.addrfile_get_ipv4(self.name)
-        #: Most recent IPv6Address successfully updated
-        self.ipv6 = manager.addrfile_get_ipv6(self.name)
+        self.addrfile = addrfile
 
     @_Retry
     def update_ipv4(self, address):
@@ -108,15 +102,14 @@ class Updater:
 
         :param address: :class:`IPv4Address` to update with
         """
-        if address == self.ipv4:
+        if not self.addrfile.needs_ipv4_update(self.name, address):
             self.log.info("Skipping update as %s is current address",
                           address.exploded)
             return
 
-        # Set current address to None before publishing. If publishing fails,
+        # Invalidate current address before publishing. If publishing fails,
         # current address is indeterminate.
-        self.ipv4 = None
-        self.manager.addrfile_set_ipv4(self.name, None)
+        self.addrfile.invalidate_ipv4(self.name, address)
 
         try:
             self.publish_ipv4(address)
@@ -130,8 +123,7 @@ class Updater:
             self.log.debug("Updater does not implement IPv4 updates")
             return
 
-        self.ipv4 = address
-        self.manager.addrfile_set_ipv4(self.name, address)
+        self.addrfile.set_ipv4(self.name, address)
 
     @_Retry
     def update_ipv6(self, address):
@@ -141,15 +133,14 @@ class Updater:
 
         :param address: :class:`IPv6Network` to update with
         """
-        if address == self.ipv6:
+        if not self.addrfile.needs_ipv6_update(self.name, address):
             self.log.info("Skipping update as %s is current address",
                           address.compressed)
             return
 
-        # Set current address to None before publishing. If publishing fails,
+        # Invalidate current address before publishing. If publishing fails,
         # current address is indeterminate.
-        self.ipv6 = None
-        self.manager.addrfile_set_ipv6(self.name, None)
+        self.addrfile.invalidate_ipv6(self.name, address)
 
         try:
             self.publish_ipv6(address)
@@ -163,8 +154,7 @@ class Updater:
             self.log.debug("Updater does not implement IPv6 updates")
             return
 
-        self.ipv6 = address
-        self.manager.addrfile_set_ipv6(self.name, address)
+        self.addrfile.set_ipv6(self.name, address)
 
     def publish_ipv4(self, address):
         """Publish a new IPv4 address to the appropriate DDNS provider. Will
@@ -175,7 +165,7 @@ class Updater:
         to raise :exc:`~ruddr.PublishError` when publishing fails!
 
         :param address: :class:`IPv4Address` to publish
-        :raise PublishError` when publishing fails
+        :raise PublishError: when publishing fails
         """
         raise NotImplementedError("IPv4 publish function not provided")
 
@@ -188,6 +178,6 @@ class Updater:
         to raise :exc:`~ruddr.PublishError` when publishing fails!
 
         :param network: :class:`IPv6Network` with the prefix to publish
-        :raise PublishError` when publishing fails
+        :raise PublishError: when publishing fails
         """
         raise NotImplementedError("IPv6 publish function not provided")

@@ -2,8 +2,6 @@
 
 import argparse
 import importlib
-import ipaddress
-import json
 import logging
 import logging.handlers
 import signal
@@ -16,6 +14,7 @@ if sys.version_info < (3, 10):
 else:
     from importlib.metadata import entry_points
 
+from . import Addrfile
 from . import configuration
 from .exceptions import RuddrException, NotifierSetupError, ConfigError
 from . import notifiers
@@ -24,35 +23,6 @@ from . import updaters
 
 
 log = logging.getLogger('ruddr')
-
-
-class _IPJSONEncoder(json.JSONEncoder):
-    """Subclass of JSONDecoder that can handle IPv4Address and IPv6Network"""
-    def default(self, o):
-        if isinstance(o, ipaddress.IPv4Address):
-            return o.exploded
-        elif isinstance(o, ipaddress.IPv6Network):
-            return o.compressed
-        return super().default(o)
-
-
-def _decode_ips(d):
-    """Object hook that decodes IP addresses. Raises a ValueError if the value
-    of an 'ipv4' key cannot be converted to an IPv4Address or the value of an
-    'ipv6' key cannot be converted to an IPv6Address."""
-    if 'ipv4' in d and d['ipv4'] is not None:
-        try:
-            d['ipv4'] = ipaddress.IPv4Address(d['ipv4'])
-        except ValueError as e:
-            log.warning("Malformed IPv4 in addrfile: %s. Ignoring.", e)
-            d['ipv4'] = None
-    if 'ipv6' in d and d['ipv6'] is not None:
-        try:
-            d['ipv6'] = ipaddress.IPv6Interface(d['ipv6']).network
-        except ValueError as e:
-            log.warning("Malformed IPv6 network in addrfile: %s. Ignoring.", e)
-            d['ipv6'] = None
-    return d
 
 
 class DDNSManager:
@@ -66,12 +36,8 @@ class DDNSManager:
     def __init__(self, config):
         self.config = config
 
-        #: Addrfile path
-        self.addrfile = self.config.main['addrfile']
-
-        #: Addrfile data. Stores contents of addrfile between writes.
-        self.addresses = dict()
-        self._read_addrfile()
+        #: Addrfile manager
+        self.addrfile = Addrfile(self.config.main['addrfile'])
 
         # Creates self.notifiers and self.updaters as dicts
         self._create_notifiers()
@@ -108,7 +74,7 @@ class DDNSManager:
             else:
                 updater_class = updaters.updaters[(module, updater_type)]
 
-            updater = updater_class(name, self, config)
+            updater = updater_class(name, self.addrfile, config)
             self._attach_updater_notifier(updater, config)
             self.updaters[name] = updater
 
@@ -183,149 +149,9 @@ class DDNSManager:
             notifier.stop()
         log.info("All notifiers stopped.")
 
-    def _read_addrfile(self):
-        """Read the addrfile in. If it cannot be read or is malformed, log and
-        return without touching :attr:`self.addresses`."""
-        try:
-            with open(self.addrfile, 'r') as f:
-                addresses = json.load(f, object_hook=_decode_ips)
-        except json.JSONDecodeError as e:
-            log.warning("Malformed JSON in addrfile %s at (%d:%d). Will "
-                        "recreate.", self.addrfile, e.lineno, e.colno)
-            return
-        except OSError as e:
-            log.warning("Could not read addrfile %s (%s). Will attempt to "
-                        "recreate.", self.addrfile, e.strerror)
-            return
-        if not isinstance(addresses, dict):
-            log.warning("Addrfile %s has unexpected JSON structure. Will "
-                        "recreate.", self.addrfile)
-            return
-
-        # Check that each key contains a properly formed dict (only keys ipv4
-        # and ipv6, values are None or appropriate type of address)
-        for name, addrs in list(addresses.items()):
-            if not isinstance(addrs, dict):
-                log.warning("Addrfile %s has unexpected JSON structure for "
-                            "key %s. Will recreate that key.",
-                            self.addrfile, name)
-                addresses[name] = {'ipv4': None, 'ipv6': None}
-                continue
-            key_count = 0
-            if 'ipv4' in addrs:
-                key_count += 1
-                if not (addrs['ipv4'] is None or
-                        isinstance(addrs['ipv4'], ipaddress.IPv4Address)):
-                    log.warning("Addrfile %s has unexpected JSON structure "
-                                "for key %s. Will recreate that key.",
-                                self.addrfile, name)
-                    addresses[name] = {'ipv4': None, 'ipv6': None}
-                    continue
-            if 'ipv6' in addrs:
-                key_count += 1
-                if not (addrs['ipv6'] is None or
-                        isinstance(addrs['ipv6'], ipaddress.IPv6Network)):
-                    log.warning("Addrfile %s has unexpected JSON structure "
-                                "for key %s. Will recreate that key.",
-                                self.addrfile, name)
-                    addresses[name] = {'ipv4': None, 'ipv6': None}
-                    continue
-            if len(addrs) > key_count:
-                log.warning("Addrfile %s has unexpected JSON structure for "
-                            "key %s. Will recreate that key.",
-                            self.addrfile, name)
-                addresses[name] = {'ipv4': None, 'ipv6': None}
-
-        self.addresses = addresses
-
-    def _write_addrfile(self):
-        """Write out the addrfile. If it cannot be written, log the error but
-        do not raise an exception."""
-        try:
-            with open(self.addrfile, 'w') as f:
-                json.dump(self.addresses, f, cls=_IPJSONEncoder,
-                          sort_keys=True, indent=4)
-        except OSError as e:
-            log.error("Could not write addrfile %s: %s",
-                      self.addrfile, e.strerror)
-
-    def addrfile_get_ipv4(self, name):
-        """Get the IPv4 entry from the addrfile for the named updater.
-
-        If the file could not be opened, there was no entry for the named
-        updater, or the addrfile or entry were malformed, returns None.
-
-        :param name: Name of the updater to fetch the address for
-        :return: An :class:`IPv4Address` or None
-        """
-        try:
-            addrs = self.addresses[name]
-        except KeyError:
-            addrs = {'ipv4': None, 'ipv6': None}
-            self.addresses[name] = addrs
-
-        try:
-            return addrs['ipv4']
-        except KeyError:
-            self.addresses[name]['ipv4'] = None
-            return None
-
-    def addrfile_get_ipv6(self, name):
-        """Get the IPv6 entry from the addrfile for the named updater.
-
-        If the file could not be opened, there was no entry for the named
-        updater, or the addrfile or entry were malformed, returns None.
-
-        :param name: Name of the updater to fetch the address for
-        :return: An :class:`IPv6Network` or None
-        """
-        try:
-            addrs = self.addresses[name]
-        except KeyError:
-            addrs = {'ipv4': None, 'ipv6': None}
-            self.addresses[name] = addrs
-
-        try:
-            return addrs['ipv6']
-        except KeyError:
-            self.addresses[name]['ipv6'] = None
-            return None
-
-    def addrfile_set_ipv4(self, name, addr):
-        """Set the IPv4 entry for the named updater in the addrfile.
-
-        If the file could not be written, the error is logged but no exception
-        is raised.
-
-        :param name: Name of the updater to write the address for
-        :param addr: An :class:`IPv4Address` to write
-        """
-        if name in self.addresses:
-            self.addresses[name]['ipv4'] = addr
-        else:
-            self.addresses[name] = {'ipv4': addr, 'ipv6': None}
-
-        self._write_addrfile()
-
-    def addrfile_set_ipv6(self, name, addr):
-        """Set the IPv6 entry for the named updater in the addrfile.
-
-        If the file could not be written, the error is logged but no exception
-        is raised.
-
-        :param name: Name of the updater to write the address for
-        :param addr: An :class:`IPv6Network` to write
-        """
-        if name in self.addresses:
-            self.addresses[name]['ipv6'] = addr
-        else:
-            self.addresses[name] = {'ipv4': None, 'ipv6': addr}
-
-        self._write_addrfile()
-
 
 def validate_notifier_type(module: Optional[str], type_: str) -> bool:
-    """Check if an notifier type exists, importing it for :class:`DDNSManager`
+    """Check if a notifier type exists, importing it for :class:`DDNSManager`
     if it is not one of the built-in notifiers that comes with Ruddr
 
     :param module: ``None`` for built-in notifiers. Otherwise, the module the
