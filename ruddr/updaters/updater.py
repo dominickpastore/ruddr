@@ -6,21 +6,29 @@ import logging
 import threading
 import types
 
-from ..exceptions import PublishError
+from ..exceptions import PublishError, FatalPublishError
 
 
-class _Retry:
+class Retry:
     """A decorator that makes a function retry periodically until success.
     Success is defined by not raising :exc:`~ruddr.PublishError`. The first
     retry interval is 5 minutes, with exponential backoff until the retry
     interval reaches 1 day, at which point it will remain constant.
 
-    Assumes it is being applied to a method of :class:`~ruddr.Updater`. Other
+    Additional calls to the function while a retry is pending are ignored if
+    the parameters are equal. Otherwise, the previously pending retry is
+    cancelled, the call is executed, and the retry timer resets as if it were a
+    fresh failure.
+
+    Assumes it is being applied to a method of a :class:`BaseUpdater`. Other
     uses may not work as intended."""
 
     def __init__(self, func):
         functools.update_wrapper(self, func)
         self.func = func
+        self.retrying = False
+        self.last_args = None
+        self.last_kwargs = None
         self.seq = 0
         self.retries = 0
         self.lock = threading.RLock()
@@ -39,6 +47,11 @@ class _Retry:
 
     def __call__(self, obj, *args, **kwargs):
         with self.lock:
+            if (self.retrying and
+                    self.last_args == args and self.last_kwargs == kwargs):
+                obj.log.debug("(Not executing call with equal args to seq %d)",
+                              self.seq)
+                return
             self.seq += 1
             self.retries = 0
             obj.log.debug("(Update seq: %d)", self.seq)
@@ -61,11 +74,15 @@ class _Retry:
         """Run the function and schedule a retry if it failed"""
         try:
             self.func(obj, *args, **kwargs)
+        except FatalPublishError:
+            self.retrying = False
+            obj.log.error("Update error was fatal. This updater will halt.")
+            obj.halt = True
         except PublishError:
-            if self.retries <= 8:
-                # Retry after 5 minutes the first time, doubling each retry
-                retry_delay = 300 * 2 ** self.retries
-            else:
+            self.retrying = True
+            # Retry after minimum interval the first time, doubling each retry
+            retry_delay = obj.min_retry_interval * (2 ** self.retries)
+            if retry_delay > 86400:
                 # Cap retry time at one day
                 retry_delay = 86400
             self.retries += 1
@@ -75,26 +92,48 @@ class _Retry:
                                     args=(seq, obj, *args), kwargs=kwargs)
             timer.daemon = True
             timer.start()
+        else:
+            self.retrying = False
 
 
-class Updater:
-    """Base class for Ruddr updaters. Handles setting up logging, attaching to
-    a notifier, retries, and working with the addrfile.
+class BaseUpdater:
+    """Skeletal superclass for :class:`Updater`. Custom updaters can opt to
+    override this instead if the default logic in Updater does not suit their
+    needs (e.g. if the protocol requires IPv4 and IPv6 updates to be sent
+    simultaneously, custom retry logic, etc.).
 
     :param name: Name of the updater (from config section heading)
     :param addrfile: The :class:`~ruddr.Addrfile` object
+    :param min_retry: The minimum number of seconds between retries, if a retry
+                      is necessary. (An exponential backoff is applied after
+                      the first retry.)
     """
 
-    def __init__(self, name, addrfile):
+    def __init__(self, name, addrfile, min_retry=300):
         #: Updater name (from config section heading)
         self.name = name
 
         #: Logger (see standard :mod:`logging` module)
+        # NOTE: This name is also used by @Retry
         self.log = logging.getLogger(f'ruddr.updater.{self.name}')
 
+        #: Addrfile for avoiding duplicate updates
         self.addrfile = addrfile
 
-    @_Retry
+        #: Minimum retry interval (some providers may require a minimum delay
+        #: when there are server errors)
+        self.min_retry_interval = min_retry
+
+        #: @Retry will set this to ``True`` when there has been a fatal error
+        #: and no more updates should be issued.
+        self.halt = False
+
+    def initial_update(self):
+        """Do the initial update: Check the addrfile, and if either address is
+        defunct but has a last-attempted-address, try to publish it again.
+        """
+        raise NotImplementedError
+
     def update_ipv4(self, address):
         """Receive a new IPv4 address from the attached notifier. If it does
         not match the current address, call the subclass' publish function,
@@ -102,9 +141,65 @@ class Updater:
 
         :param address: :class:`IPv4Address` to update with
         """
+        raise NotImplementedError
+
+    def update_ipv6(self, address):
+        """Receive a new IPv6 prefix from the attached notifier. If it does
+        not match the current prefix, call the subclass' publish function,
+        update the addrfile if successful, and retry if not.
+
+        :param address: :class:`IPv6Network` to update with
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    def replace_ipv6_prefix(
+            network: ipaddress.IPv6Network,
+            address: ipaddress.IPv6Address
+    ) -> ipaddress.IPv6Address:
+        """Replace the prefix portion of the given IPv6 address with the network
+        prefix provided and return the result"""
+        host = int(address) & ((1 << (128 - network.prefixlen)) - 1)
+        return network[host]
+
+
+class Updater(BaseUpdater):
+    """Base class for Ruddr updaters. Handles setting up logging, attaching to
+    a notifier, retries, and working with the addrfile.
+
+    :param name: Name of the updater (from config section heading)
+    :param addrfile: The :class:`~ruddr.Addrfile` object
+    """
+
+    def initial_update(self):
+        """Do the initial update: Check the addrfile, and if either address is
+        defunct but has a last-attempted-address, try to publish it again.
+        """
+        ipv4, is_current = self.addrfile.get_ipv4(self.name)
+        if not is_current:
+            self.update_ipv4(ipv4)
+
+        ipv6, is_current = self.addrfile.get_ipv6(self.name)
+        if not is_current:
+            self.update_ipv6(ipv6)
+
+    @Retry
+    def update_ipv4(self, address):
+        """Receive a new IPv4 address from the attached notifier. If it does
+        not match the current address, call the subclass' publish function,
+        update the addrfile if successful, and retry if not.
+
+        :param address: :class:`IPv4Address` to update with
+        """
+        if self.halt:
+            return
+
+        if address is None:
+            self.log.info("Skipping update with no address (will not "
+                          "de-publish)")
         if not self.addrfile.needs_ipv4_update(self.name, address):
-            self.log.info("Skipping update as %s is current address",
-                          address.exploded)
+            self.log.debug("Skipping update as %s is current address",
+                           address.exploded)
             return
 
         # Invalidate current address before publishing. If publishing fails,
@@ -114,10 +209,7 @@ class Updater:
         try:
             self.publish_ipv4(address)
         except PublishError:
-            if address is None:
-                self.log.error("Failed to unpublish IPv4 address")
-            else:
-                self.log.error("Failed to publish address %s", address)
+            self.log.error("Failed to publish address %s", address)
             raise
         except NotImplementedError:
             self.log.debug("Updater does not implement IPv4 updates")
@@ -125,38 +217,41 @@ class Updater:
 
         self.addrfile.set_ipv4(self.name, address)
 
-    @_Retry
-    def update_ipv6(self, address):
+    @Retry
+    def update_ipv6(self, prefix):
         """Receive a new IPv6 prefix from the attached notifier. If it does
         not match the current prefix, call the subclass' publish function,
         update the addrfile if successful, and retry if not.
 
-        :param address: :class:`IPv6Network` to update with
+        :param prefix: :class:`IPv6Network` to update with
         """
-        if not self.addrfile.needs_ipv6_update(self.name, address):
-            self.log.info("Skipping update as %s is current address",
-                          address.compressed)
+        if self.halt:
             return
 
-        # Invalidate current address before publishing. If publishing fails,
-        # current address is indeterminate.
-        self.addrfile.invalidate_ipv6(self.name, address)
+        if prefix is None:
+            self.log.info("Skipping update with no prefix (will not "
+                          "de-publish)")
+        if not self.addrfile.needs_ipv6_update(self.name, prefix):
+            self.log.debug("Skipping update as %s is current address",
+                           prefix.compressed)
+            return
+
+        # Invalidate current prefix before publishing. If publishing fails,
+        # current prefix is indeterminate.
+        self.addrfile.invalidate_ipv6(self.name, prefix)
 
         try:
-            self.publish_ipv6(address)
+            self.publish_ipv6(prefix)
         except PublishError:
-            if address is None:
-                self.log.error("Failed to unpublish IPv6 address")
-            else:
-                self.log.error("Failed to publish address %s", address)
+            self.log.error("Failed to publish prefix %s", prefix)
             raise
         except NotImplementedError:
             self.log.debug("Updater does not implement IPv6 updates")
             return
 
-        self.addrfile.set_ipv6(self.name, address)
+        self.addrfile.set_ipv6(self.name, prefix)
 
-    def publish_ipv4(self, address):
+    def publish_ipv4(self, address: ipaddress.IPv4Address):
         """Publish a new IPv4 address to the appropriate DDNS provider. Will
         only be called if an update contains a new address or a previous update
         failed.
@@ -169,7 +264,7 @@ class Updater:
         """
         raise NotImplementedError("IPv4 publish function not provided")
 
-    def publish_ipv6(self, network):
+    def publish_ipv6(self, network: ipaddress.IPv6Network):
         """Publish a new IPv6 prefix to the appropriate DDNS provider. Will
         only be called if an update contains a new address or a previous update
         failed.

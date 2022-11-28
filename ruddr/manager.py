@@ -75,6 +75,7 @@ class DDNSManager:
                 updater_class = updaters.updaters[(module, updater_type)]
 
             updater = updater_class(name, self.addrfile, config)
+            updater.initial_update()
             self._attach_updater_notifier(updater, config)
             self.updaters[name] = updater
 

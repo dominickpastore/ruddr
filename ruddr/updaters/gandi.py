@@ -295,13 +295,6 @@ class GandiUpdater(Updater):
         if not success:
             raise PublishError("Could not update all records")
 
-    @staticmethod
-    def replace_prefix(net6, addr6):
-        """Replace the prefix portion of the given IPv6 address with the network
-        prefix provided and return the result"""
-        host = int(addr6) & ((1 << net6.prefixlen) - 1)
-        return net6[host]
-
     def publish_ipv6(self, network):
         zone_subdomains = self._get_subdomain_zones()
 
@@ -342,7 +335,7 @@ class GandiUpdater(Updater):
                         if aaaa not in new_ips:
                             new_ips.append(aaaa)
                     else:
-                        new_ip = self.replace_prefix(network, aaaa)
+                        new_ip = self.replace_ipv6_prefix(network, aaaa)
                         if new_ip not in new_ips:
                             new_ips.append(new_ip)
                         changed = True

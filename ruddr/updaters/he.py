@@ -52,6 +52,13 @@ class HEUpdater(Updater):
                   'myip': address.exploded}
         try:
             r = requests.get(self.endpoint, auth=self.auth, params=params)
+        except requests.exceptions.RequestException as e:
+            self.log.error("Could not update tunnel %s client IPv4 to %s: %s",
+                           self.tunnel, address.exploded, e)
+            raise PublishError("Updater %s could not access %s: %s" % (
+                self.name, self.endpoint, e)) from e
+
+        try:
             r.raise_for_status()
         except requests.exceptions.HTTPError as e:
             self.log.error("Received HTTP %d when trying to update tunnel %s "
@@ -59,11 +66,6 @@ class HEUpdater(Updater):
                            self.tunnel, address.exploded, r.text)
             raise PublishError("Updater %s got HTTP %d for %s" % (
                 self.name, r.status_code, self.endpoint)) from e
-        except requests.exceptions.RequestException as e:
-            self.log.error("Could not update tunnel %s client IPv4 to %s: %s",
-                           self.tunnel, address.exploded, e)
-            raise PublishError("Updater %s could not access %s: %s" % (
-                self.name, self.endpoint, e)) from e
 
         response = r.text.strip().split()
         if response[0] == 'good':

@@ -2,10 +2,19 @@
 
 import configparser
 import pathlib
+import sys
 
 from typing import Dict, Callable, Union, TextIO, Optional
 
+if sys.version_info < (3, 10):
+    from importlib_metadata import version
+else:
+    from importlib.metadata import version
+
 from .exceptions import ConfigError
+
+
+USER_AGENT = f"ruddr/{version('ruddr')} ruddr@dcpx.org"
 
 
 DEFAULT_ADDRFILE = '/var/lib/misc/ruddr.addrfile'

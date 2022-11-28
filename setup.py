@@ -7,7 +7,7 @@ setup(
     name='ruddr',
     version='0.0.0dev0',
     author='Dominick C. Pastore',
-    author_email='dominickpastore@dcpx.org',
+    author_email='ruddr@dcpx.org',
     description='Robotic Updater for Dynamic DNS Records',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -23,6 +23,7 @@ setup(
     install_requires=[
         'requests',
         'netifaces',
+        'dnspython',
         "importlib_metadata; python_version<'3.10'",
     ],
     python_requires='>=3.7',

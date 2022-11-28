@@ -55,8 +55,8 @@ def get_iface_addrs(if_name, omit_private=True, omit_link_local=True):
     """
     ipv4, ipv6 = _get_iface_addrs(if_name)
 
-    ipv4 = []
-    ipv6 = []
+    result_ipv4 = []
+    result_ipv6 = []
     ipv4_private = []
     ipv6_private = []
     ipv4_link_local = []
@@ -68,20 +68,20 @@ def get_iface_addrs(if_name, omit_private=True, omit_link_local=True):
         elif a.is_private:
             ipv4_private.append(a)
         else:
-            ipv4.append(a)
+            result_ipv4.append(a)
     for a in ipv6:
         if a.is_link_local:
             ipv6_link_local.append(a)
         elif a.is_private:
             ipv6_private.append(a)
         else:
-            ipv6.append(a)
+            result_ipv6.append(a)
 
     if not omit_private:
-        ipv4 += ipv4_private
-        ipv6 += ipv6_private
+        result_ipv4 += ipv4_private
+        result_ipv6 += ipv6_private
     if not omit_link_local:
-        ipv4 += ipv4_link_local
-        ipv6 += ipv6_link_local
+        result_ipv4 += ipv4_link_local
+        result_ipv6 += ipv6_link_local
 
     return (ipv4, ipv6)

@@ -29,9 +29,10 @@ this is the updater to use.
     endpoint = https://api.dynu.com
     username = <your-username>
     password = <your-password>
-    hosts = foo bar
-    dns_query = .dynu.com@ns1.dynu.com
-    ipv6_dialect = separate
+    hosts = foo.dynuddns.com/foo.dynuddns.com bar.dynuddns.com/::1a2b:3c3d
+    nameserver = ns1.dynu.com
+    ipv6_dialect = separate_no
+    min_retry_interval = 600
 
 **Sample config for NoIP**::
 
@@ -40,9 +41,10 @@ this is the updater to use.
     endpoint = http://dynupdate.no-ip.com
     username = <your-username>
     password = <your-password>
-    hosts = foo.example.com bar.example.com
-    dns_query = .@ns1.no-ip.com
+    hosts = foo.ddns.net/foo.ddns.net bar.ddns.net/::1a2b:3c3d
+    nameserver = ns1.no-ip.com
     ipv6_dialect = combined
+    min_retry_interval = 1800
 
 .. TODO Give sample configs for other major providers
 
@@ -63,9 +65,10 @@ there's a good chance you can create a working config using these options.
     endpoint = https://update.example.com
     username = <your-username>
     password = <your-password>
-    hosts = foo bar/::1a2b:3c3d
-    #dns_query = .example.com[@ns.example.com]
+    hosts = foo/foo.example.com bar/::1a2b:3c3d
+    #nameserver = ns.example.com
     #ipv6_dialect = separate
+    #min_retry_interval = 300
 
 **Configuration options:**
 
@@ -81,58 +84,29 @@ there's a good chance you can create a working config using these options.
     The password to include with update requests
 
 ``hosts``
-    A whitespace-separated list of hostnames to keep updated. Note that there
-    are two formats you can use when specifying a hostname. First is the
-    hostname alone, and the second is the hostname with an IPv6 address.
+    A whitespace-separated list of hostnames to keep updated. Each entry must
+    be in one of the following three formats:
 
-    When Ruddr does an IPv6 update, it only changes the network prefix portion
-    of the address (unless you specified your prefix length as 128, i.e. the
-    entire address, in your notifier config). Therefore, Ruddr needs to know
-    what to use for the host portion of the address.
+    ``<hostname>/-`` - Ruddr requires an existing IPv6 address in order to do
+    IPv6 updates, since it only changes the network prefix for IPv6 addresses.
+    However, if you do not need IPv6 addresses, you can use this format, and
+    the updater will ignore IPv6 addresses from the notifier.
 
-    If you specify an IPv6 address along with a hostname, Ruddr will get the
-    host portion that way (it ignores the network prefix of the address).
-    Otherwise, Ruddr will use the ``dns_query`` configuration (see below) to
-    look up the current IPv6 address using DNS.
+    ``<hostname>/<IPv6-address>`` - For IPv6 updates, Ruddr will take the given
+    address, replace its network prefix with the one from the notifier, and
+    publish the resulting address.
 
-    Allowing Ruddr to look up the IPv6 address with DNS is recommended for
-    convenience.
+    ``<hostname>/<fqdn>`` - For IPv6 updates, Ruddr will look up the given
+    fully-qualified domain name to get an IPv6 address from an AAAA record. It
+    will take that address, replace the network prefix with the one from the
+    notifier, and publish the resulting address. **This is the recommended
+    format, since it will update the prefix of the address already in DNS.**
 
-``dns_query``
-    This option is required when any hostname in ``hosts`` does not have an
-    IPv6 address provided with it. It provides the additional info Ruddr needs
-    to fetch the current address from DNS. The format is
-    ``<.domain>[@server]``.
-
-    The ``<.domain>`` portion is the rest of the domain name to append to each
-    hostname when doing a DNS lookup. The optional ``@server`` portion lets
-    you specify a specific DNS server to use (for example, you can provide the
-    nameserver for your DDNS provider to look up the record from them
-    directly).
-
-    For example: If you have hostname "example" with Dynu, you can use this
-    configuration to have Ruddr do the lookup as "example.dynu.com" on one of
-    Dynu's own nameservers::
-
-        hosts = example
-        dns_query = .dynu.com@ns1.dynu.com
-
-    In another case, you may want to have Ruddr get the host portion of the
-    IPv6 from your LAN's internal DNS server at 192.168.0.1, and perhaps the
-    hostname alone is enough to do the lookup there. Use a single dot as the
-    domain portion to say the hostname is lookup-able as-is::
-
-        hosts = example
-        dns_query = .@192.168.0.1
-
-    (Note that some networks may appear to allow bare hostname lookups, when in
-    fact the OS is automatically appending your network's local domain name.)
-
-    .. note::
-       Some providers may require you to specify fully-qualified domain names
-       as the ``hosts`` to be updated. In that case, use a single dot as the
-       domain portion in ``dns_query`` since no additional domain needs to be
-       added for lookups.
+``nameserver``
+    This option is used only if you used the ``<hostname>/<fqdn>`` format
+    for any of the entries in ``hosts``. It allows you to specify a specific
+    nameserver to query. You can specify your provider's nameserver here to
+    ensure Ruddr gets the most up-to-date result directly from them.
 
 ``ipv6_dialect``
     The DynDNS API was originally designed for IPv4 only. As a result,
@@ -141,10 +115,23 @@ there's a good chance you can create a working config using these options.
     provider. These are the possibilities:
 
     ``separate`` provides IPv6 addresses using a separate ``myipv6`` parameter
-    in the URL. This is the default.
+    in the URL. If only one address needs to be set (IPv4 or IPv6), the
+    parameter for the other type of address will be omitted. This is the
+    default.
+
+    ``separate_no`` is like ``separate``, except if only one address can be
+    set, ``no`` is sent in place of the other address.
 
     ``combined`` provides both IP addresses together in the ``myip`` parameter,
-    separated by a comma, e.g. ``myip=1.2.3.4,2001:0db8::4``
+    separated by a comma, e.g. ``myip=1.2.3.4,2001:0db8::4``. If only one
+    address needs to be set (IPv4 or IPv6), it will be sent in the ``myip``
+    parameter alone, without a comma.
+
+``min_retry_interval``
+    The minimum number of seconds to wait between retries when an update fails.
+    This minimum is used for the first retry, with an exponential backoff for
+    subsequent retries. Some providers, especially free ones, have specific
+    requirements for this.
 
 Gandi Updater
 -------------
