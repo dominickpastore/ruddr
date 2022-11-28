@@ -3,10 +3,14 @@
 import functools
 import ipaddress
 import logging
+import socket
 import threading
 import types
+from typing import Union, Tuple, List, Optional
 
-from ..exceptions import PublishError, FatalPublishError
+import dns.resolver
+
+from ..exceptions import PublishError, FatalPublishError, ConfigError
 
 
 class Retry:
@@ -276,3 +280,231 @@ class Updater(BaseUpdater):
         :raise PublishError: when publishing fails
         """
         raise NotImplementedError("IPv6 publish function not provided")
+
+
+class OneWayUpdater(Updater):
+    """Base class for updaters supporting protocols that are one-way, that is,
+    the API has no way to obtain the current address for a host. It can use
+    hardcoded IPv6 addresses or look them up in DNS.
+
+    :param name: Name of the updater (from config section heading)
+    :param addrfile: The :class:`~ruddr.Addrfile` object
+    :param hosts: A list of tuples (hostname, None|IPv6Address|fqdn)
+                  specifying where each host portion of IPv6 addresses should
+                  come from
+    :param nameserver: The nameserver to use to look up AAAA records for the
+                       FQDNs, if any. If ``None``, system DNS is used.
+    """
+
+    def __init__(
+        self,
+        name,
+        addrfile,
+        hosts,
+        nameserver: Optional[str] = None,
+        min_retry=300
+    ):
+        super().__init__(name, addrfile, min_retry)
+
+        #: A list of hosts and how to get the host portion of their IPv6s
+        self.hosts = hosts
+        if isinstance(self.hosts, str):
+            self.hosts = self.split_hosts(self.hosts)
+
+        #: Nameserver to use when looking up AAAA records for FQDNs in hosts
+        self.nameserver = nameserver
+
+    def split_hosts(
+            self,
+            hosts: str
+    ) -> List[Tuple[str, Optional[Union[ipaddress.IPv6Address, str]]]]:
+        """Helper function to split a hosts string into a list of (hostname,
+        None|IPv6Address|hostname).
+
+        Given a whitespace-separated list of entries in the following formats:
+
+        - ``foo/-``
+        - ``foo/foo.example.com``
+        - ``foo/::1a2b:3c3d``
+
+        produce a list of tuples where the first entry is the hostname to
+        update and the second entry is an :class:`~ipaddress.IPv6Address`,
+        :class:`str` FQDN, or ``None`` indicating how to get the host portion
+        of the IPv6 address.
+
+        :param hosts: The whitespace-separated list
+        :returns: The list of host tuples
+        """
+        hosts = hosts.split()
+        result = []
+        for host in hosts:
+            hostname, sep, ip_lookup = host.partition("/")
+            if sep == '':
+                self.log.critical("'%s' entry in hosts needs an fqdn, IPv6, "
+                                  "or '-' after a slash", hostname)
+                raise ConfigError(f"{self.name} updater hosts entry {hostname}"
+                                  " needs an fqdn, IPv6, or '-' after a slash")
+
+            if hostname in [x[0] for x in result]:
+                self.log.critical("'%s' entry in hosts is a duplicate")
+                raise ConfigError(f"{self.name} updater has duplicate hosts "
+                                  f"entry {hostname}")
+
+            if ip_lookup == '-':
+                result.append((hostname, None))
+                continue
+
+            try:
+                ip_lookup = ipaddress.IPv6Address(ip_lookup)
+            except ValueError:
+                self.log.info("hosts entry '/%s' is not an IPv6 address; "
+                              "treating as an fqdn", ip_lookup)
+
+            # If ip_lookup was not converted to an IPv6Address, assume it's an
+            # FQDN
+            result.append((hostname, ip_lookup))
+
+        return result
+
+    def publish_ipv4(self, address):
+        error = None
+        for host, _ in self.hosts:
+            try:
+                self.publish_ipv4_one_host(host, address)
+            except PublishError as e:
+                if error is None:
+                    error = e
+        if error is not None:
+            raise error
+
+    def publish_ipv4_one_host(self,
+                              hostname: str,
+                              address: ipaddress.IPv4Address):
+        """Attempt to publish an IPv4 address for a single host
+
+        :param hostname: The host to publish for
+        :param address: The address to publish
+
+        :raise PublishError: if publishing fails
+        :raise FatalPublishError: if publishing fails in a non-recoverable way
+                                  (all future publishing will halt)
+        """
+        raise NotImplementedError
+
+    def publish_ipv6(self, network):
+        error = None
+        for host, ip_lookup in self.hosts:
+            if ip_lookup is None:
+                continue
+            try:
+                current_ip = self._get_current_ipv6(host, ip_lookup)
+                new_ipv6 = self.replace_ipv6_prefix(network, current_ip)
+                self.publish_ipv6_one_host(host, new_ipv6)
+            except PublishError as e:
+                if error is None:
+                    error = e
+        if error is not None:
+            raise error
+
+    def _get_current_ipv6(
+        self,
+        hostname: str,
+        ip_lookup: Union[str, ipaddress.IPv6Address]
+    ) -> ipaddress.IPv6Address:
+        """Get the current IPv6 address for a host, either returning the
+        hardcoded value or doing a DNS lookup. Convert errors to
+        :class:`PublishError`.
+
+        :param hostname: The host to fetch the IPv6 for
+        :param ip_lookup: A hardcoded :class:`~ipaddress.IPv6Address` or an
+                          FQDN to fetch an AAAA record from
+
+        :raises PublishError: if fetching the IPv6 failed
+        :returns: An :class:`~ipaddress.IPv6Address` with the current IPv6
+        """
+        if isinstance(ip_lookup, ipaddress.IPv6Address):
+            current_ipv6 = ip_lookup
+        else:
+            try:
+                current_ipv6 = self._lookup_ipv6(ip_lookup)
+            except (OSError, dns.exception.DNSException) as e:
+                self.log.error("Could not look up the current IPv6 address "
+                               "for hostname %s: %s", hostname, e)
+                raise PublishError(f"Updater {self.name} could not look up "
+                                   "the current IPv6 address for hostname "
+                                   f"{ip_lookup}")
+            self.log.debug("Looked up IPv6 addr %s for hostname %s",
+                           current_ipv6.compressed, hostname)
+        return current_ipv6
+
+    def _lookup_ipv6(self, ip_lookup: str) -> Optional[ipaddress.IPv6Address]:
+        """Do a DNS lookup for an AAAA record, preferring globally-routable
+        addresses if multiple are present
+
+        :raises OSError: if lookup failed
+        :raises dns.exception.DNSException: if lookup failed
+        :return: An :class:`~ipaddress.IPv6Address` or ``None`` if none could
+                 be found
+        """
+        if self.nameserver is None:
+            self.log.debug("Looking up AAAA record(s) for '%s' in system DNS",
+                           ip_lookup)
+            results = socket.getaddrinfo(ip_lookup, None,
+                                         family=socket.AF_INET6)
+            aaaa_records = [
+                ipaddress.IPv6Address(ai[4][0]) for ai in results
+            ]
+        else:
+            self.log.debug("Looking up address of nameserver %s",
+                           self.nameserver)
+            ns_results = socket.getaddrinfo(self.nameserver, 53,
+                                            type=socket.SOCK_DGRAM)
+            ns_list = [ai[4][0] for ai in ns_results]
+            self.log.debug("Found address(es) for nameserver %s: %s",
+                           self.nameserver, str(ns_list))
+
+            self.log.debug("Looking up AAAA record(s) for '%s' on that "
+                           "nameserver", ip_lookup)
+            resolver = dns.resolver.Resolver(configure=False)
+            resolver.nameservers = ns_list
+            answer = resolver.resolve(ip_lookup, 'AAAA')
+            aaaa_records = [
+                ipaddress.IPv6Address(rec.address)
+                for rec in answer
+            ]
+
+        self.log.debug("Found following address(es) for %s: %s", ip_lookup,
+                       str([addr.compressed for addr in aaaa_records]))
+
+        # Sift through the addresses to find the first globally routable, or if
+        # none, the first private, or if none, the first link-local address
+        first_private = None
+        first_link_local = None
+        for addr in aaaa_records:
+            if addr.is_global:
+                return addr
+            elif addr.is_link_local:
+                if first_link_local is None:
+                    first_link_local = addr
+            elif addr.is_private:
+                if first_private is None:
+                    first_private = addr
+        if first_private is not None:
+            return first_private
+        return first_link_local
+
+    def publish_ipv6_one_host(
+            self,
+            hostname: str,
+            address: ipaddress.IPv6Address
+    ):
+        """Attempt to publish an IPv6 address for a single host
+
+        :param hostname: The host to publish for
+        :param address: The address to publish
+
+        :raise PublishError: if publishing fails
+        :raise FatalPublishError: if publishing fails in a non-recoverable way
+                                  (all future publishing will halt)
+        """
+        raise NotImplementedError

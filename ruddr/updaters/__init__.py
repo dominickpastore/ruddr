@@ -1,6 +1,6 @@
 """Built in updaters and the updater base class"""
 
-from .updater import Updater
+from .updater import BaseUpdater, Updater, OneWayUpdater
 
 from . import gandi
 from . import he
@@ -12,4 +12,4 @@ updaters = {
     'standard': standard.StandardUpdater,
 }
 
-__all__ = ['Updater']
+__all__ = ['BaseUpdater', 'Updater', 'OneWayUpdater']

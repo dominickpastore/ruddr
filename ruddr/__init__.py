@@ -7,7 +7,7 @@ updaters.
 from .addrfile import Addrfile
 from .configuration import ConfigReader, Config
 from .exceptions import (RuddrException, ConfigError, NotifyError,
-                         NotifierSetupError, PublishError)
+                         NotifierSetupError, PublishError, FatalPublishError)
 from .manager import DDNSManager
 from .notifiers import Notifier, ScheduledNotifier, get_iface_addrs
-from .updaters import Updater
+from .updaters import Updater, OneWayUpdater
