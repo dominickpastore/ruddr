@@ -7,6 +7,7 @@ from typing import Dict, Optional
 import requests
 
 from .. import Addrfile
+from ..configuration import USER_AGENT
 from ..exceptions import ConfigError, PublishError
 from .updater import Updater
 
@@ -68,7 +69,8 @@ class FreeDNSUpdater(Updater):
                                         'action': 'getdyndns',
                                         'v': '2',
                                         'sha': self.account_sha1
-                                    })
+                                    },
+                                    headers={'User-Agent': USER_AGENT})
         except requests.exceptions.RequestException as e:
             self.log.error("Could not get list of account subdomains: %s", e)
             return None
@@ -162,7 +164,8 @@ class FreeDNSUpdater(Updater):
         """
         self.log.debug("Updating IP address for %s to %s", fqdn, address)
         try:
-            response = requests.get(url, params={'address': address})
+            response = requests.get(url, params={'address': address},
+                                    headers={'User-Agent': USER_AGENT})
         except requests.exceptions.RequestException as e:
             self.log.error("Could not update %s to %s: %s", fqdn, address, e)
             return False

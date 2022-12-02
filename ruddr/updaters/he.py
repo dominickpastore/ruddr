@@ -2,6 +2,7 @@
 
 import requests
 
+from ..configuration import USER_AGENT
 from ..exceptions import ConfigError, PublishError
 from .updater import Updater
 
@@ -50,8 +51,10 @@ class HEUpdater(Updater):
     def publish_ipv4(self, address):
         params = {'hostname': self.tunnel,
                   'myip': address.exploded}
+        headers = {'User-Agent': USER_AGENT}
         try:
-            r = requests.get(self.endpoint, auth=self.auth, params=params)
+            r = requests.get(self.endpoint, auth=self.auth,
+                             params=params, headers=headers)
         except requests.exceptions.RequestException as e:
             self.log.error("Could not update tunnel %s client IPv4 to %s: %s",
                            self.tunnel, address.exploded, e)

@@ -14,7 +14,7 @@ else:
 from .exceptions import ConfigError
 
 
-USER_AGENT = f"ruddr/{version('ruddr')} ruddr@dcpx.org"
+USER_AGENT = f"ruddr/{version('ruddr')} (ruddr@dcpx.org)"
 
 
 DEFAULT_ADDRFILE = '/var/lib/misc/ruddr.addrfile'

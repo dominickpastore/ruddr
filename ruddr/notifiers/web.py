@@ -5,6 +5,7 @@ import ipaddress
 import socket
 import requests
 
+from ..configuration import USER_AGENT
 from ..exceptions import NotifyError, ConfigError
 from ..restrictfamily import FamilyRestriction
 from .notifier import ScheduledNotifier
@@ -138,7 +139,8 @@ class WebNotifier(ScheduledNotifier):
         if self.want_ipv4():
             with FamilyRestriction(socket.AF_INET):
                 try:
-                    r = requests.get(self.url4, timeout=self.timeout4)
+                    r = requests.get(self.url4, timeout=self.timeout4,
+                                     headers={'User-Agent': USER_AGENT})
                     r.raise_for_status()
                 except requests.exceptions.HTTPError:
                     self.log.error("Received HTTP %d from %s: %s",
@@ -165,7 +167,8 @@ class WebNotifier(ScheduledNotifier):
         if self.want_ipv6():
             with FamilyRestriction(socket.AF_INET6):
                 try:
-                    r = requests.get(self.url6, timeout=self.timeout6)
+                    r = requests.get(self.url6, timeout=self.timeout6,
+                                     headers={'User-Agent': USER_AGENT})
                     r.raise_for_status()
                 except requests.exceptions.HTTPError:
                     self.log.error("Received HTTP %d from %s: %s",

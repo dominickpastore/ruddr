@@ -149,7 +149,7 @@ class StandardUpdater(OneWayUpdater):
             r = requests.get(self.endpoint,
                              auth=self.auth,
                              params=params,
-                             headers={'user-agent': USER_AGENT})
+                             headers={'User-Agent': USER_AGENT})
         except requests.exceptions.RequestException as e:
             self.log.error("Could not update hostname '%s' %s to %s: %s",
                            hostname, addr_type, addr, e)

@@ -6,6 +6,7 @@ from pprint import pprint
 import re
 import requests
 
+from ..configuration import USER_AGENT
 from ..exceptions import ConfigError, PublishError
 from .updater import Updater
 
@@ -88,7 +89,8 @@ class GandiUpdater(Updater):
         :return: The :class:`Response` object, or `None` if there was an error
                  (which will be logged)
         """
-        headers = {'Authorization': "Apikey " + self.api_key}
+        headers = {'Authorization': "Apikey " + self.api_key,
+                   'User-Agent': USER_AGENT}
         if method == 'GET':
             method_f = requests.get
         elif method == 'PUT':
