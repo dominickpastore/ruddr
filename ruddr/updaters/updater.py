@@ -291,7 +291,8 @@ class OneWayUpdater(Updater):
     :param addrfile: The :class:`~ruddr.Addrfile` object
     :param hosts: A list of tuples (hostname, None|IPv6Address|fqdn)
                   specifying where each host portion of IPv6 addresses should
-                  come from
+                  come from (or in unparsed string form—see docs for the
+                  standard updater)
     :param nameserver: The nameserver to use to look up AAAA records for the
                        FQDNs, if any. If ``None``, system DNS is used.
     """
@@ -493,11 +494,9 @@ class OneWayUpdater(Updater):
             return first_private
         return first_link_local
 
-    def publish_ipv6_one_host(
-            self,
-            hostname: str,
-            address: ipaddress.IPv6Address
-    ):
+    def publish_ipv6_one_host(self,
+                              hostname: str,
+                              address: ipaddress.IPv6Address):
         """Attempt to publish an IPv6 address for a single host
 
         :param hostname: The host to publish for

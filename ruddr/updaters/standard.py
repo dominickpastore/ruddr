@@ -1,4 +1,4 @@
-"""Ruddr updater for the IPv4 address at Hurricane Electric's tunnel broker"""
+"""Ruddr updater for providers using the de facto standard /nic/update API"""
 
 import enum
 import ipaddress
@@ -110,11 +110,9 @@ class StandardUpdater(OneWayUpdater):
 
         self._send_request(params, hostname, 'IPv4', address.exploded)
 
-    def publish_ipv6_one_host(
-        self,
-        hostname: str,
-        address: ipaddress.IPv6Address
-    ):
+    def publish_ipv6_one_host(self,
+                              hostname: str,
+                              address: ipaddress.IPv6Address):
         """Attempt to publish an IPv6 address for a single host
 
         :param hostname: The host to publish for
@@ -143,7 +141,12 @@ class StandardUpdater(OneWayUpdater):
         """Send an update request and handle the reply
 
         :param params: Dict of parameters to send with the request
+        :param hostname: Name of the host being updated
         :param addr_type: ``'IPv4'`` or ``'IPv6'``
+        :param addr: The address being assigned to the host
+
+        :raises PublishError: if there is an error
+        :raises FatalPublishError: if there is a non-retryable error
         """
         try:
             r = requests.get(self.endpoint,

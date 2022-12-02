@@ -184,7 +184,7 @@ class FreeDNSUpdater(Updater):
 
         if response.headers['content-type'].startswith('text/html'):
             self.log.error("Received abnormal response when trying to update"
-                           "%s to %s:\n%s",fqdn, address, response.text)
+                           "%s to %s:\n%s", fqdn, address, response.text)
             return False
         if response.text.startswith("ERROR:"):
             self.log.error("Received error when trying to update %s to %s:\n"

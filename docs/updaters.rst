@@ -133,6 +133,38 @@ there's a good chance you can create a working config using these options.
     subsequent retries. Some providers, especially free ones, have specific
     requirements for this.
 
+Duck DNS Updater
+----------------
+
+Type: ``duckdns``
+
+This updater is for Duck DNS, the dynamic DNS service at duckdns.org. The API
+does not provide a way to obtain the current IP address, which Ruddr needs for
+IPv6 updates, so it uses DNS queries to the Duck DNS nameserver instead.
+
+**Sample config for Duck DNS (with defaults commented)**::
+
+    [updater.main]
+    type = duckdns
+    token = <duck-dns-token>
+    hosts = example1 example2
+    #nameserver = ns1.duckdns.org
+
+**Configuration options:**
+
+``token``
+    Your update token, found by logging into your account
+
+``hosts``
+    A whitespace-separated list of hosts in your account to be updated. These
+    should not include ``.duckdns.org``.
+
+``nameserver``
+    The DNS server to query for the current IPv6 address of each host. This
+    should not need to be set, but can be if desired. Explicitly setting it to
+    an empty value will use the system DNS resolver instead of a specific
+    server.
+
 FreeDNS Updater
 ---------------
 
