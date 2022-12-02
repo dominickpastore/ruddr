@@ -87,16 +87,16 @@ there's a good chance you can create a working config using these options.
     A whitespace-separated list of hostnames to keep updated. Each entry must
     be in one of the following three formats:
 
-    ``<hostname>/-`` - Ruddr requires an existing IPv6 address in order to do
+    ``<hostname>/-`` Ruddr requires an existing IPv6 address in order to do
     IPv6 updates, since it only changes the network prefix for IPv6 addresses.
     However, if you do not need IPv6 addresses, you can use this format, and
     the updater will ignore IPv6 addresses from the notifier.
 
-    ``<hostname>/<IPv6-address>`` - For IPv6 updates, Ruddr will take the given
+    ``<hostname>/<IPv6-address>`` For IPv6 updates, Ruddr will take the given
     address, replace its network prefix with the one from the notifier, and
     publish the resulting address.
 
-    ``<hostname>/<fqdn>`` - For IPv6 updates, Ruddr will look up the given
+    ``<hostname>/<fqdn>`` For IPv6 updates, Ruddr will look up the given
     fully-qualified domain name to get an IPv6 address from an AAAA record. It
     will take that address, replace the network prefix with the one from the
     notifier, and publish the resulting address. **This is the recommended
@@ -133,6 +133,33 @@ there's a good chance you can create a working config using these options.
     subsequent retries. Some providers, especially free ones, have specific
     requirements for this.
 
+FreeDNS Updater
+---------------
+
+Type: ``freedns``
+
+This updater is for FreeDNS, the dynamic DNS service at freedns.afraid.org.
+
+**Sample config for FreeDNS**::
+
+    [updater.main]
+    type = freedns
+    username = <freedns-username>
+    password = <freedns-password>
+    fqdns = foo.example.com bar.example.com
+
+**Configuration options:**
+
+``username``
+    Your account's username at freedns.afraid.org
+
+``password``
+    Your account's password at freedns.afraid.org
+
+``fqdns``
+    A whitespace-separated list of domains or subdomains in your account whose
+    IP address(es) should be updated.
+
 Gandi Updater
 -------------
 
@@ -159,10 +186,9 @@ choice for you.
 
 ``fqdns``
     A list of fully qualified domain names to update the A and AAAA records
-    for. Multiple domain names should be separated by whitespace (note: if
-    using newlines as a separator, lines after the first must be indented).
-    These may be your root domains (e.g. example.com), subdomains (e.g.
-    www.example.com), or any mixture of both.
+    for. Multiple domain names should be separated by whitespace. These may be
+    your root domains (e.g. example.com), subdomains (e.g. www.example.com), or
+    any mixture of both.
 
 ``endpoint``
     The API endpoint to use, that is, the base URL for the LiveDNS API. This
@@ -171,8 +197,8 @@ choice for you.
     staging API environment as of September 16, 2021, but if they do in the
     future, this option could be used to switch to that for testing purposes.)
 
-HE Updaters
------------
+HE Updater
+----------
 
 Type: ``he``
 

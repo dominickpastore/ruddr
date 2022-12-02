@@ -103,13 +103,14 @@ class GandiUpdater(Updater):
                 r = method_f(url, headers=headers, params=params)
             else:
                 r = method_f(url, headers=headers, params=params, json=data)
+        except requests.exceptions.RequestException as e:
+            self.log.error("Could not %s %s: %s", method, url, e)
+            return None
+        try:
             r.raise_for_status()
         except requests.exceptions.HTTPError:
             self.log.error("Received HTTP %d when trying to %s %s:\n%s",
                            r.status_code, method, url, r.text)
-            return None
-        except requests.exceptions.RequestException as e:
-            self.log.error("Could not %s %s: %s", method, url, e)
             return None
 
         try:
