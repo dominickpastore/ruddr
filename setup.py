@@ -19,15 +19,15 @@ if len(version_parts) > 3:
     version += ".dirty"
 
 setup(
-    name='ruddr',
+    name="ruddr",
     version=version,
-    author='Dominick C. Pastore',
-    author_email='ruddr@dcpx.org',
-    description='Robotic Updater for Dynamic DNS Records',
+    author="Dominick C. Pastore",
+    author_email="ruddr@dcpx.org",
+    description="Robotic Updater for Dynamic DNS Records",
     long_description=long_description,
-    long_description_content_type='text/markdown',
-    url='https://github.com/dominickpastore/ruddr/',
-    license='Copyright (c) 2022 Dominick C. Pastore. All rights reserved.',
+    long_description_content_type="text/markdown",
+    url="https://github.com/dominickpastore/ruddr/",
+    license="Copyright (c) 2022 Dominick C. Pastore. All rights reserved.",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: Other/Proprietary License",
@@ -36,25 +36,25 @@ setup(
 
     packages=find_packages(),
     install_requires=[
-        'requests',
-        'netifaces',
-        'dnspython',
+        "requests",
+        "netifaces",
+        "dnspython",
         "importlib_metadata; python_version<'3.10'",
     ],
-    python_requires='>=3.7',
+    python_requires=">=3.7",
     extras_require={
-        'systemd': ['PyGObject'],   # Systemd notifier
-        'docs': ['sphinx'],
-        'test': [
-            'flake8',
-            'pytest',
-            'pytest-cov'
+        "systemd": ["PyGObject"],   # Systemd notifier
+        "docs": ["sphinx"],
+        "test": [
+            "flake8",
+            "pytest",
+            "pytest-cov"
         ]
     },
 
     entry_points={
-        'console_scripts': [
-            'ruddr=ruddr.manager:main',
+        "console_scripts": [
+            "ruddr=ruddr.manager:main",
         ],
     },
 )
