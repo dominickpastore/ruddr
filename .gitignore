@@ -32,7 +32,10 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Scratch directories
 tmp/
+scratch/
 
 # Sphinx Documentation
 docs/_build/
