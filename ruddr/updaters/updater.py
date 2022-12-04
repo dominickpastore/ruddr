@@ -10,6 +10,7 @@ from typing import Union, Tuple, List, Optional
 
 import dns.resolver
 
+from .. import Addrfile
 from ..exceptions import PublishError, FatalPublishError, ConfigError
 
 
@@ -108,12 +109,9 @@ class BaseUpdater:
 
     :param name: Name of the updater (from config section heading)
     :param addrfile: The :class:`~ruddr.Addrfile` object
-    :param min_retry: The minimum number of seconds between retries, if a retry
-                      is necessary. (An exponential backoff is applied after
-                      the first retry.)
     """
 
-    def __init__(self, name, addrfile, min_retry=300):
+    def __init__(self, name, addrfile):
         #: Updater name (from config section heading)
         self.name = name
 
@@ -125,8 +123,9 @@ class BaseUpdater:
         self.addrfile = addrfile
 
         #: Minimum retry interval (some providers may require a minimum delay
-        #: when there are server errors)
-        self.min_retry_interval = min_retry
+        #: when there are server errors, in which case, subclasses can modify
+        #: this)
+        self.min_retry_interval = 300
 
         #: @Retry will set this to ``True`` when there has been a fatal error
         #: and no more updates should be issued.
@@ -174,6 +173,9 @@ class Updater(BaseUpdater):
     :param name: Name of the updater (from config section heading)
     :param addrfile: The :class:`~ruddr.Addrfile` object
     """
+
+    def __init__(self, name: str, addrfile: Addrfile):
+        super().__init__(name, addrfile)
 
     def initial_update(self):
         """Do the initial update: Check the addrfile, and if either address is
@@ -289,33 +291,52 @@ class OneWayUpdater(Updater):
 
     :param name: Name of the updater (from config section heading)
     :param addrfile: The :class:`~ruddr.Addrfile` object
-    :param hosts: A list of tuples (hostname, None|IPv6Address|fqdn)
-                  specifying where each host portion of IPv6 addresses should
-                  come from (or in unparsed string form—see docs for the
-                  standard updater)
-    :param nameserver: The nameserver to use to look up AAAA records for the
-                       FQDNs, if any. If ``None``, system DNS is used.
     """
 
     def __init__(
         self,
         name,
         addrfile,
-        hosts,
-        nameserver: Optional[str] = None,
-        min_retry=300
     ):
-        super().__init__(name, addrfile, min_retry)
+        super().__init__(name, addrfile)
 
         #: A list of hosts and how to get the host portion of their IPv6s
-        self.hosts = hosts
-        if isinstance(self.hosts, str):
-            self.hosts = self.split_hosts(self.hosts)
+        self.hosts: List[Tuple[str, Union[str, ipaddress.IPv6Address, None]]] \
+            = []
 
         #: Nameserver to use when looking up AAAA records for FQDNs in hosts
+        self.nameserver = None
+
+    def init_hosts(self,
+                   hosts,
+                   nameserver: Optional[str] = None,
+                   min_retry=300):
+        """Initialize the hosts list, nameserver, and min retry interval.
+
+        This is separate from :meth:`__init__` so subclasses can rely on the
+        logger while doing their config parsing, then pass the parsed config
+        here.
+
+        :param hosts: A list of tuples (hostname, None|IPv6Address|fqdn)
+                      specifying where each host portion of IPv6 addresses
+                      should come from (or in unparsed string form—see docs for
+                      the standard updater)
+        :param nameserver: The nameserver to use to look up AAAA records for
+                           the FQDNs, if any. If ``None``, system DNS is used.
+        :param min_retry: The minimum retry interval after failed updates, in
+                          seconds. (There is an exponential backoff for
+                          subsequent retries.)
+        """
+        if isinstance(hosts, str):
+            self.hosts = self._split_hosts(hosts)
+        else:
+            self.hosts = hosts
+
         self.nameserver = nameserver
 
-    def split_hosts(
+        self.min_retry_interval = min_retry
+
+    def _split_hosts(
             self,
             hosts: str
     ) -> List[Tuple[str, Optional[Union[ipaddress.IPv6Address, str]]]]:

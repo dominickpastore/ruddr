@@ -26,11 +26,12 @@ class StandardUpdater(OneWayUpdater):
     """
 
     def __init__(self, name, addrfile, config: dict):
+        super().__init__(name, addrfile)
+
         # Minimum retry interval
         try:
             min_retry = int(config.get('min_retry_interval', '300'))
         except ValueError:
-            super().__init__(name, addrfile, [])
             self.log.critical("'min_retry_interval' config option must be an "
                               "integer")
             raise ConfigError(f"{name} updater requires an integer for "
@@ -40,7 +41,6 @@ class StandardUpdater(OneWayUpdater):
         try:
             hosts = config['hosts']
         except KeyError:
-            super().__init__(name, addrfile, [])
             self.log.critical("'hosts' config option is required")
             raise ConfigError(f"{self.name} updater requires 'hosts' config "
                               "option") from None
@@ -48,7 +48,7 @@ class StandardUpdater(OneWayUpdater):
         # Nameserver
         nameserver = config.get('nameserver')
 
-        super().__init__(name, addrfile, hosts, nameserver, min_retry)
+        self.init_hosts(hosts, nameserver, min_retry)
 
         # Endpoint
         try:

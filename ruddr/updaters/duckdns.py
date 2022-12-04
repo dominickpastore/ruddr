@@ -20,11 +20,12 @@ class DuckDNSUpdater(OneWayUpdater):
     """
 
     def __init__(self, name: str, addrfile: Addrfile, config: Dict[str, str]):
+        super().__init__(name, addrfile)
+
         # Hosts
         try:
             hosts = config['hosts']
         except KeyError:
-            super().__init__(name, addrfile, [])
             self.log.critical("'hosts' config option is required")
             raise ConfigError(f"{self.name} updater requires 'hosts' config "
                               "option") from None
@@ -36,7 +37,7 @@ class DuckDNSUpdater(OneWayUpdater):
             self.log.debug("'nameserver' was empty. Using system DNS")
             nameserver = None
 
-        super().__init__(name, addrfile, hosts, nameserver)
+        self.init_hosts(hosts, nameserver)
 
         # Token
         try:
