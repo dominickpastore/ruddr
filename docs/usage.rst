@@ -44,9 +44,15 @@ this can be changed with the ``-c``/``--configfile`` command line option (see
 Here is a sample config::
 
   [ruddr]
-  ## The addrfile is where Ruddr keeps track of the current address at each
-  ## DDNS provider. Uncomment this line if you want to change its location.
-  #addrfile = /var/lib/misc/ruddr.addrfile
+  ## This directory is where Ruddr keeps runtime data, including:
+  ## - The addrfile, used to keep track of the current address at each DDNS
+  ##   provider
+  ## - The tldextract cache, where a local copy of the Public Suffix List (PSL)
+  ##   data is kept. This is used to infer zones for domain names if
+  ##   necessary.
+  ## The line below shows the default location. Uncomment it if you would like
+  ## to change it.
+  #datadir = /var/lib/ruddr
 
   ## Each updater must get its addresses from a particular notifier. You can
   ## optionally set a default notifier here, and it will be used whenever an

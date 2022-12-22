@@ -1,6 +1,7 @@
 """Ruddr configuration parsing"""
 
 import configparser
+import os.path
 import pathlib
 import sys
 
@@ -17,7 +18,7 @@ from .exceptions import ConfigError
 USER_AGENT = f"ruddr/{version('ruddr')} (ruddr@dcpx.org)"
 
 
-DEFAULT_ADDRFILE = '/var/lib/misc/ruddr.addrfile'
+DEFAULT_DATA_DIR = '/var/lib/ruddr'
 
 
 class Config:
@@ -86,12 +87,16 @@ class ConfigReader:
                 raise ConfigError("Config section %s is not a notifier "
                                   "or updater section" % section)
 
-        if 'addrfile' not in main:
-            main['addrfile'] = DEFAULT_ADDRFILE
+        if 'datadir' not in main:
+            main['datadir'] = DEFAULT_DATA_DIR
+        if not os.path.isabs(main['datadir']):
+            raise ConfigError("Config option 'datadir' cannot be a relative"
+                              "path")
 
         result = Config(main, notifiers, updaters)
         self._validate_types(result)
         self._validate_and_assign_notifiers(result)
+        self._copy_globals(result)
         return result
 
     def _validate_types(self, config: Config) -> None:
@@ -201,6 +206,20 @@ class ConfigReader:
                 pass
             updater_config['notifier4'] = notifier4
             updater_config['notifier6'] = notifier6
+
+    def _copy_globals(self, config: Config) -> None:
+        """Copy relevant global (``[ruddr]``) config options into updater and
+        notifier configs, e.g. the data directory.
+
+        Does not copy the global notifier(s), which are handled by
+        :func:`_validate_and_assign_notifiers`.
+
+        :param config: The config to modify
+        """
+        for notifier_config in config.notifiers.values():
+            notifier_config['datadir'] = config.main['datadir']
+        for updater_config in config.updaters.values():
+            updater_config['datadir'] = config.main['datadir']
 
     def read_file_path(self, filename: Union[str, pathlib.Path]) -> Config:
         """Read configuration from the named file or :class:`~pathlib.Path`

@@ -20,6 +20,8 @@
 import ipaddress
 import json
 import logging
+import os
+import os.path
 from typing import Optional, Tuple
 
 log = logging.getLogger('ruddr')
@@ -143,6 +145,7 @@ class Addrfile:
         """Write out the addrfile. If it cannot be written, log the error but
         do not raise an exception."""
         try:
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
             with open(self.path, 'w') as f:
                 json.dump(self.addresses, f, cls=_IPJSONEncoder,
                           sort_keys=True, indent=4)

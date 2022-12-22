@@ -4,6 +4,7 @@ import argparse
 import importlib
 import logging
 import logging.handlers
+import os.path
 import signal
 import sys
 import time
@@ -37,7 +38,8 @@ class DDNSManager:
         self.config = config
 
         #: Addrfile manager
-        self.addrfile = Addrfile(self.config.main['addrfile'])
+        addrfile_name = os.path.join(self.config.main['datadir'], 'addrfile')
+        self.addrfile = Addrfile(addrfile_name)
 
         # Creates self.notifiers and self.updaters as dicts
         self._create_notifiers()

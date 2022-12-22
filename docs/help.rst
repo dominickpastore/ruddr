@@ -49,6 +49,22 @@ hosts in the network, they will likely each need to run their own instance of
 Ruddr (since a centralized instance of Ruddr won't have easy access to the
 full addresses of each host when they change).
 
+How do I get Ruddr to fetch the latest Public Suffix List?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ruddr can use the `Public Suffix List`_ in some of its updaters to infer which
+zone each domain belongs to. It fetches a copy of the list when it first runs
+and caches it indefinitely. Most users will never need Ruddr to fetch a new
+copy, especially if they are not adding new domains to be updated. But, if for
+some reason you do, you can force Ruddr to fetch a new copy by deleting the
+cached copy.
+
+The cached copy resides in Ruddr's configured ``datadir`` (``/var/lib/ruddr``
+by default). Delete the entire ``tldextract`` directory inside. Next time Ruddr
+needs the Public Suffix List, it will download a new copy.
+
+.. _Public Suffix List: https://publicsuffix.org/
+
 Issues and Bugs
 ---------------
 
