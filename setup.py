@@ -39,6 +39,7 @@ setup(
         "requests",
         "netifaces",
         "dnspython",
+        "tldextract ~= 3.0",
         "importlib_metadata; python_version<'3.10'",
     ],
     python_requires=">=3.7",

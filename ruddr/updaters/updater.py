@@ -6,12 +6,15 @@ import logging
 import socket
 import threading
 import types
-from typing import Union, Tuple, List, Optional
+from typing import Union, Tuple, List, Optional, Dict, TypeVar
 
 import dns.resolver
 
-from .. import Addrfile
+from .. import Addrfile, ZoneSplitter
 from ..exceptions import PublishError, FatalPublishError, ConfigError
+
+
+A = TypeVar('A', bound=Union[ipaddress.IPv4Address, ipaddress.IPv6Address])
 
 
 class Retry:
@@ -282,6 +285,861 @@ class Updater(BaseUpdater):
         :raise PublishError: when publishing fails
         """
         raise NotImplementedError("IPv6 publish function not provided")
+
+
+class TwoWayUpdater(Updater):
+    """Base class for updaters supporting protocols that are two-way, that is,
+    the API supports fetching the current address for a host.
+
+    It's meant to be flexible enough for a variety of API styles. For example,
+    some APIs may be more zone-based, with calls to fetch a list of zones and
+    retrieve/update zones as a whole. Other APIs may be more domain-based, with
+    calls to fetch and update records for a single domain name. Still others
+    may be a hybrid, with a way to fetch an entire zone but only update single
+    domains. This class supports all of the above by allowing only the
+    appropriate methods to be implemented.
+
+    :param name: Name of the updater (from config section heading)
+    :param addrfile: The :class:`~ruddr.Addrfile` object
+    :param datadir: The configured data directory
+    """
+
+    def __init__(self, name: str, addrfile: Addrfile, datadir: str):
+        super().__init__(name, addrfile)
+
+        #: List of hosts to keep updated, as FQDNs, along with any
+        #: explicitly-specified zones they reside in
+        self.hosts: List[Tuple[str, Optional[str]]] = []
+
+        #: Used by :func:`_get_subdomain_and_zone_for`
+        self._zone_splitter = None
+        self._datadir = datadir
+
+    def init_hosts(self, hosts: Union[List[Tuple[str, Optional[str]]], str]):
+        """Provide the list of hosts to be updated.
+
+        This can be provided either as an unparsed :class:`str` or as a list of
+        2-tuples ``(fqdn, zone)``:
+
+        - When provided as an unparsed :class:`str`, it should be a
+          whitespace-separated list whose items are in the format
+          ``foo.example.com`` or ``foo.example.com/example.com`` (the latter
+          format explicitly setting the zone)
+
+        - When provided as a list of 2-tuples, ``fqdn`` is the FQDN for the
+          host and ``zone`` is either ``None`` or a :class:`str` explicitly
+          specifying the zone for this host.
+
+        For hosts without a zone explicitly specified (which can be all of
+        them), Ruddr will use :meth:`get_zones` to determine the zone, or the
+        `public suffix list`_ if :meth:`get_zones` is not implemented.
+
+        Some APIs are 100% zone-agnostic (e.g. there are no zone-centric calls,
+        nor any calls that require a zone as a parameter). There is no need for
+        any zones to be specified in this case.
+
+        .. _public suffix list: https://publicsuffix.org/
+
+        :param hosts: The list of hosts to be updated
+
+        :raises ConfigError: if an FQDN does not reside in the zone provided
+                             with it, or is a duplicate
+        """
+        if isinstance(hosts, str):
+            hosts = hosts.split()
+            self.hosts = []
+            for host in hosts:
+                fqdn, sep, zone = host.partition('/')
+                if sep == '':
+                    self.hosts.append((fqdn, None))
+                    continue
+                self._check_zone_and_duplicates(fqdn, zone)
+                self.hosts.append((fqdn, zone))
+        else:
+            for fqdn, zone in hosts:
+                self._check_zone_and_duplicates(fqdn, zone)
+            self.hosts = hosts
+
+    def _check_zone_and_duplicates(self, fqdn: str, zone: str):
+        """Check if the given FQDN is in the given zone and that it is not a
+        duplicate of any existing hosts
+
+        :param fqdn: The FQDN to check
+        :param zone: The zone to check
+        :raise ConfigError: if the FQDN is not in the given zone or is a
+                            duplicate
+        """
+        try:
+            self.subdomain_of(fqdn, zone)
+        except ValueError:
+            self.log.critical("Domain '%s' is not in zone '%s'", fqdn, zone)
+            raise ConfigError(f"Domain {fqdn} in updater {self.name} "
+                              f"is not in zone {zone}") from None
+        for host, _ in self.hosts:
+            if fqdn == host:
+                self.log.critical("Domain '%s' is listed multiple times", fqdn)
+                raise ConfigError(f"Updater {self.name} has domain {fqdn} "
+                                  "listed multiple times")
+
+    def get_zones(self) -> List[str]:
+        """Get a list of zones under the account.
+
+        If implemented, this function should return a list of zones (more
+        specifically, the domain name for each zone). The FQDNs-to-be-updated
+        will be compared against the zone list. This serves two purposes:
+
+        1. It allows better error checking. If any of the FQDNs do not fall
+           into one of the available zones, Ruddr can catch that and log it for
+           the user.
+
+        2. If any of the zones are not immediate subdomains of a public suffix
+           (public suffix being .com, .co.uk, etc., see `public suffix list`_),
+           for example, myzone.provider.com, this allows Ruddr to get the
+           correct zone without it being manually configured.
+
+        If not implemented, Ruddr uses the `public suffix list`_ to organize
+        the FQDNs-to-be-updated into zones.
+
+        If the provider's API is zone-agnostic (e.g. there is no way to fetch
+        or update an entire zone at once, nor is there a "zone" field when
+        fetching or updating individual domains or records), there is no need
+        to implement this.
+
+        .. _public suffix list: https://publicsuffix.org/
+
+        :return: A list of zones
+
+        :raises NotImplementedError: if not implemented
+        :raises PublishError: if fetching the zones is implemented, but failed
+        """
+        raise NotImplementedError
+
+    def fetch_zone_ipv4s(
+        self,
+        zone: str
+    ) -> List[Tuple[str, ipaddress.IPv4Address, Optional[int]]]:
+        """Get a list of A (IPv4) records for the given zone.
+
+        If implemented, this function should return a list of A (IPv4) records
+        in the given zone in the form ``(name, addr, ttl)`` where ``name`` is
+        the subdomain portion (e.g. a record for "foo.bar.example.com" in zone
+        "example.com" should return "foo.bar" as the name), ``addr`` is an
+        :class:`~ipaddress.IPv4Address`, and ``ttl`` is the TTL of the record.
+        Some notes:
+
+        - ``name`` should be empty for the root domain in the zone
+
+        - The :meth:`subdomain_of` function may be helpful for the ``name``
+          element if the provider's API returns FQDNs
+
+        - The ``ttl`` may be set to ``None`` if the API does not provide it. It
+          is only required for providers that would change the TTL back to
+          default if it's not explicitly included when Ruddr later updates the
+          record.
+
+        - If there are multiple records/IPv4s for a single subdomain, return
+          them as separate list items with the same ``name``. Note that if the
+          subdomain needs to be updated by Ruddr, it will only produce a single
+          record to replace them.
+
+        **If not implemented, then :meth:`fetch_domain_ipv4s` and
+        :meth:`put_domain_ipv4` must be implemented.**
+
+        :param zone: The zone to fetch records for
+
+        :return: A list of A records in the format described
+
+        :raises NotImplementedError: if not implemented
+        :raises PublishError: if implemented, but there is a failure, or the
+                              zone does not exist
+        """
+        raise NotImplementedError
+
+    def fetch_domain_ipv4s(
+        self,
+        subdomain: str,
+        zone: str
+    ) -> List[Tuple[ipaddress.IPv4Address, Optional[int]]]:
+        """Get a list of A (IPv4) records for the given domain.
+
+        **This does not need to be implemented if :meth:`fetch_zone_ipv4s` is
+        implemented.**
+
+        This function should return a list of A (IPv4) records for the given
+        domain. If this provider's API requires using the original FQDN (rather
+        than separate subdomain and zone fields), use :meth:`fqdn_of` on the
+        parameters to obtain it.
+
+        The return value is a list of tuples ``(addr, ttl)`` where ``addr`` is
+        an :class:`~ipaddress.IPv4Address` and ``ttl`` is the TTL of the
+        record. As with :meth:`fetch_zone_ipv4s`:
+
+        - The ``ttl`` may be set to ``None`` if the API does not provide it. It
+          is only required for providers that would change the TTL back to
+          default if it's not explicitly included when Ruddr later updates the
+          record.
+
+        - The return value is a list in case there is more than one A record
+          associated with the domain; however, note that Ruddr will want to
+          replace all of them with a single record.
+
+        :param subdomain: The subdomain to fetch records for (only the
+                          subdomain portion), empty for the root domain of the
+                          zone
+        :param zone: The zone the subdomain belongs to
+
+        :return: A list of A records in the format described
+
+        :raises NotImplementedError: if not implemented
+        :raises PublishError: if implemented, but there is a failure, or no
+                              such record exists
+        """
+        raise NotImplementedError
+
+    def put_zone_ipv4s(
+        self,
+        zone: str,
+        records: Dict[str, Tuple[List[ipaddress.IPv4Address], Optional[int]]]
+    ):
+        """Publish A (IPv4) records for the given zone.
+
+        If implemented, this function should replace all the A records for the
+        given zone with the records provided. The records are provided as a
+        :class:`dict` where the keys are the subdomain names and the values are
+        2-tuples ``(addrs, ttl)`` where ``addrs`` is a list of
+        :class:`~ipaddress.IPv4Address` and ``ttl`` is an :class:`int` (or
+        ``None`` if the ``fetch_zone_ipv4s`` function didn't provide any).
+
+        Records that Ruddr is not configured to update will be passed through
+        from :meth:`fetch_zone_ipv4s` unmodified.
+
+        **Either this function or :meth:`put_domain_ipv4` must be implemented.
+        The latter must be implemented if :meth:`fetch_zone_ipv4s` is not
+        implemented.**
+
+        :param zone: The zone to publish records for
+        :param records: The records to publish
+
+        :raises NotImplementedError: if not implemented
+        :raises PublishError: if implemented, but there is a failure
+        """
+        raise NotImplementedError
+
+    def put_domain_ipv4(self, subdomain: str, zone: str,
+                        address: ipaddress.IPv4Address, ttl: Optional[int]):
+        """Publish an A (IPv4) record for the given domain.
+
+        **This does not need to be implemented if :meth:`fetch_zone_ipv4s` and
+        :meth:`put_zone_ipv4s` are implemented.**
+
+        This function should replace the A records for the given domain with a
+        single A record matching the given parameters. If this provider's API
+        requires using the original FQDN (rather than separate subdomain and
+        zone fields), use :meth:`fqdn_of` on the parameters to obtain it.
+
+        This will only be called for the records Ruddr is configured to update.
+
+        :param subdomain: The subdomain to publish the record for (only the
+                          subdomain portion), empty for the root domain of the
+                          zone
+        :param zone: The zone the subdomain belongs to
+        :param address: The address for the new record
+        :param ttl: The TTL for the new record (or ``None`` if the
+                    ``fetch_*_ipv4s`` functions didn't provide any). Ruddr
+                    passes this through unchanged.
+
+        :raises NotImplementedError: if not implemented
+        :raises PublishError: if implemented, but there is a failure
+        """
+        raise NotImplementedError
+
+    def fetch_zone_ipv6s(
+            self,
+            zone: str
+    ) -> List[Tuple[str, ipaddress.IPv6Address, Optional[int]]]:
+        """Get a list of AAAA (IPv6) records for the given zone.
+
+        If implemented, this function should return a list of AAAA (IPv6)
+        records in the given zone in the form ``(name, addr, ttl)`` where
+        ``name`` is the subdomain portion (e.g. a record for
+        "foo.bar.example.com" in zone "example.com" should return "foo.bar" as
+        the name), ``addr`` is an :class:`~ipaddress.IPv6Address`, and ``ttl``
+        is the TTL of the record. Some notes:
+
+        - ``name`` should be empty for the root domain in the zone
+
+        - The :meth:`subdomain_of` function may be helpful for the ``name``
+          element if the provider's API returns FQDNs
+
+        - The ``ttl`` may be set to ``None`` if the API does not provide it. It
+          is only required for providers that would change the TTL back to
+          default if it's not explicitly included when Ruddr later updates the
+          record.
+
+        - If there are multiple records/IPv6s for a single subdomain, return
+          them as separate list items with the same ``name``. If the subdomain
+          needs to be updated by Ruddr, it will update all of them.
+
+        **If not implemented, then :meth:`fetch_domain_ipv6s` and
+        :meth:`put_domain_ipv6s` must be implemented.**
+
+        :param zone: The zone to fetch records for
+
+        :return: A list of AAAA records in the format described
+
+        :raises NotImplementedError: if not implemented
+        :raises PublishError: if implemented, but there is a failure, or the
+                              zone does not exist
+        """
+        raise NotImplementedError
+
+    def fetch_domain_ipv6s(
+            self,
+            subdomain: str,
+            zone: str
+    ) -> List[Tuple[ipaddress.IPv6Address, Optional[int]]]:
+        """Get a list of AAAA (IPv6) records for the given domain.
+
+        **This does not need to be implemented if :meth:`fetch_zone_ipv6s` is
+        implemented.**
+
+        This function should return a list of AAAA (IPv6) records for the given
+        domain. If this provider's API requires using the original FQDN (rather
+        than separate subdomain and zone fields), use :meth:`fqdn_of` on the
+        parameters to obtain it.
+
+        The return value is a list of tuples ``(addr, ttl)`` where ``addr`` is
+        an :class:`~ipaddress.IPv6Address` and ``ttl`` is the TTL of the
+        record. As with :meth:`fetch_zone_ipv6s`:
+
+        - The ``ttl`` may be set to ``None`` if the API does not provide it. It
+          is only required for providers that would change the TTL back to
+          default if it's not explicitly included when Ruddr later updates the
+          record.
+
+        - The return value is a list in case there is more than one AAAA record
+          associated with the domain. Ruddr will update all of them.
+
+        :param subdomain: The subdomain to fetch records for (only the
+                          subdomain portion), empty for the root domain of the
+                          zone
+        :param zone: The zone the subdomain belongs to
+
+        :return: A list of AAAA records in the format described
+
+        :raises NotImplementedError: if not implemented
+        :raises PublishError: if implemented, but there is a failure, or no
+                              such record exists
+        """
+        raise NotImplementedError
+
+    def put_zone_ipv6s(
+        self,
+        zone: str,
+        records: Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]]
+    ):
+        """Publish AAAA (IPv6) records for the given zone.
+
+        If implemented, this function should replace all the AAAA records for
+        the given zone with the records provided. The records are provided as a
+        :class:`dict` where the keys are the subdomain names and the values are
+        2-tuples ``(addrs, ttl)`` where ``addrs`` is a list of
+        :class:`~ipaddress.IPv6Address` and ``ttl`` is an :class:`int` (or
+        ``None`` if the ``fetch_zone_ipv6s`` function didn't provide any).
+
+        Records that Ruddr is not configured to update will be passed through
+        from :meth:`fetch_zone_ipv6s` unmodified.
+
+        **Either this function or :meth:`put_domain_ipv6s` must be implemented.
+        The latter must be implemented if :meth:`fetch_zone_ipv6s` is not
+        implemented.**
+
+        :param zone: The zone to publish records for
+        :param records: The records to publish
+
+        :raises NotImplementedError: if not implemented
+        :raises PublishError: if implemented, but there is a failure
+        """
+        raise NotImplementedError
+
+    def put_domain_ipv6s(self, subdomain: str, zone: str,
+                        addresses: List[ipaddress.IPv6Address],
+                        ttl: Optional[int]):
+        """Publish AAAA (IPv6) records for the given domain.
+
+        **This does not need to be implemented if :meth:`fetch_zone_ipv6s` and
+        :meth:`put_zone_ipv6s` are implemented.**
+
+        This function should replace the AAAA records for the given domain with
+        the records provided. If this provider's API requires using the
+        original FQDN (rather than separate subdomain and zone fields), use
+        :meth:`fqdn_of` on the parameters to obtain it.
+
+        This will only be called for the records Ruddr is configured to update.
+
+        :param subdomain: The subdomain to publish the records for (only the
+                          subdomain portion), empty for the root domain of the
+                          zone
+        :param zone: The zone the subdomain belongs to
+        :param addresses: The addresses for the new records
+        :param ttl: The TTL for the new records (or ``None`` if the
+                    ``fetch_*_ipv6s`` functions didn't provide any). Ruddr
+                    passes this through unchanged.
+
+        :raises NotImplementedError: if not implemented
+        :raises PublishError: if implemented, but there is a failure
+        """
+        raise NotImplementedError
+
+    def _get_subdomain_and_zone_for(
+        self,
+        fqdn: str,
+        zones: Optional[List[str]],
+    ) -> Tuple[str, str]:
+        """Find the zone the FQDN belongs to and return that and the subdomain
+        portion.
+
+        If a zone list is given, use that to determine the FQDN's zone (and
+        verify that the zone is present). If not, use the `publix suffix list`_
+        to determine the zone.
+
+        .. _public suffix list: https://publicsuffix.org/
+
+        :param fqdn: Domain name to split into subdomain and zone
+        :param zones: List of zones, or ``None``
+
+        :return: A 2-tuple ``(subdomain, zone)``
+        :raise PublishError: if the given FQDN is not in any of the given zones
+        """
+        if zones is None:
+            # Use public suffix list
+            if self._zone_splitter is None:
+                self._zone_splitter = ZoneSplitter(self._datadir)
+            return self._zone_splitter.split(fqdn)
+
+        for zone in zones:
+            try:
+                subdomain = self.subdomain_of(fqdn, zone)
+            except ValueError:
+                continue
+            return (subdomain, zone)
+        self.log.error("Domain '%s' not in any available zone")
+        raise PublishError(f"Domain {fqdn} not in any zone available to "
+                           f"updater {self.name}")
+
+    def _get_hosts_by_zone(self) -> Dict[str, List[str]]:
+        """Get a list of subdomains to be updated, sorted into zones
+
+        :return: A dict with zones as keys and lists of subdomains as values,
+                 with the root of the zone represented by an empty string
+        """
+        self.log.debug("Assembling a dict of hosts by zone")
+        result = dict()
+        zones_fetched = False
+        zones = None
+
+        for host, zone in self.hosts:
+            if zone is None:
+                if not zones_fetched:
+                    self.log.debug("Fetching zones")
+                    try:
+                        self.get_zones()
+                    except NotImplementedError:
+                        self.log.debug("get_zones() not implemented, will use"
+                                       "PSL")
+                subdomain, zone = self._get_subdomain_and_zone_for(host, zones)
+            else:
+                subdomain = self.subdomain_of(host, zone)
+            result.setdefault(zone, []).append(subdomain)
+
+        return result
+
+    def _verify_and_group_addrs_by_host(
+        self,
+        zone: str,
+        records: List[Tuple[str, A, Optional[int]]],
+        hosts: List[str],
+    ) -> Dict[str, Tuple[List[A], Optional[int]]]:
+        """Group the list of records by host and verify that at least one
+        record is present for each listed host
+
+        :param zone: The zone the records are from
+        :param records: A list of records from :func:`fetch_zone_ipv4s` or
+                        :func:`fetch_zone_ipv6s`
+        :param hosts: A list of subdomains
+        :return: Records grouped by host: a :class:`dict` where keys are the
+                 subdomain and values are 2-tuples ``(addrs, ttl)`` where
+                 ``addrs`` is a list of :class:`~ipaddress.IPv4Address` or
+                 :class:`~ipaddress.IPv6Address` and ``ttl`` is the lowest TTL
+                 of all the given records for that subdomain.
+        :raises PublishError: if any host is missing from the records
+        """
+        result = dict()
+        for next_host, next_addr, next_ttl in records:
+            if next_host in result:
+                addrs, ttl = result[next_host]
+                addrs.append(next_addr)
+                if next_ttl is not None and (ttl is None or ttl > next_ttl):
+                    ttl = next_ttl
+                result[next_host] = addrs, ttl
+            else:
+                result[next_host] = [next_addr], next_ttl
+
+        for host in hosts:
+            if host not in result:
+                self.log.error("No A record for subdomain %s in zone %s",
+                               host, zone)
+                raise PublishError(f"Updater {self.name} found no A records "
+                                   f"for subdomain {host} in zone {zone}")
+
+        return result
+
+    def _get_ipv4_records(
+        self,
+        zone: str,
+        subdomains: List[str],
+    ) -> Tuple[
+        Dict[str, Tuple[List[ipaddress.IPv4Address], Optional[int]]],
+        Union[bool, PublishError]
+    ]:
+        """Get A records, group by subdomain, and return whether they could be
+        fetched by zone. Can also return a :class:`PublishError` as the second
+        element in the tuple, indicating it was not fetched by zone and at
+        least one :class:`PublishError` occurred (:class:`PublishError` while
+        fetching by zone is simply raised because there can't be partial
+        success in that case)
+
+        :param zone: Zone to fetch records for
+        :param subdomains: Subdomains to fetch
+        :return: ``(records_by_subdomain, by_zone|PublishError)``
+        :raises PublishError: if there was a problem fetching records
+        :raises FatalPublishError: if necessary methods are not implemented
+        """
+        # First try using fetch_zone_ipv4s
+        try:
+            records = self.fetch_zone_ipv4s(zone)
+        except NotImplementedError:
+            self.log.debug("fetch_zone_ipv4s not implemented, will fall "
+                           "back to fetching by domain")
+        else:
+            records = self._verify_and_group_addrs_by_host(zone, records,
+                                                           subdomains)
+            return records, True
+
+        # Use fetch_domain_ipv4s if it didn't work
+        records = dict()
+        error = None
+        for subdomain in subdomains:
+            try:
+                domain_records = self.fetch_domain_ipv4s(subdomain, zone)
+            except NotImplementedError:
+                self.log.critical("Updater has a bug: Neither fetch_zone_ipv4s"
+                                  " nor fetch_domain_ipv4s is implemented")
+                raise FatalPublishError("Neither fetch_zone_ipv4s nor "
+                                        "fetch_domain_ipv4s is implemented for"
+                                        f" updater {self.name}")
+            except PublishError as e:
+                # Subclass should already log, so use debug here
+                self.log.debug("Could not fetch A records for domain "
+                               f"{self.fqdn_of(subdomain, zone)}: %s", e)
+                if error is None:
+                    error = e
+                continue
+
+            ttl = min((rec[1] for rec in domain_records if rec[1] is not None),
+                      default=None)
+            domain_record_addrs = [rec[0] for rec in domain_records]
+            records[subdomain] = (domain_record_addrs, ttl)
+        if error is None:
+            return records, False
+        else:
+            return records, error
+
+    def _put_ipv4_records(
+        self,
+        zone: str,
+        subdomains: List[str],
+        records: Dict[str, Tuple[List[ipaddress.IPv4Address], Optional[int]]],
+        by_zone: bool,
+    ):
+        """Publish the given IPv4 records by zone or by domain
+
+        :param zone: The zone the records are for
+        :param subdomains: List of subdomains that must be published
+        :param records: The records to publish, grouped by domain
+        :param by_zone: Whether to publish by zone or by domain
+        :raises PublishError: if publishing fails
+        """
+        if by_zone:
+            try:
+                self.put_zone_ipv4s(zone, records)
+            except NotImplementedError:
+                self.log.debug("put_zone_ipv4s not implemented, will fall back"
+                               " to publishing by domain")
+            else:
+                return
+
+        error = None
+        for subdomain in subdomains:
+            if subdomain not in records:
+                self.log.debug("Skipping ipv4 update for %s with no existing A"
+                               " records", self.fqdn_of(subdomain, zone))
+                continue
+            if len(records[subdomain][0]) != 1:
+                self.log.critical("Bug in updater (incorrect number of A "
+                                  "records)")
+                raise FatalPublishError(f"Bug in updater {self.name}")
+            address = records[subdomain][0][0]
+            ttl = records[subdomain][1]
+            try:
+                self.put_domain_ipv4(subdomain, zone, address, ttl)
+            except NotImplementedError:
+                self.log.critical("Updater has a bug: put_domain_ipv4 must be "
+                                  "implemented and is not")
+                raise FatalPublishError("put_domain_ipv4 must be implemented "
+                                        f"for updater {self.name} and is not")
+            except PublishError as e:
+                # Subclass should already log, so use debug here
+                self.log.debug("Could not put A record for domain "
+                               f"{self.fqdn_of(subdomain, zone)}: %s", e)
+                if error is None:
+                    error = e
+                continue
+        if error is not None:
+            raise error
+
+    def publish_ipv4(self, address: ipaddress.IPv4Address):
+        hosts_by_zone = self._get_hosts_by_zone()
+
+        error = None
+        for zone, subdomains in hosts_by_zone.items():
+            # Fetch zone's records
+            self.log.debug("Fetching A records")
+            try:
+                records, by_zone = self._get_ipv4_records(zone, subdomains)
+            except PublishError as e:
+                if error is None:
+                    error = e
+                continue
+            if isinstance(by_zone, PublishError):
+                if error is None:
+                    error = by_zone
+                by_zone = False
+
+            # Update records
+            for subdomain in subdomains:
+                if subdomain in records:
+                    ttl = records[subdomain][1]
+                    records[subdomain] = ([address], ttl)
+                elif by_zone:
+                    if error is None:
+                        error = PublishError(f"Zone {zone} fetched by updater "
+                                             f"{self.name} does not have A "
+                                             f"record for subdomain "
+                                             f"{subdomain}")
+
+            # Put zone's records
+            self.log.debug("Putting A records")
+            try:
+                self._put_ipv4_records(zone, subdomains, records, by_zone)
+            except PublishError as e:
+                if error is None:
+                    error = e
+                continue
+
+        if error is not None:
+            raise error
+
+    def _get_ipv6_records(
+        self,
+        zone: str,
+        subdomains: List[str],
+    ) -> Tuple[
+        Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]],
+        Union[bool, PublishError]
+    ]:
+        """Get AAAA records, group by subdomain, and return whether they could
+        be fetched by zone. Can also return a :class:`PublishError` as the
+        second element in the tuple, indicating it was not fetched by zone and
+        at least one :class:`PublishError` occurred (:class:`PublishError`
+        while fetching by zone is simply raised because there can't be partial
+        success in that case)
+
+        :param zone: Zone to fetch records for
+        :param subdomains: Subdomains to fetch
+        :return: ``(records_by_subdomain, by_zone|PublishError)``
+        :raises PublishError: if there was a problem fetching records
+        :raises FatalPublishError: if necessary methods are not implemented
+        """
+        # First try using fetch_zone_ipv6s
+        try:
+            records = self.fetch_zone_ipv6s(zone)
+        except NotImplementedError:
+            self.log.debug("fetch_zone_ipv6s not implemented, will fall "
+                           "back to fetching by domain")
+        else:
+            records = self._verify_and_group_addrs_by_host(zone, records,
+                                                           subdomains)
+            return records, True
+
+        # Use fetch_domain_ipv6s if it didn't work
+        records = dict()
+        error = None
+        for subdomain in subdomains:
+            try:
+                domain_records = self.fetch_domain_ipv6s(subdomain, zone)
+            except NotImplementedError:
+                self.log.critical("Updater has a bug: Neither fetch_zone_ipv6s"
+                                  " nor fetch_domain_ipv6s is implemented")
+                raise FatalPublishError("Neither fetch_zone_ipv6s nor "
+                                        "fetch_domain_ipv6s is implemented for"
+                                        f" updater {self.name}")
+            except PublishError as e:
+                # Subclass should already log, so use debug here
+                self.log.debug("Could not fetch AAAA records for domain "
+                               f"{self.fqdn_of(subdomain, zone)}: %s", e)
+                if error is None:
+                    error = e
+                continue
+
+            ttl = min((rec[1] for rec in domain_records if rec[1] is not None),
+                      default=None)
+            domain_record_addrs = [rec[0] for rec in domain_records]
+            records[subdomain] = (domain_record_addrs, ttl)
+        if error is None:
+            return records, False
+        else:
+            return records, error
+
+    def _put_ipv6_records(
+        self,
+        zone: str,
+        subdomains: List[str],
+        records: Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]],
+        by_zone: bool,
+    ):
+        """Publish the given IPv6 records by zone or by domain
+
+        :param zone: The zone the records are for
+        :param subdomains: List of subdomains that must be published
+        :param records: The records to publish, grouped by domain
+        :param by_zone: Whether to publish by zone or by domain
+        :raises PublishError: if publishing fails
+        """
+        if by_zone:
+            try:
+                self.put_zone_ipv6s(zone, records)
+            except NotImplementedError:
+                self.log.debug("put_zone_ipv6s not implemented, will fall back"
+                               " to publishing by domain")
+            else:
+                return
+
+        error = None
+        for subdomain in subdomains:
+            if subdomain not in records:
+                self.log.debug("Skipping ipv6 update for %s with no existing "
+                               "AAAA records", self.fqdn_of(subdomain, zone))
+                continue
+            addresses = records[subdomain][0]
+            ttl = records[subdomain][1]
+            try:
+                self.put_domain_ipv6s(subdomain, zone, addresses, ttl)
+            except NotImplementedError:
+                self.log.critical("Updater has a bug: put_domain_ipv6s must be"
+                                  " implemented and is not")
+                raise FatalPublishError("put_domain_ipv6s must be implemented "
+                                        f"for updater {self.name} and is not")
+            except PublishError as e:
+                # Subclass should already log, so use debug here
+                self.log.debug("Could not put AAAA record for domain "
+                               f"{self.fqdn_of(subdomain, zone)}: %s", e)
+                if error is None:
+                    error = e
+                continue
+        if error is not None:
+            raise error
+
+    def publish_ipv6(self, network: ipaddress.IPv6Network):
+        hosts_by_zone = self._get_hosts_by_zone()
+
+        error = None
+        for zone, subdomains in hosts_by_zone.items():
+            # Fetch zone's records
+            self.log.debug("Fetching AAAA records")
+            try:
+                records, by_zone = self._get_ipv6_records(zone, subdomains)
+            except PublishError as e:
+                if error is None:
+                    error = e
+                continue
+            if isinstance(by_zone, PublishError):
+                if error is None:
+                    error = by_zone
+                by_zone = False
+
+            # Update records
+            for subdomain in subdomains:
+                if subdomain in records:
+                    ttl = records[subdomain][1]
+                    addrs = records[subdomain][0]
+                    addrs = [self.replace_ipv6_prefix(network, addr)
+                             for addr in addrs]
+                    records[subdomain] = (addrs, ttl)
+                elif by_zone:
+                    if error is None:
+                        error = PublishError(f"Zone {zone} fetched by updater "
+                                             f"{self.name} does not have AAAA "
+                                             f"record for subdomain "
+                                             f"{subdomain}")
+
+            # Put zone's records
+            self.log.debug("Putting AAAA records")
+            try:
+                self._put_ipv6_records(zone, subdomains, records, by_zone)
+            except PublishError as e:
+                if error is None:
+                    error = e
+                continue
+
+        if error is not None:
+            raise error
+
+    @staticmethod
+    def subdomain_of(fqdn: str, zone: str) -> str:
+        """Return the subdomain portion of the given FQDN.
+
+        :param fqdn: The FQDN to get the subdomain of (*without* trailing dot)
+        :param zone: The zone this FQDN belongs to
+
+        :return: The subdomain portion, e.g. "foo.bar" for FQDN
+                 "foo.bar.example.com" with zone "example.com", or the empty
+                 string if the FQDN is the zone's root domain
+        :raises ValueError: if the FQDN is not in the given zone
+        """
+        if not fqdn.endswith(zone):
+            raise ValueError(f"'{fqdn}' not in zone '{zone}'")
+        result = fqdn[: -len(zone)]
+        if result == '':
+            return ''
+        if result[-1] != '.':
+            raise ValueError(f"'{fqdn}' not in zone '{zone}'")
+        return result.rstrip('.')
+
+    @staticmethod
+    def fqdn_of(subdomain: str, zone: str) -> str:
+        """Return an FQDN for the given subdomain in the given zone.
+
+        :param subdomain: The subdomain to return an FQDN for, or the empty
+                          string for the zone's root domain
+        :param zone: The zone the subdomain resides in
+
+        :return: An FQDN, without trailing dot
+        """
+        if subdomain == '':
+            return zone
+        else:
+            return f'{subdomain}.{zone}'
 
 
 class OneWayUpdater(Updater):

@@ -38,6 +38,8 @@ class Config:
         self.updaters: Dict[str, Dict[str, str]] = updaters
 
 
+#TODO Move all the validation and processing into Config so it can be used as
+# an API
 class ConfigReader:
     """A reader for Ruddr configuration that validates the config after it is
     read in.
