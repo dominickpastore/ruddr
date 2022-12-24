@@ -10,8 +10,9 @@ from typing import Union, Tuple, List, Optional, Dict, TypeVar
 
 import dns.resolver
 
-from .. import Addrfile, ZoneSplitter
+from ..addrfile import Addrfile
 from ..exceptions import PublishError, FatalPublishError, ConfigError
+from ..zones import ZoneSplitter
 
 
 A = TypeVar('A', bound=Union[ipaddress.IPv4Address, ipaddress.IPv6Address])

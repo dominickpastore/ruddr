@@ -40,6 +40,11 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+# Use typehints for autodoc in a more sensible way: Render them in the
+# parameter description the same way :type xyz: is, and don't add undocumented
+# items just to document their type hints
+autodoc_typehints = 'description'
+autodoc_typehints_description_target = 'documented'
 
 # -- Options for HTML output -------------------------------------------------
 

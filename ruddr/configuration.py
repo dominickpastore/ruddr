@@ -22,7 +22,30 @@ DEFAULT_DATA_DIR = '/var/lib/ruddr'
 
 
 class Config:
-    """Ruddr configuration data"""
+    """Contains all Ruddr configuration required by
+    :class:`~ruddr.DDNSManager`. Normally, this would be created from a
+    configuration file by :func:`read_file` or :func:`read_file_from_path`,
+    but it can also be created directly when using Ruddr as a library.
+
+    Note that all configuration values should be strings, as they would be from
+    Python's :class:`configparser.ConfigParser`.
+
+    The configuration must be finalized before use, but programs using Ruddr as
+    a library need not concern themselves with that.
+    :class:`~ruddr.DDNSManager` will do that itself.
+
+    :param main: A dictionary of global configuration options, that is, the
+                 options that go under ``[ruddr]`` in the configuration file.
+    :param notifiers: A dictionary of notifier configurations. Keys are
+                      notifier names (i.e. the ``XYZ`` part of
+                      ``[notifier.XYZ]`` if it were from a configuration file)
+                      and values are themselves dicts of config options for
+                      that notifier.
+    :param updaters: A dictionary of updater configurations. Keys are updater
+                     names (i.e. the ``XYZ`` part of ``[updater.XYZ]`` if it
+                     were from a configuration file) and values are themselves
+                     dicts of config options for that updater.
+    """
 
     def __init__(self,
                  main: Dict[str, str],
@@ -185,6 +208,9 @@ class Config:
         This consists of validating the updater and notifier types, filling
         default values, and doing some normalization.
 
+        Programs using Ruddr as a library need not call this function
+        themselves; :class:`~ruddr.DDNSManager` will handle it.
+
         :param validate_notifier_type: A callable to check if a notifier type
                                        is valid. First parameter is a module
                                        name, or ``None`` if it's a built-in
@@ -239,7 +265,7 @@ def _process_config(config: configparser.ConfigParser) -> Config:
 
     return Config(main, notifiers, updaters)
 
-def read_file_path(filename: Union[str, pathlib.Path]) -> Config:
+def read_file_from_path(filename: Union[str, pathlib.Path]) -> Config:
     """Read configuration from the named file or :class:`~pathlib.Path`
 
     :param filename: Filename or path to read from
@@ -255,7 +281,8 @@ def read_file_path(filename: Union[str, pathlib.Path]) -> Config:
                           (filename, e.strerror)) from e
 
 def read_file(configfile: TextIO) -> Config:
-    """Read configuration in from the named file
+    """Read configuration in from the given file-like object opened in text
+    mode
 
     :param configfile: Filelike object to read the config from
     :raises ConfigError: if the config file cannot be read or is invalid

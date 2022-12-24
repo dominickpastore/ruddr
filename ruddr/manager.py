@@ -8,7 +8,7 @@ import os.path
 import signal
 import sys
 import time
-from typing import Optional, Any, Union, Dict
+from typing import Optional, Any, Union, Dict, Tuple
 
 if sys.version_info < (3, 10):
     from importlib_metadata import entry_points
@@ -195,7 +195,7 @@ def validate_updater_type(module: Optional[str], type_: str) -> bool:
 
 def _validate_updater_or_notifier_type(
     which: str,
-    existing: Dict[Union[str, (str, str)], Any],
+    existing: Dict[Union[str, Tuple[str, str]], Any],
     module: Optional[str],
     type_: str,
 ) -> bool:
@@ -264,7 +264,7 @@ def main(argv=None):
     """Main entry point when run as a standalone program"""
     args = parse_args(argv)
     try:
-        conf = configuration.read_file_path(args.configfile)
+        conf = configuration.read_file_from_path(args.configfile)
     except ConfigError as e:
         print("Config error:", e, file=sys.stderr)
         sys.exit(2)
