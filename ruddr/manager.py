@@ -30,11 +30,15 @@ class DDNSManager:
     """Manages the rest of the Ruddr system. Creates notifiers and updaters and
     manages the addrfile.
 
-    :param config: A :class:`~ruddr.ConfigReader` with the configuration to
-                   use
+    :param config: A :class:`~ruddr.Config` with the configuration to use
     """
 
-    def __init__(self, config):
+    def __init__(self, config: configuration.Config):
+        try:
+            config.finalize(validate_notifier_type, validate_notifier_type)
+        except ConfigError as e:
+            log.critical("Config error: %s", e)
+            raise
         self.config = config
 
         #: Addrfile manager
@@ -259,10 +263,8 @@ def parse_args(argv):
 def main(argv=None):
     """Main entry point when run as a standalone program"""
     args = parse_args(argv)
-    conf_reader = configuration.ConfigReader(validate_notifier_type,
-                                             validate_updater_type)
     try:
-        conf = conf_reader.read_file_path(args.configfile)
+        conf = configuration.read_file_path(args.configfile)
     except ConfigError as e:
         print("Config error:", e, file=sys.stderr)
         sys.exit(2)

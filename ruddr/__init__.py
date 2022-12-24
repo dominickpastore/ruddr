@@ -5,7 +5,7 @@ updaters.
 """
 
 from .addrfile import Addrfile
-from .configuration import ConfigReader, Config
+from .configuration import Config
 from .exceptions import (RuddrException, ConfigError, NotifyError,
                          NotifierSetupError, PublishError, FatalPublishError)
 from .manager import DDNSManager
