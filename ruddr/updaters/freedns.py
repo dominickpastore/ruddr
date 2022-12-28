@@ -2,24 +2,25 @@
 import hashlib
 import ipaddress
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple, List
 
 import requests
 
 from .. import Addrfile
 from ..configuration import USER_AGENT
 from ..exceptions import ConfigError, PublishError
-from .updater import Updater
+from .updater import TwoWayUpdater
 
 
 @dataclass
 class _SubdomainRecord:
     url4: Optional[str] = None
     url6: Optional[str] = None
+    ipv4: Optional[ipaddress.IPv4Address] = None
     ipv6: Optional[ipaddress.IPv6Address] = None
 
 
-class FreeDNSUpdater(Updater):
+class FreeDNSUpdater(TwoWayUpdater):
     """Ruddr updater for freedns.afraid.org
 
     :param name: Name of the updater (from config section heading)
@@ -28,7 +29,7 @@ class FreeDNSUpdater(Updater):
     """
 
     def __init__(self, name: str, addrfile: Addrfile, config: Dict[str, str]):
-        super().__init__(name, addrfile)
+        super().__init__(name, addrfile, config['datadir'])
 
         # Username and password
         try:
@@ -53,14 +54,18 @@ class FreeDNSUpdater(Updater):
             self.log.critical("'fqdns' config option is required")
             raise ConfigError(f"{self.name} updater requires 'fqdns' config "
                               "option") from None
-        self.fqdns = fqdns.split()
+        self.init_hosts(fqdns)
 
-    def _get_account_subdomains(self) -> Optional[Dict[str, _SubdomainRecord]]:
+        #: Stores subdomain update URLs between when they are fetched and
+        #: when they are put
+        self._fetched_subdomains: Dict[str, _SubdomainRecord] = dict()
+
+    def _get_account_subdomains(self) -> Dict[str, _SubdomainRecord]:
         """Fetch a list of the account's subdomains and return them in a dict
 
         :returns: A dict with subdomain names as keys and
-                  :class:`_SubdomainRecord` as values, or ``None`` if there is
-                  an error
+                  :class:`_SubdomainRecord` as values
+        :raises PublishError: If the list of subdomains could not be fetched
         """
         self.log.debug("Fetching account subdomains")
         try:
@@ -73,7 +78,7 @@ class FreeDNSUpdater(Updater):
                                     headers={'User-Agent': USER_AGENT})
         except requests.exceptions.RequestException as e:
             self.log.error("Could not get list of account subdomains: %s", e)
-            return None
+            raise PublishError("Could not get list of account subdomains")
 
         try:
             response.raise_for_status()
@@ -81,7 +86,8 @@ class FreeDNSUpdater(Updater):
             self.log.error("Received HTTP %d when trying to get list of "
                            "account subdomains:\n%s",
                            response.status_code, response.text)
-            return None
+            raise PublishError(f"Received HTTP {response.status_code} when "
+                               "trying to get list of account subdomains")
 
         # This API doesn't seem to return status codes other than 200, but
         # errors are always given as HTML
@@ -89,7 +95,8 @@ class FreeDNSUpdater(Updater):
         if response.headers['content-type'].startswith('text/html'):
             self.log.error("Received abnormal response when trying to get list"
                            " of account subdomains:\n%s", response.text)
-            return None
+            raise PublishError("Received abnormal response when trying to get "
+                               "list of account subdomains")
 
         result = dict()
         for line in response.text.splitlines():
@@ -99,59 +106,51 @@ class FreeDNSUpdater(Updater):
                 ipv6 = ipaddress.IPv6Address(addr)
             except ValueError:
                 subdomain_record.url4 = update_url
+                subdomain_record.ipv4 = ipaddress.IPv4Address(addr)
             else:
                 subdomain_record.url6 = update_url
                 subdomain_record.ipv6 = ipv6
         return result
 
-    def publish_ipv4(self, address: ipaddress.IPv4Address):
-        acct_fqdns = self._get_account_subdomains()
-        if acct_fqdns is None:
-            raise PublishError("Could not fetch account subdomains")
+    def fetch_all_ipv4s(
+            self
+    ) -> List[Tuple[str, ipaddress.IPv4Address, Optional[int]]]:
+        self._fetched_subdomains = self._get_account_subdomains()
 
-        success = True
-        for fqdn in self.fqdns:
-            try:
-                record = acct_fqdns[fqdn]
-            except KeyError:
-                self.log.warning("Account does not have domain %s", fqdn)
-                success = False
-                continue
-            if record.url4 is None:
-                self.log.warning("Domain %s does not have IPv4 update URL "
-                                 "(have you assigned an IPv4 yet?", fqdn)
-                success = False
-                continue
-            if not self._update_one(fqdn, record.url4, address.exploded):
-                success = False
+        result = []
+        for subdomain, record in self._fetched_subdomains.items():
+            if record.ipv4 is not None:
+                result.append((subdomain, record.ipv4, None))
+        return result
 
-        if not success:
-            raise PublishError("Could not update all records")
+    def fetch_all_ipv6s(
+        self
+    ) -> List[Tuple[str, ipaddress.IPv6Address, Optional[int]]]:
+        self._fetched_subdomains = self._get_account_subdomains()
 
-    def publish_ipv6(self, network: ipaddress.IPv6Network):
-        acct_fqdns = self._get_account_subdomains()
-        if acct_fqdns is None:
-            raise PublishError("Could not fetch account subdomains")
+        result = []
+        for subdomain, record in self._fetched_subdomains.items():
+            if record.ipv6 is not None:
+                result.append((subdomain, record.ipv6, None))
+        return result
 
-        success = True
-        for fqdn in self.fqdns:
-            try:
-                record = acct_fqdns[fqdn]
-            except KeyError:
-                self.log.warning("Account does not have domain %s", fqdn)
-                success = False
-                continue
-            if record.url6 is None:
-                self.log.warning("Domain %s does not have IPv4 update URL "
-                                 "(have you assigned an IPv4 yet?", fqdn)
-                success = False
-                continue
-            new_ipv6 = self.replace_ipv6_prefix(network, record.ipv6)
-            if not self._update_one(fqdn, record.url6, new_ipv6.compressed):
-                success = False
+    def put_domain_ipv4(self, domain: str,
+                        address: ipaddress.IPv4Address, ttl: Optional[int]):
+        address = address.exploded
+        url = self._fetched_subdomains[domain].url4
+        self._update_one(domain, url, address)
 
-        if not success:
-            raise PublishError("Could not update all records")
+    def put_domain_ipv6s(self, domain: str,
+                         addresses: List[ipaddress.IPv6Address],
+                         ttl: Optional[int]):
+        if len(addresses) != 1:
+            self.log.critical(f"There is a bug in freedns updater {self.name}:"
+                              " Incorrect number of IPv6 addresses in "
+                              f"put_domain_ipv6s: {addresses}")
+            raise PublishError("Bug in freedns updater")
+        address = addresses[0].compressed
+        url = self._fetched_subdomains[domain].url6
+        self._update_one(domain, url, address)
 
     def _update_one(self, fqdn: str, url: str, address: str):
         """Update a single domain's IP address
@@ -160,7 +159,7 @@ class FreeDNSUpdater(Updater):
         :param url: The update URL
         :param address: The address to update with
 
-        :returns: ``True`` if successful, ``False`` if not
+        :raises PublishError: if not successful
         """
         self.log.debug("Updating IP address for %s to %s", fqdn, address)
         try:
@@ -168,7 +167,7 @@ class FreeDNSUpdater(Updater):
                                     headers={'User-Agent': USER_AGENT})
         except requests.exceptions.RequestException as e:
             self.log.error("Could not update %s to %s: %s", fqdn, address, e)
-            return False
+            raise PublishError(f"Could not update {fqdn} to {address}")
 
         try:
             response.raise_for_status()
@@ -176,7 +175,8 @@ class FreeDNSUpdater(Updater):
             self.log.error("Received HTTP %d when trying to update %s to %s:\n"
                            "%s", response.status_code, fqdn, address,
                            response.text)
-            return False
+            raise PublishError(f"Received HTTP {response.status_code} when "
+                               f"trying to upcate {fqdn} to {address}")
             
         # This API seems to always return plain text. Errors are in the form
         # "ERROR: message" and successes in the form
@@ -185,11 +185,12 @@ class FreeDNSUpdater(Updater):
         if response.headers['content-type'].startswith('text/html'):
             self.log.error("Received abnormal response when trying to update"
                            "%s to %s:\n%s", fqdn, address, response.text)
-            return False
+            raise PublishError("Received abnormal response when trying to "
+                               f"update {fqdn} to {address}")
         if response.text.startswith("ERROR:"):
             self.log.error("Received error when trying to update %s to %s:\n"
                            "%s", fqdn, address, response.text[7:])
-            return False
+            raise PublishError(f"Received error when trying to update {fqdn} "
+                               f"to {address}")
 
         self.log.info("Updated address for %s to %s", fqdn, address)
-        return True

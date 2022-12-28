@@ -935,11 +935,13 @@ class TwoWayZoneUpdater(Updater):
                     ttl = records[subdomain][1]
                     records[subdomain] = ([address], ttl)
                 elif by_zone:
+                    fqdn = self.fqdn_of(subdomain, zone)
+                    self.log.warning("Updater did not find A record for %s",
+                                     fqdn)
                     if error is None:
-                        error = PublishError(f"Zone {zone} fetched by updater "
-                                             f"{self.name} does not have A "
-                                             f"record for subdomain "
-                                             f"{subdomain}")
+                        error = PublishError(f"Updater {self.name} did not "
+                                             "find A record for domain "
+                                             f"{fqdn}")
 
             # Put zone's records
             self.log.debug("Putting A records")
@@ -1091,11 +1093,13 @@ class TwoWayZoneUpdater(Updater):
                              for addr in addrs]
                     records[subdomain] = (addrs, ttl)
                 elif by_zone:
+                    fqdn = self.fqdn_of(subdomain, zone)
+                    self.log.warning("Updater did not find AAAA record for %s",
+                                     fqdn)
                     if error is None:
-                        error = PublishError(f"Zone {zone} fetched by updater "
-                                             f"{self.name} does not have AAAA "
-                                             f"record for subdomain "
-                                             f"{subdomain}")
+                        error = PublishError(f"Updater {self.name} did not "
+                                             "find AAAA record for domain "
+                                             f"{fqdn}")
 
             # Put zone's records
             self.log.debug("Putting AAAA records")
