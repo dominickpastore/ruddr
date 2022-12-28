@@ -225,9 +225,9 @@ choice for you.
 ``endpoint``
     The API endpoint to use, that is, the base URL for the LiveDNS API. This
     should rarely need to be set explicitly, as it defaults to Gandi's
-    production LiveDNS API endpoint. (Gandi does not currently provide a
-    staging API environment as of September 16, 2021, but if they do in the
-    future, this option could be used to switch to that for testing purposes.)
+    production LiveDNS API endpoint. However, if you wish to test in Gandi's
+    sandbox API environment, you can set this to
+    ``https://api.sandbox.gandi.net/v5/livedns``.
 
 HE Updater
 ----------
