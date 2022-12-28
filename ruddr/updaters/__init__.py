@@ -1,6 +1,7 @@
 """Built in updaters and the updater base class"""
 
-from .updater import BaseUpdater, Updater, OneWayUpdater
+from .updater import (BaseUpdater, Updater, OneWayUpdater, TwoWayUpdater,
+                      TwoWayZoneUpdater)
 
 from . import duckdns
 from . import freedns
@@ -16,4 +17,5 @@ updaters = {
     'standard': standard.StandardUpdater,
 }
 
-__all__ = ['BaseUpdater', 'Updater', 'OneWayUpdater']
+__all__ = ['BaseUpdater', 'Updater', 'OneWayUpdater', 'TwoWayUpdater',
+           'TwoWayZoneUpdater']

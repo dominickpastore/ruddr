@@ -10,5 +10,5 @@ from .exceptions import (RuddrException, ConfigError, NotifyError,
                          NotifierSetupError, PublishError, FatalPublishError)
 from .manager import DDNSManager
 from .notifiers import Notifier, ScheduledNotifier, get_iface_addrs
-from .updaters import Updater, OneWayUpdater
+from .updaters import Updater, OneWayUpdater, TwoWayUpdater, TwoWayZoneUpdater
 from .zones import ZoneSplitter
