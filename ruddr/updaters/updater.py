@@ -182,8 +182,8 @@ class BaseUpdater:
 
 
 class Updater(BaseUpdater):
-    """Base class for Ruddr updaters. Handles setting up logging, retries, and
-    working with the addrfile.
+    """Base class for Ruddr updaters. Handles setting up logging, retries, the
+    initial update, and working with the addrfile.
 
     :param name: Name of the updater (from config section heading)
     :param addrfile: The :class:`~ruddr.Addrfile` object
@@ -326,7 +326,8 @@ class TwoWayZoneUpdater(Updater):
 
         This is separate from :meth:`__init__` so subclasses can rely on the
         logger while doing their config parsing, then pass the list of hosts
-        in via this method after.
+        in via this method after. **It must be called before your subclass's
+        constructor completes.**
 
         The list can be provided either as an unparsed :class:`str` or as a
         list of 2-tuples ``(fqdn, zone)``:
@@ -1205,7 +1206,8 @@ class TwoWayUpdater(TwoWayZoneUpdater):
 
         This is separate from :meth:`__init__` so subclasses can rely on the
         logger while doing their config parsing, then pass the list of hosts
-        in via this method after.
+        in via this method after. **It must be called before your subclass's
+        constructor completes.**
 
         The list can be provided either as an unparsed :class:`str` with a
         whitespace-separated list of domain names or as an actual :class:`list`
@@ -1566,7 +1568,8 @@ class OneWayUpdater(Updater):
 
         This is separate from :meth:`__init__` so subclasses can rely on the
         logger while doing their config parsing, then pass the relevant config
-        options in by calling this method.
+        options in by calling this method. **It must be called before your
+        subclass's constructor completes.**
 
         :param hosts: A list of 2-tuples ``(hostname, ipv6_src)`` specifying
                       which hosts should be updated and where their IPv6

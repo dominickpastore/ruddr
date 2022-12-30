@@ -32,7 +32,7 @@ glance, so Ruddr provides a few base classes that lay the groundwork for
 several common types of APIs. Each of these provides certain abstract methods
 appropriate to the specific style of API they support.
 
-**To create an updater:** Create a class that inherits from one of these base
+To create an updater, create a class that inherits from one of those base
 classes, listed below, and implement its abstract methods as described under
 :ref:`high level updaters`.
 
@@ -60,6 +60,36 @@ if you need even more flexibility, you can inherit directly from the low-level
 :class:`Updater` base class instead, or the most primitive, the
 :class:`BaseUpdater` base class. These are described under :ref:`low level
 updaters`.
+
+A few additional guidelines and tips:
+
+- All updaters must have a constructor that matches the following:
+
+  .. function:: Updater.__init__(name, addrfile, config)
+     :noindex:
+
+     :param name: Updater name, taken from ``[updater.<name>]`` in the Ruddr
+                  config
+     :type name: str
+     :param addrfile: The :class:`~ruddr.Addrfile` object this updater should use
+     :type addrfile: ruddr.Addrfile
+     :param config: A :class:`dict` of this updater's configuration values, all
+                    as strings, plus any global configuration options that may
+                    be useful (currently, only ``datadir``, which updaters may
+                    use to cache data if necessary).
+     :type config: Dict[str, str]
+
+- The first two parameters (``name`` and ``addrfile``) can be passed directly
+  to the super class constructor, and it's strongly recommended that that be
+  the first thing your constructor does (so the variables in the next bullet
+  point will be initialized).
+
+- The :class:`BaseUpdater` class, which is a superclass of all updaters
+  (directly or indirectly), makes the ``self.name`` and ``self.log`` member
+  variables available. ``self.name`` is a :class:`str` with the updater name
+  and ``self.log`` is a Python logger named after the updater. You may use
+  either of these whenever convenient, but you are especially encouraged to use
+  ``self.log`` often.
 
 .. _high level updaters:
 
