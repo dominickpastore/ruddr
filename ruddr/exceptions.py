@@ -1,6 +1,12 @@
 """All Ruddr exceptions"""
 
 
+# TODO Redesign this. RuddrException becomes a base class for all Ruddr
+# exceptions, period. New RuddrSetupError for exceptions raised during
+# initialization and setup (ConfigError, NotifierSetupError). NotifyError for
+# failed notify, PublishError for failed publish.
+
+
 class RuddrException(Exception):
     """Base class for all Ruddr exceptions except PublishError (which should
     never be uncaught within Ruddr when raised). Whenever this is raised, a

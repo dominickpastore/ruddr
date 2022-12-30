@@ -46,11 +46,13 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 autodoc_typehints = 'description'
 autodoc_typehints_description_target = 'documented'
 
+# Document members in source order rather than alphabetical
+autodoc_member_order = 'bysource'
+
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-#
 html_theme = 'alabaster'
 html_theme_options = {
     'description': 'Robotic Updater for Dynamic DNS Records',
