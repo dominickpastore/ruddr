@@ -2,7 +2,7 @@
 
 import ipaddress
 
-from ..exceptions import ConfigError
+from ruddr.exceptions import ConfigError
 from .notifier import Notifier
 
 
@@ -58,9 +58,3 @@ class StaticNotifier(Notifier):
             self.notify_ipv4(self.ipv4)
         if self.want_ipv6():
             self.notify_ipv6(self.ipv6)
-
-    def start(self):
-        self.log.debug("Nothing to start for StaticNotifier")
-
-    def stop(self):
-        self.log.debug("Nothing to stop for StaticNotifier")

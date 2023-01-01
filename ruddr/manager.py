@@ -7,7 +7,6 @@ import logging.handlers
 import os.path
 import signal
 import sys
-import time
 from typing import Optional, Any, Union, Dict, Tuple
 
 if sys.version_info < (3, 10):
@@ -17,7 +16,8 @@ else:
 
 from . import Addrfile
 from . import configuration
-from .exceptions import RuddrException, NotifierSetupError, ConfigError
+from .exceptions import (RuddrException, NotifierSetupError, ConfigError,
+                         RuddrSetupError)
 from . import notifiers
 from . import sdnotify
 from . import updaters
@@ -31,6 +31,8 @@ class DDNSManager:
     manages the addrfile.
 
     :param config: A :class:`~ruddr.Config` with the configuration to use
+
+    :raises ConfigError: if configuration is not valid
     """
 
     def __init__(self, config: configuration.Config):
@@ -46,15 +48,19 @@ class DDNSManager:
         self.addrfile = Addrfile(addrfile_name)
 
         # Creates self.notifiers and self.updaters as dicts
-        self._create_notifiers()
-        self._create_updaters()
+        self.notifiers: Dict[
+            str, notifiers.BaseNotifier
+        ] = self._create_notifiers()
+        self.updaters: Dict[
+            str, updaters.BaseUpdater
+        ] = self._create_updaters()
 
         self._discard_unused_notifiers()
 
-    def _create_notifiers(self):
+    def _create_notifiers(self) -> Dict[str, notifiers.BaseNotifier]:
         """Initialize the notifiers. Assumes the notifiers have been previously
         imported by :func:`validate_notifier_type`."""
-        self.notifiers = dict()
+        notifiers_dict: Dict[str, notifiers.BaseNotifier] = dict()
         for name, config in self.config.notifiers.items():
             module = config.get('module')
             notifier_type = config['type']
@@ -65,12 +71,13 @@ class DDNSManager:
                 notifier_class = notifiers.notifiers[(module, notifier_type)]
 
             notifier = notifier_class(name, config)
-            self.notifiers[name] = notifier
+            notifiers_dict[name] = notifier
+        return notifiers_dict
 
-    def _create_updaters(self):
+    def _create_updaters(self) -> Dict[str, updaters.BaseUpdater]:
         """Initialize the updaters. Assumes the updaters have been previously
         imported by :func:`validate_updater_type`."""
-        self.updaters = dict()
+        updater_dict: Dict[str, updaters.BaseUpdater] = dict()
         for name, config in self.config.updaters.items():
             module = config.get('module')
             updater_type = config['type']
@@ -83,7 +90,8 @@ class DDNSManager:
             updater = updater_class(name, self.addrfile, config)
             updater.initial_update()
             self._attach_updater_notifier(updater, config)
-            self.updaters[name] = updater
+            updater_dict[name] = updater
+        return updater_dict
 
     def _attach_updater_notifier(self, updater, config):
         """Attach the given :class:`~ruddr.Updater` to its notifier(s).
@@ -110,9 +118,10 @@ class DDNSManager:
                 del self.notifiers[name]
 
     def start(self):
-        """Start running all notifiers.
+        """Start running all notifiers. Returns after they start. The notifiers
+        will continue running in background threads.
 
-        :raises NotifierSetupError: when a notifier fails to start.
+        :raises NotifierSetupError: if a notifier fails to start
         """
         log.info("Starting all notifiers...")
 
@@ -128,24 +137,12 @@ class DDNSManager:
 
         log.info("All notifiers started.")
 
-    def check_once(self):
-        """Do a single notify from all notifiers.
-
-        :raises NotifyError: if any notifier fails to notify.
-        """
+    def do_notify(self):
+        """Do an on-demand notify from all notifiers."""
         log.info("Checking once for all notifiers...")
 
-        exc = None
         for name, notifier in self.notifiers.items():
-            try:
-                notifier.check_once()
-            except NotifierSetupError as e:
-                log.error("Notifier %s failed to check.",
-                          name, exc_info=True)
-                if exc is None:
-                    exc = e
-        if exc is not None:
-            raise exc
+            notifier.do_notify()
 
         log.info("Check for all notifiers complete.")
 
@@ -247,10 +244,11 @@ def parse_args(argv):
     :param argv: Either ``None`` or a list of arguments
     :returns: a :class:`argparse.Namespace` containing the parsed arguments
     """
-    parser = argparse.ArgumentParser(description="Robotic Updater for "
-                                                 "Dynamic DNS Records")
-    parser.add_argument("-1", "--single-shot", action="store_true",
-                        help="Check and update all IP addresses a single time")
+    parser = argparse.ArgumentParser(
+        description="Robotic Updater for Dynamic DNS Records",
+        epilog="SIGUSR1 will cause a running instance to immediately check and"
+               " update the current IP address(es) if possible",
+    )
     parser.add_argument("-c", "--configfile", default="/etc/ruddr.conf",
                         help="Path to the config file")
     parser.add_argument("-d", "--debug-logs", action="store_true",
@@ -287,21 +285,14 @@ def main(argv=None):
         log.setLevel(logging.INFO)
 
     # Start up the actual DDNS code
-    manager = DDNSManager(conf)
-    if args.single_shot:
-        # TODO This seems like it may interfere with a running Ruddr. It should
-        #   potentially check if Ruddr is running and if so, send a signal to
-        #   have it do the check_once() itself.
-        try:
-            manager.check_once()
-        except RuddrException:
-            sys.exit(1)
-        return
     try:
+        manager = DDNSManager(conf)
         manager.start()
+    except RuddrSetupError:
+        log.critical("Ruddr failed to start.")
+        sys.exit(1)
     except RuddrException:
-        # Exception happened, but generated within Ruddr, so it should be
-        # sufficiently logged. Just exit.
+        log.critical("Unexpected RuddrException", exc_info=True)
         sys.exit(1)
     except:
         log.critical("Uncaught exception!", exc_info=True)
@@ -310,15 +301,23 @@ def main(argv=None):
     # Notify systemd, if applicable
     sdnotify.ready()
 
+    # Do an immediate update on SIGUSR1
+    def handle_sigusr1(sig, _):
+        log.info("Received signal: %s", signal.strsignal(sig))
+        manager.do_notify()
+    signal.signal(signal.SIGUSR1, handle_sigusr1)
+
     # Wait for SIGINT (^C) or SIGTERM
-    def handle_signals(sig, frame):
-        log.info("Received signal:", signal.strsignal(sig))
+    def handle_signals(sig, _):
+        log.info("Received signal: %s", signal.strsignal(sig))
         sdnotify.stopping()
         manager.stop()
     signal.signal(signal.SIGINT, handle_signals)
     signal.signal(signal.SIGTERM, handle_signals)
-    while True:
-        time.sleep(60)
+
+    # TODO Do we need this? If not, remove it
+    #while True:
+    #    time.sleep(60)
 
 
 if __name__ == '__main__':

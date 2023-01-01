@@ -826,9 +826,9 @@ class TwoWayZoneUpdater(Updater):
         Union[bool, PublishError]
     ]:
         """Get A records, group by subdomain, and return whether they could be
-        fetched by zone. Can also return a :class:`PublishError` as the second
+        fetched by zone. Can also return a :exc:`PublishError` as the second
         element in the tuple, indicating it was not fetched by zone and at
-        least one :class:`PublishError` occurred (:class:`PublishError` while
+        least one :exc:`PublishError` occurred (:exc:`PublishError` while
         fetching by zone is simply raised because there can't be partial
         success in that case)
 
@@ -986,9 +986,9 @@ class TwoWayZoneUpdater(Updater):
         Union[bool, PublishError]
     ]:
         """Get AAAA records, group by subdomain, and return whether they could
-        be fetched by zone. Can also return a :class:`PublishError` as the
+        be fetched by zone. Can also return a :exc:`PublishError` as the
         second element in the tuple, indicating it was not fetched by zone and
-        at least one :class:`PublishError` occurred (:class:`PublishError`
+        at least one :exc:`PublishError` occurred (:exc:`PublishError`
         while fetching by zone is simply raised because there can't be partial
         success in that case)
 
@@ -1700,7 +1700,7 @@ class OneWayUpdater(Updater):
     ) -> ipaddress.IPv6Address:
         """Get the current IPv6 address for a host, either returning the
         hardcoded value or doing a DNS lookup. Convert errors to
-        :class:`PublishError`.
+        :exc:`PublishError`.
 
         :param hostname: The host to fetch the IPv6 for
         :param ip_lookup: A hardcoded :class:`~ipaddress.IPv6Address` or an

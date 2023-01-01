@@ -1,6 +1,6 @@
 """Built in notifiers and the notifier base class"""
 
-from .notifier import Notifier, ScheduledNotifier
+from .notifier import BaseNotifier, Notifier
 from ._getifaceaddrs import get_iface_addrs
 
 from . import timed
@@ -22,7 +22,7 @@ else:
     notifiers['systemd'] = systemd.SystemdNotifier
 
 __all__ = [
+    'BaseNotifier',
     'Notifier',
-    'ScheduledNotifier',
     'get_iface_addrs',
 ]

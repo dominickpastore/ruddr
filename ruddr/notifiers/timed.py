@@ -3,12 +3,12 @@ schedule"""
 
 import ipaddress
 
-from ..exceptions import NotifyError, ConfigError
+from ruddr.exceptions import NotifyError, ConfigError
 from ._getifaceaddrs import get_iface_addrs
-from .notifier import ScheduledNotifier
+from .notifier import Notifier
 
 
-class TimedNotifier(ScheduledNotifier):
+class TimedNotifier(Notifier):
     """Ruddr notifier that checks the IP address of a local interface on a
     schedule"""
 
@@ -44,49 +44,6 @@ class TimedNotifier(ScheduledNotifier):
             raise ConfigError(f"'ipv6_prefix' option for {self.name} notifier "
                               "must be an integer from 1-128")
 
-        # Check interval: Number of seconds between successful IP address
-        # checks
-        try:
-            self.success_interval = int(config.get('interval', '1800'))
-        except ValueError:
-            self.log.critical("'interval' config option must be an integer")
-            raise ConfigError(f"'interval' option for {self.name} notifier"
-                              " must be an integer") from None
-        if self.success_interval < 0:
-            self.success_interval = 0
-
-        # Retry min and max interval: Number of seconds to wait before retrying
-        # after a failed IP address check (e.g. the interface hasn't obtained
-        # an IP # address yet or a cable is unplugged). When a check first
-        # fails, the min interval is used, but the retry interval grows after
-        # each failure until the max interval is reached. After a successful
-        # retry, it returns to the regular check interval.
-        try:
-            self.fail_min_interval = int(config.get('retry_min_interval',
-                                                    '10'))
-        except ValueError:
-            self.log.critical("'retry_min_interval' config option must be an "
-                              "integer")
-            raise ConfigError(f"'retry_min_interval' option for {self.name} "
-                              "notifier must be an integer") from None
-        try:
-            self.fail_max_interval = int(config.get('retry_max_interval',
-                                                    '600'))
-        except ValueError:
-            self.log.critical("'retry_max_interval' config option must be an "
-                              "integer")
-            raise ConfigError(f"'retry_max_interval' option for {self.name} "
-                              "notifier must be an integer") from None
-        if (self.fail_min_interval > self.fail_max_interval or
-                self.fail_min_interval <= 0 or
-                self.fail_max_interval <= 0):
-            self.log.critical("'retry_min_interval' option must be less than "
-                              "'retry_max_interval' option and both must be "
-                              "greater than 0")
-            raise ConfigError("'retry_min_interval' option must be less than "
-                              f"'retry_max_interval' option for {self.name} "
-                              "notifier and both must be greater than 0")
-
         # Allow private addresses: By default, addresses in private IP space
         # (192.168.0.0/16, 10.0.0.0/8, 192.0.2.0/24, fc00::/7, 2001:db8::/32,
         # etc.) are ignored when assigned to the monitored interface. If this
@@ -99,6 +56,11 @@ class TimedNotifier(ScheduledNotifier):
             self.allow_private = True
         else:
             self.allow_private = False
+
+        self.set_check_intervals(retry_min_interval=10,
+                                 retry_max_interval=600,
+                                 success_interval=1800,
+                                 config=config)
 
     def check_once(self):
         self.log.info("Checking IP addresses.")

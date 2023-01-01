@@ -15,7 +15,6 @@ system's interfaces"""
 
 import ipaddress
 import netifaces
-import sys
 
 
 def _get_iface_addrs(if_name):

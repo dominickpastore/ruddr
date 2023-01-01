@@ -20,6 +20,9 @@ Writing Your Own Notifier
 
 .. TODO
 
+.. TODO note that there's no harm in notifying extra, except a marginal number
+   of extra CPU cycles
+
 .. _updater_dev:
 
 Writing Your Own Updater

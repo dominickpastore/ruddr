@@ -1,12 +1,6 @@
 """All Ruddr exceptions"""
 
 
-# TODO Redesign this. RuddrException becomes a base class for all Ruddr
-# exceptions, period. New RuddrSetupError for exceptions raised during
-# initialization and setup (ConfigError, NotifierSetupError). NotifyError for
-# failed notify, PublishError for failed publish.
-
-
 class RuddrException(Exception):
     """Base class for all Ruddr exceptions except PublishError (which should
     never be uncaught within Ruddr when raised). Whenever this is raised, a
@@ -14,23 +8,30 @@ class RuddrException(Exception):
     """
 
 
-class NotifyError(RuddrException):
-    """Raised by a notifier's :meth:`~ruddr.Notifier.check_once` method or a
-    scheduled method in a :class:`~ruddr.ScheduledNotifier` to signal an error.
-    In the latter case, the method will be rescheduled using the failure
-    interval."""
+class RuddrSetupError(RuddrException):
+    """Base class for Ruddr exceptions that happen during startup"""
 
 
-class NotifierSetupError(RuddrException):
+class ConfigError(RuddrSetupError):
+    """Raised when the configuration is malformed or has other errors"""
+
+
+class NotifierSetupError(RuddrSetupError):
     """Raised by a notifier when there is a fatal error during setup for
     persistent checks"""
 
 
-class ConfigError(RuddrException):
-    """Raised when the configuration is malformed or has other errors"""
+class NotStartedError(RuddrException):
+    """Raised when requesting an on-demand notify before starting the
+    notifier"""
 
 
-class PublishError(Exception):
+class NotifyError(RuddrException):
+    """Notifiers should raise when an attempt to check the current IP address
+    fails. Doing so triggers the retry mechanism."""
+
+
+class PublishError(RuddrException):
     """Updaters should raise when an attempt to publish an update fails. Doing
     so triggers the retry mechanism."""
 

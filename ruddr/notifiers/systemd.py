@@ -6,12 +6,12 @@ from gi.repository import Gio
 import ipaddress
 import socket
 
-from ..exceptions import NotifyError, NotifierSetupError, ConfigError
+from ruddr.exceptions import NotifyError, NotifierSetupError, ConfigError
 from ._getifaceaddrs import get_iface_addrs
-from .notifier import ScheduledNotifier
+from .notifier import Notifier
 
 
-class SystemdNotifier(ScheduledNotifier):
+class SystemdNotifier(Notifier):
     """Ruddr notifier that listens for updates from systemd-networkd over DBus
     """
 
@@ -47,29 +47,6 @@ class SystemdNotifier(ScheduledNotifier):
             raise ConfigError(f"'ipv6_prefix' option for {self.name} notifier "
                               "must be an integer from 1-128")
 
-        # Max interval: Maximum number of seconds to go without checking the
-        # current IP address, even without systemd-networkd signaling. It's not
-        # clear if systemd-networkd signals in the event the IP address changes
-        # but there was no other change in network connectivity (e.g. DHCP
-        # server gives a different lease at renewal), so this ensures that any
-        # such misses would not go undetected. This should be uncommon, if even
-        # possible. Setting to 0 disables interval-based notifying.
-        try:
-            self.success_interval = int(config.get('max_interval', '21600'))
-        except ValueError:
-            self.log.critical("'max_interval' config option must be an "
-                              "integer")
-            raise ConfigError(f"'max_interval' option for {self.name} notifier"
-                              " must be an integer") from None
-        if self.success_interval < 0:
-            self.success_interval = 0
-        self.fail_min_interval = 60
-        if self.success_interval > 0:
-            if self.fail_max_interval > self.success_interval:
-                self.fail_max_interval = self.success_interval
-            if self.fail_min_interval > self.success_interval:
-                self.fail_min_interval = self.success_interval
-
         # Allow private addresses: By default, addresses in private IP space
         # (192.168.0.0/16, 10.0.0.0/8, 192.0.2.0/24, fc00::/7, 2001:db8::/32,
         # etc.) are ignored when assigned to the monitored interface. If this
@@ -82,6 +59,17 @@ class SystemdNotifier(ScheduledNotifier):
             self.allow_private = True
         else:
             self.allow_private = False
+
+        # It's not clear if systemd-networkd signals in the event the IP
+        # IP address changes but there was no other change in network
+        # connectivity (e.g. DHCP server gives a different lease at renewal).
+        # So, we also check the IP address on a schedule by default just in
+        # case (though this should be uncommon, if even possible). If we want
+        # to disable this, just set the success interval to 0.
+        self.set_check_intervals(retry_min_interval=60,
+                                 retry_max_interval=21600,
+                                 success_interval=21600,
+                                 config=config)
 
         # Will store a reference to the GLib main loop, so we can stop it later
         self.mainloop = None
@@ -253,17 +241,13 @@ class SystemdNotifier(ScheduledNotifier):
         self.mainloop.run()
         self.log.debug("Main loop stopped.")
 
-    def start(self):
-        super().start()
-
+    def setup(self):
         # Start monitoring DBus
-        self.log.debug("First notify complete. Starting to monitor DBus.")
+        self.log.debug("Starting to monitor DBus.")
         thread = threading.Thread(target=self._dbus_listen)
         thread.start()
 
-    def stop(self):
-        super().stop()
-
+    def teardown(self):
         # Stop monitoring DBus
         if self.mainloop is None:
             self.log.debug("Main loop not started, nothing to stop")

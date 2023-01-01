@@ -1,21 +1,33 @@
 """Base class for Ruddr notifiers"""
 
+import ipaddress
 import logging
 import threading
+# Note: We are not using abstractmethod the way it is intended. We are using it
+# purely to get Sphinx to mark methods as abstract. Thus, we intentionally do
+# NOT use ABCMeta or inherit from ABC.
+from abc import abstractmethod
+from typing import Callable, Dict, List, Optional
 
-from ..exceptions import NotifyError, ConfigError
+from ruddr.exceptions import NotifyError, ConfigError, NotStartedError
 
 
-class Notifier:
-    """Base class for Ruddr notifiers
+class BaseNotifier:
+    """Base class for all Ruddr notifiers. Sets up the logger, sets up some
+    useful member variables, and handles attaching to update functions.
 
-    :param name: Name of the updater (from config section heading)
-    :param config: Dict of config options for this updater
+    Notifiers should generally not extend this class directly, but should
+    extend :class:`Notifier` instead.
+
+    :param name: Name of the notifier (from config section heading)
+    :param config: Dict of config options for this notifier
+
+    :raises ConfigError: if the configuration is invalid
     """
 
-    def __init__(self, name, config):
+    def __init__(self, name: str, config: Dict[str, str]):
         #: Notifier name (from config section heading)
-        self.name = name
+        self.name: str = name
 
         #: Logger (see standard :mod:`logging` module)
         self.log = logging.getLogger(f'ruddr.notifier.{self.name}')
@@ -51,16 +63,16 @@ class Notifier:
         #   Ruddr not to waste time trying to determine an IPv6 address.
 
         try:
-            self._skip_ipv4 = (config.get('skip_ipv4', 'false').lower()
-                               in ('true', 'on', 'yes', '1'))
+            self._skip_ipv4: bool = (config.get('skip_ipv4', 'false').lower()
+                                     in ('true', 'on', 'yes', '1'))
         except ValueError:
             self.log.critical("'skip_ipv4' must be boolean (true/yes/on/1/"
                               "false/no/off/0)")
             raise ConfigError(f"'skip_ipv4' option for {self.name} must"
                               "be boolean (true/yes/on/1/false/no/off/0)")
         try:
-            self._skip_ipv6 = (config.get('skip_ipv6', 'false').lower()
-                               in ('true', 'on', 'yes', '1'))
+            self._skip_ipv6: bool = (config.get('skip_ipv6', 'false').lower()
+                                     in ('true', 'on', 'yes', '1'))
         except ValueError:
             self.log.critical("'skip_ipv6' must be boolean (true/yes/on/1/"
                               "false/no/off/0)")
@@ -68,26 +80,34 @@ class Notifier:
                               "be boolean (true/yes/on/1/false/no/off/0)")
 
         try:
-            self._ipv4_required = (config.get('ipv4_required', 'true').lower()
-                                   in ('true', 'on', 'yes', '1'))
+            self._ipv4_required: bool = (config.get('ipv4_required',
+                                                    'true').lower()
+                                         in ('true', 'on', 'yes', '1'))
         except ValueError:
             self.log.critical("'ipv4_required' must be boolean (true/yes/on/1/"
                               "false/no/off/0)")
             raise ConfigError(f"'ipv4_required' option for {self.name} must"
                               "be boolean (true/yes/on/1/false/no/off/0)")
         try:
-            self._ipv6_required = (config.get('ipv6_required', 'false').lower()
-                                   in ('true', 'on', 'yes', '1'))
+            self._ipv6_required: bool = (config.get('ipv6_required',
+                                                    'false').lower()
+                                         in ('true', 'on', 'yes', '1'))
         except ValueError:
             self.log.critical("'ipv6_required' must be boolean (true/yes/on/1/"
                               "false/no/off/0)")
             raise ConfigError(f"'ipv6_required' option for {self.name} must"
                               "be boolean (true/yes/on/1/false/no/off/0)")
 
-        self._ipv4_update_funcs = []
-        self._ipv6_update_funcs = []
+        self._ipv4_update_funcs: List[
+            Callable[[ipaddress.IPv4Address], None]
+        ] = []
+        self._ipv6_update_funcs: List[
+            Callable[[ipaddress.IPv6Network], None]
+        ] = []
 
-    def attach_ipv4_updater(self, update_func):
+    def attach_ipv4_updater(
+        self, update_func: Callable[[ipaddress.IPv4Address], None],
+    ) -> None:
         """Attach an IPv4 update function to this notifier. No effect if IPv4
         is skipped for this notifier.
 
@@ -98,6 +118,7 @@ class Notifier:
                             (e.g. by scheduling a retry in a separate thread if
                             it fails), but this function should not block
                             longer than a single update attempt.
+        :raises ConfigError: If config required for IPv4 notifying is missing
         """
         if self._skip_ipv4:
             self.log.info("Not attaching updater to notifier %s for skipped "
@@ -112,7 +133,9 @@ class Notifier:
                               "required IPv4 config" % self.name)
         self._ipv4_update_funcs.append(update_func)
 
-    def attach_ipv6_updater(self, update_func):
+    def attach_ipv6_updater(
+        self, update_func: Callable[[ipaddress.IPv6Network], None]
+    ) -> None:
         """Attach an IPv6 update function to this notifier. No effect if IPv6
         is skipped for this notifier.
 
@@ -123,6 +146,7 @@ class Notifier:
                             (e.g. by scheduling a retry in a separate thread if
                             it fails), but this function should not block
                             longer than a single update attempt.
+        :raises ConfigError: If config required for IPv6 notifying is missing
         """
         if self._skip_ipv6:
             self.log.info("Not attaching updater to notifier %s for skipped "
@@ -137,34 +161,33 @@ class Notifier:
                               "required IPv6 config" % self.name)
         self._ipv6_update_funcs.append(update_func)
 
-    def notify_ipv4(self, address):
-        """Subclasses must call this to notify all the attached IPv4 updaters of
-        a (possibly) new IPv4 address.
+    def notify_ipv4(self, address: ipaddress.IPv4Address) -> None:
+        """Subclasses must call this to notify all the attached IPv4 updaters
+        of a (possibly) new IPv4 address.
 
-        Subclasses should not call this if :meth:`want_ipv4` is false.
+        Subclasses may, but need not, call this if :meth:`want_ipv4` is false.
 
-        :param address: The (possibly) new :class:`IPv4Address`
+        :param address: The (possibly) new IPv4 address
         """
         self.log.debug("Notifier %s notifying attached updaters of IPv4 %s",
                        self.name, address.exploded)
         for update_func in self._ipv4_update_funcs:
             update_func(address)
 
-    def notify_ipv6(self, address):
+    def notify_ipv6(self, prefix: ipaddress.IPv6Network) -> None:
         """Subclasses must call this to notify all the attached IPv6 updaters
         of a (possibly) new IPv6 prefix.
 
-        Subclasses should not call this if :meth:`want_ipv6` is false.
+        Subclasses may, but need not, call this if :meth:`want_ipv6` is false.
 
-        :param address: The :class:`IPv6Network` representing the (possibly)
-                        new prefix
+        :param prefix: The (possibly) new IPv6 network prefix
         """
         self.log.debug("Notifier %s notifying attached updaters of IPv6 %s",
-                       self.name, address.compressed)
+                       self.name, prefix.compressed)
         for update_func in self._ipv6_update_funcs:
-            update_func(address)
+            update_func(prefix)
 
-    def want_ipv4(self):
+    def want_ipv4(self) -> bool:
         """Subclasses should call this to determine whether to check for
         current IPv4 addresses at all.
 
@@ -174,7 +197,7 @@ class Notifier:
         # because skip_ipv4
         return len(self._ipv4_update_funcs) > 0
 
-    def want_ipv6(self):
+    def want_ipv6(self) -> bool:
         """Subclasses should call this to determine whether to check for
         current IPv6 addresses at all.
 
@@ -184,215 +207,377 @@ class Notifier:
         # because skip_ipv6
         return len(self._ipv6_update_funcs) > 0
 
-    def need_ipv4(self):
-        """Subclasses should call this to determine if a lack of IPv4 addressing
+    def need_ipv4(self) -> bool:
+        """Subclasses must call this to determine if a lack of IPv4 addressing
         is an error.
 
         :return: True or False
         """
         return self.want_ipv4() and self._ipv4_required
 
-    def need_ipv6(self):
-        """Subclasses should call this to determine if a lack of IPv6 addressing
+    def need_ipv6(self) -> bool:
+        """Subclasses must call this to determine if a lack of IPv6 addressing
         is an error.
 
         :return: True or False
         """
         return self.want_ipv6() and self._ipv6_required
 
-    def ipv4_ready(self):
+    @abstractmethod
+    def ipv4_ready(self) -> bool:
         """Check if all configuration required for IPv4 checks is present.
 
-        Subclasses should override if there is any configuration only required
-        for IPv4.
+        **Subclasses must override if there is any configuration only required
+        for IPv4.**
         """
         return True
 
-    def ipv6_ready(self):
+    @abstractmethod
+    def ipv6_ready(self) -> bool:
         """Check if all configuration required for IPv6 checks is present.
 
-        Subclasses should override if there is any configuration only required
-        for IPv6.
+        **Subclasses must override if there is any configuration only required
+        for IPv6.**
         """
         return True
 
-    def check_once(self):
-        """Check the IP address a single time and notify immediately.
+    @abstractmethod
+    def do_notify(self) -> None:
+        """Check the IP address a single time and notify immediately, if
+        possible.
 
-        :raises NotifyError: if the check fails.
+        This is known as an "on-demand notify." Notifiers should support this
+        if possible, but it is okay if they do not. In the latter case, this
+        should do nothing and not raise any exceptions (except optionally
+        :exc:`NotStartedError`).
 
-        Must be overridden by subclasses."""
+        **Must be overridden by subclasses.**
 
-    def start(self):
-        """Begin ongoing IP address notifications. Should do the first check
-        immediately. Further checks should run in a separate thread or
-        otherwise be asynchronous.
+        :raises NotStartedError: if the notifier is not started
+        """
+        raise NotImplementedError
 
-        Must be overridden by subclasses.
+    @abstractmethod
+    def start(self) -> None:
+        """Begin ongoing IP address notifications. Any setup should be complete
+        before this function returns (e.g. opening socket connections, etc.)
+        but ongoing notifications should continue in the background, e.g. on
+        a separate thread.
+
+        **Must be overridden by subclasses.**
 
         :raises NotifierSetupError: when there is a nonrecoverable error
-                                    preventing notifier startup. Causes
-                                    Ruddr to exit gracefully with a failure
-                                    status.
+                                    preventing notifier startup.
         """
+        raise NotImplementedError
 
-    def stop(self):
+    @abstractmethod
+    def stop(self) -> None:
         """Halt ongoing IP address notifications. Clean up gracefully and stop
         any non-daemon threads so Python may exit.
 
-        This should not raise any exceptions, even if called before
-        :meth:`start` or after :meth:`start` fails.
+        This must not raise any exceptions, even if called before :meth:`start`
+        or after :meth:`start` fails.
 
-        Must be overridden by subclasses.
+        **Must be overridden by subclasses.**
         """
+        raise NotImplementedError
 
 
-class ScheduledNotifier(Notifier):
-    """An abstract notifier that schedules checks to happen at regular
-    intervals and retry when failed.
+class Notifier(BaseNotifier):
+    """A base class for notifiers. Supports
 
-    Instance attributes :attr:`success_interval`, :attr:`fail_min_interval`,
-    and :attr:`fail_max_interval` can be modified by subclasses to control the
-    timing.
+    :param name: Name of the notifier
+    :param config: Dict of config options for this notifier
 
-    Single checks can be done with :meth:`check_once`. But, after the notifier
-    is started, extra checks can be done with :meth:`check`, which
-    automatically handles scheduling the next check according to the
-    success/failure intervals and whether the check succeeded.
-
-    Constructor parameters match :class:`~ruddr.Notifier`.
+    :raises ConfigError: if the configuration is invalid
     """
 
-    def __init__(self, name, config):
+    def __init__(self, name: str, config: Dict[str, str]):
         super().__init__(name, config)
 
-        #: When a scheduled function runs successfully, the next invocation
-        #: will be scheduled this many seconds later. If zero, invocations will
-        #: only be rescheduled after failed invocations.
-        self.success_interval = 86400
+        # Ensure can't do_notify when not started
+        self._started_lock = threading.Lock()
+        self._started_lock.acquire()
+        self._do_notify_lock = threading.Lock()
 
-        #: When a scheduled function fails (by raising
-        #: :exc:`~ruddr.NotifyError`), the next invocation will be scheduled
-        #: using an exponential backoff strategy. This attribute sets the
-        #: scheduling interval for the first failure.
-        self.fail_min_interval = 300
+        # See set_check_intervals for info on these
+        self._retry_min_interval: int = 300
+        self._retry_max_interval: int = 86400
+        self._success_interval: int = 0
 
-        #: After the scheduled function fails the first time, subsequent
-        #: failures will be scheduled using successively longer intervals,
-        #: until reaching the maximum length determined by this attribute. Once
-        #: the maximum interval is reached, it will remain constant until the
-        #: next successful invocation.
-        self.fail_max_interval = 86400
-
-        # The following are used for scheduling checks
-        self._seq = 0   # Increments every time check() is called
+        # Used for retries and polling
         self._timer = None
-        self._fail_interval = None
-        self._lock = threading.RLock()
+        self._seq = 0
+        self._retries = 0
+        self._check_lock = threading.RLock()
 
-    def check_once(self):
-        """Check the IP address a single time and notify immediately.
+    def set_check_intervals(self,
+                            retry_min_interval: int = 300,
+                            retry_max_interval: int = 86400,
+                            success_interval: int = 0,
+                            config: Optional[Dict[str, str]] = None) -> None:
+        """Set the retry intervals for the :meth:`check_once` function, and
+        optionally set :meth:`check_once` to run periodically when successful.
 
-        Must be overridden by subclasses.
+        When :meth:`check_once` fails (by raising :exc:`NotifyError`), the next
+        invocation will be scheduled using an exponential backoff strategy,
+        starting with ``retry_min_interval`` seconds. Subsequent consecutive
+        failures will be scheduled using successively longer intervals, until
+        reaching the maximum failure interval, ``retry_max_interval`` seconds.
 
-        :raises NotifyError: if the check fails.
+        The ``success_interval`` parameter triggers some additional behavior:
 
-        This function can be called by the manager to do a single check, but
-        in :class:`~ruddr.ScheduledNotifier`, this same function is called to
-        perform each scheduled check (by default—override
-        :meth:`check_scheduled` to change that).
+        - If ``success_interval`` is greater than zero, then when
+          :meth:`check_once` succeeds, another invocation will be scheduled for
+          ``success_interval`` seconds later. This is useful for notifiers that
+          check the current address by polling, like the ``web`` notifier.
+          Since :meth:`check` runs at notifier startup, that means
+          :meth:`setup` and :meth:`teardown` may not have to be implemented at
+          all for these polling-style notifiers.
 
-        When called as part of a scheduled check, raising
-        :class:`~ruddr.NotifyError` or not determines whether to schedule the
-        next check using the success or failure interval."""
+        - If ``success_interval`` is zero, :meth:`check_once` will only be
+          scheduled for future invocation for retries.
 
-    def check_scheduled(self):
-        """Do a scheduled IP address check. By default, this calls
-        :meth:`check_once`, but it can be overridden if that is not suitable.
+        If the ``config`` parameter is provided, it will be checked for keys
+        ``retry_min_interval``, ``retry_max_interval``, and ``interval``. If
+        either of the ``retry_*`` keys are found, their values override the
+        parameters passed into this function. If the ``interval`` key is found,
+        its value overrides the ``success_interval`` parameter *if and only if*
+        the parameter was already nonzero (preventing a configuration mistake
+        from changing a non-polling notifier into a polling notifier).
 
-        Raising :class:`~ruddr.NotifyError` or not determines whether to
-        schedule the next check using the success or failure interval.
+        In practice, that means this function should be called using the
+        notifier's default values for ``retry_min_interval``,
+        ``retry_max_interval``, and ``success_interval`` (if it needs defaults
+        other than the method defaults) and passing in the config to allow
+        the user to override them.
 
-        Note that if a subclass needs to do an extra check (for example, the
-        :class:`~ruddr.notifiers.systemd.SystemdNotifier` when it gets a DBus
-        message from systemd-networkd), it should call :meth:`check` instead.
-        That will ensure the next call is scheduled properly, which would not
-        happen just by calling this method directly.
+        **Subclasses should call this before returning from their
+        constructor (if it needs to be called at all).**
 
-        :raises NotifyError: if the check fails.
+        This has no effect if :meth:`check_once` raises
+        :exc:`NotImplementedError`.
+
+        :param retry_min_interval: Minimum retry interval
+        :param retry_max_interval: Maximum retry interval
+        :param success_interval: Normal polling interval, or 0
+        :param config: Config dict for this updater
+
+        :raises ConfigError: if the retry intervals are less than 1, the
+                             success interval is less than 0, or the values in
+                             the config cannot be converted to :class:`int`
         """
-        self.check_once()
-
-    def _run_check_and_schedule(self, seq):
-        """Do a scheduled invocation of :meth:`_check_and_schedule`. Meant to
-        be used as the target of a :class:`~threading.Timer`."""
-        with self._lock:
-            if self._seq > seq:
-                self.log.debug("(Invocation for schedule seq %d aborted due "
-                               "to new invocation in the meantime.)", seq)
-            else:
-                self.log.debug("(Next invocation for schedule seq: %d)", seq)
-                self._check_and_schedule(seq)
-
-    def _check_and_schedule(self, seq):
-        """Run :meth:`check_scheduled` and schedule its next invocation"""
         try:
-            self.check_scheduled()
-        except NotifyError:
-            if self._fail_interval is None:
-                self._fail_interval = self.fail_min_interval
-            else:
-                self._fail_interval *= 2
-                if self._fail_interval > self.fail_max_interval:
-                    self._fail_interval = self.fail_max_interval
-            self.log.info("(Seq %d failed. Will retry in %d seconds.)",
-                          seq, self._fail_interval)
-            retry_delay = self._fail_interval
+            self._retry_min_interval = int(config.get('retry_min_interval',
+                                                      retry_min_interval))
+        except ValueError:
+            self.log.critical("'retry_min_interval' config option must be an "
+                              "integer > 0")
+            raise ConfigError(f"'retry_min_interval' option for {self.name} "
+                              "notifier must be an integer > 0")
+        if self._retry_min_interval <= 0:
+            raise ConfigError(f"'retry_min_interval' option for {self.name} "
+                              "notifier must be an integer > 0")
+
+        try:
+            self._retry_max_interval = int(config.get('retry_max_interval',
+                                                      retry_max_interval))
+        except ValueError:
+            self.log.critical("'retry_max_interval' config option must be an "
+                              "integer > 0")
+            raise ConfigError(f"'retry_max_interval' option for {self.name} "
+                              "notifier must be an integer > 0")
+        if self._retry_max_interval <= 0:
+            raise ConfigError(f"'retry_max_interval' option for {self.name} "
+                              "notifier must be an integer > 0")
+
+        self._success_interval = success_interval
+        if self._success_interval == 0:
+            return
+        try:
+            self._success_interval = int(config['interval'])
+        except KeyError:
+            pass
+        except ValueError:
+            self.log.critical("'interval' config option must be an "
+                              "integer >= 0")
+            raise ConfigError(f"'interval' option for {self.name} "
+                              "notifier must be an integer > 0")
+        if self._success_interval <= 0:
+            raise ConfigError(f"'interval' option for {self.name} "
+                              "notifier must be an integer > 0")
+
+    def start(self) -> None:
+        try:
+            self.setup()
+        except NotImplementedError:
+            self.log.info("Notifier has no setup")
         else:
-            self._fail_interval = None
-            retry_delay = self.success_interval
-            self.log.debug("(Invocation success for schedule seq: %d)", seq)
+            self.log.info("Notifier is finished with setup")
+        self._started_lock.release()
 
-        if retry_delay > 0:
-            timer = threading.Timer(retry_delay,
-                                    self._run_check_and_schedule,
-                                    args=(seq,))
-            timer.daemon = True
-            self._timer = timer
-            timer.start()
+        # Do the first check in the background
+        def first_check():
+            try:
+                self.check()
+            except NotImplementedError:
+                self.log.info("Not doing an immediate check as this notifier "
+                              "does not support it")
+        threading.Thread(target=first_check).start()
 
-    def check(self):
-        """Check the IP address and schedule the next check according to
-        whether the check was successful and the success/failure intervals.
-
-        This is the method to call if a subclass needs to do an extra check
-        (for example, the :class:`~ruddr.notifiers.systemd.SystemdNotifier`
-        when it gets a DBus message from systemd-networkd). That will ensure
-        the next check is scheduled properly.
-
-        If the most recent checks failed, the failure interval resets back to
-        the minimum whenever this is called.
-        """
-        with self._lock:
-            # Must still use sequence numbers to prevent race conditions (e.g.:
-            # check is called and enters critical section, then timer expires
-            # before code below runs. Then, _run_check_and_schedule() will run
-            # but block entering its own critical section. The code below will
-            # then continue, but it's too late to cancel the timer since it
-            # already expired.)
+    def stop(self) -> None:
+        self.log.info("Stopping notifier")
+        # Stop a scheduled retry or check
+        with self._check_lock:
+            self.log.debug("Canceling pending checks")
             if self._timer is not None:
                 self._timer.cancel()
+            # Ensure a timer that expired before it could be cancelled but
+            # after the lock was acquired will not actually retry
             self._seq += 1
-            self.log.debug("(Schedule seq: %d)", self._seq)
-            self._fail_interval = None
+
+        self._started_lock.acquire()
+        self.log.info("Notifier is starting teardown")
+        try:
+            self.teardown()
+        except NotImplementedError:
+            self.log.info("Notifier has no teardown")
+
+    def do_notify(self) -> None:
+        self.log.debug("Doing on-demand notify")
+
+        # Ensure only one do_notify can touch _started_lock at once, so if it's
+        # locked, we know it's because the notifier isn't started
+        with self._do_notify_lock:
+            started = self._started_lock.acquire(blocking=False)
+            if not started:
+                self.log.error("Tried to do_notify when not started")
+                raise NotStartedError(f"Notifier {self.name} cannot do_notify when "
+                                      "not started")
+            try:
+                self.check()
+            except NotImplementedError:
+                self.log.info("Notifier does not support on-demand notifications")
+            finally:
+                self._started_lock.release()
+
+    @abstractmethod
+    def setup(self) -> None:
+        """Do any setup and start ongoing IP address notifications. Setup
+        should be complete before this function returns (e.g. opening socket
+        connections, etc.) but ongoing notifications should continue in the
+        background, e.g. on a separate thread.
+
+        **Should be overridden by subclasses if required.**
+
+        :raises NotifierSetupError: when there is a nonrecoverable error
+                                    preventing notifier startup.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def teardown(self) -> None:
+        """Halt ongoing IP address notifications, do any teardown, and stop any
+        non-daemon threads so Python may exit.
+
+        **Should be overridden by subclasses if required.**
+
+        When this is called, there will be no pending retries or other checks
+        in progress.
+
+        This must not raise any exceptions, even if called before :meth:`setup`
+        or after :meth:`setup` fails.
+        """
+        raise NotImplementedError
+
+    def check(self):
+        """Check the current IP address and do a notify, retrying on failure.
+        If the ``success_interval`` is nonzero (see
+        :meth:`set_check_intervals`) and the check was successful, also
+        schedule the next check.
+
+        This is called automatically after notifier startup and for on-demand
+        notifies. The notifier can also call this itself to trigger additional
+        notifies. For example, the ``systemd`` notifier does this when it
+        receives a DBus event saying the network status has changed.
+
+        :raises NotImplementedError: if not supported by this notifier
+        """
+        self.log.debug("Check waiting for lock")
+        with self._check_lock:
+            self._seq += 1
+            self._retries = 0
+            self.log.debug("(check seq: %d", self._seq)
             self._check_and_schedule(self._seq)
 
-    def start(self):
-        self.log.info("Starting notifier")
-        # Do the first check, which also schedules future checks
-        self.check()
+    def _scheduled_check(self, seq: int):
+        """Do a scheduled check (retry or poll), verifying that no new check
+        has happened meanwhile"""
+        with self._check_lock:
+            if self._seq != seq:
+                # Another update has happened in the time since this retry was
+                # scheduled. Abort.
+                self.log.debug("(invocation for seq %d aborted due to new "
+                               "check or notifier stopping)", seq)
+            else:
+                self.log.debug("(new invocation for check seq: %d)", seq)
+                self._check_and_schedule(seq)
 
-    def stop(self):
-        self.log.info("Stopping notifier")
-        if self._timer is not None:
-            self._timer.cancel()
+    def _check_and_schedule(self, seq: int):
+        """Do a check, scheduling the next one if necessary after"""
+        try:
+            self.check_once()
+        except NotifyError:
+            # Minimum retry interval the first time, doubling each retry after
+            retry_delay = self._retry_min_interval * (2 ** self._retries)
+            if retry_delay > self._retry_max_interval:
+                retry_delay = self._retry_min_interval
+            self._retries += 1
+            self.log.info("Check failed. Retrying in %d secs.", retry_delay)
+            self._timer = threading.Timer(retry_delay, self._scheduled_check,
+                                          args=(seq,))
+            self._timer.start()
+        else:
+            self._retries = 0
+            self.log.debug("(success for seq %d, next invocation in %d secs)",
+                           seq, self._success_interval)
+            self._timer = threading.Timer(self._success_interval,
+                                          self._scheduled_check, args=(seq,))
+            self._timer.start()
+
+    @abstractmethod
+    def check_once(self) -> None:
+        """Check the current IP address and do a notify, if possible.
+
+        **Should be overridden by subclasses if supported.**
+
+        Some notifiers do not support notifying on demand (for example, they
+        get the current address from an event, thus they can only notify when
+        such an event happens). For those updaters, this method should raise
+        :exc:`NotImplementedError` when called (which is the default behavior
+        when not overridden).
+
+        For any notifier that does support obtaining the current IP address on
+        demand, this function should do that immediately and notify using
+        :meth:`notify_ipv4` and :meth:`notify_ipv6`. Some additional
+        guidelines:
+
+        - Ruddr may not need both IPv4 and IPv6 addresses from this notifier.
+          Call :meth:`want_ipv4` and :meth:`want_ipv6` to determine if either
+          should be skipped.
+
+        - Even if Ruddr wants an address type, it may or may not be an error if
+          it cannot be provided. If :meth:`need_ipv4` returns ``True`` and an
+          IPv4 address cannot be obtained, raise :exc:`NotifyError` (after
+          notifying for the other address type, if necessary). The same goes
+          for :meth:`need_ipv6` and availability of an IPv6 prefix.
+
+        This is called at notifier startup, for on-demand notifies, and any
+        time the notifier calls :meth:`check` itself.
+
+        :raises NotifyError: if checking the current IP address failed (will
+                             trigger a retry after a delay)
+        :raises NotImplementedError: if not supported by this notifier
+        """
+        raise NotImplementedError
