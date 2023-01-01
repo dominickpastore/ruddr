@@ -198,17 +198,36 @@ Using Ruddr as a Library
 Ruddr's primary use case is as a standalone service, but it can be integrated
 into other Python programs as a library as well. The steps boil down to this:
 
-1. First, create an instance of :class:`~ruddr.Config`. It can be created
-   directly, or you may use :func:`~ruddr.read_file` or
-   :func:`~ruddr.read_file_from_path`.
+1. First, create an instance of :class:`Config`. It can be created directly, or
+   you may use :func:`read_file` or :func:`read_file_from_path`.
 
-2. Use the :class:`~ruddr.Config` to create a :class:`~ruddr.DDNSManager`
+2. Use the :class:`Config` to create a :class:`DDNSManager`.
 
-3. TODO
+3. Call :func:`~DDNSManager.start` on the :class:`DDNSManager` you created.
+   This will return once Ruddr finishes starting. Ruddr runs in background
+   non-daemon threads.
 
-.. TODO
+4. When ready for Ruddr to stop, call :func:`~DDNSManager.stop` on your
+   :class`DDNSManager` object. Ruddr will halt the background threads
+   gracefully.
 
-The APIs for these classes and functions are below.
+See the next section for the APIs involved.
+
+.. warning::
+   The config file reader functions can throw :exc:`ConfigError`. The
+   :class:`DDNSManager` constructor can raise :exc:`ConfigError` and its
+   :func:`~DDNSManager.start` function can raise :exc:`NotifierSetupError`. Be
+   ready to handle those exceptions. Both of them can be caught under
+   :exc:`RuddrSetupError`.
+
+.. note::
+   An immediate update (if possible) can be triggered on a started
+   :class:`DDNSManager` by calling its :func:`~DDNSManager.do_notify` method.
+   This is not always possible if the configured notifier does not support it,
+   though most do.
+
+Manager and Config API
+~~~~~~~~~~~~~~~~~~~~~~
 
 .. autofunction:: read_file
 
@@ -216,8 +235,6 @@ The APIs for these classes and functions are below.
 
 .. autoclass:: Config
    :members:
-
-.. TODO DDNSManager needs a better docstring
 
 .. autoclass:: DDNSManager
    :members:

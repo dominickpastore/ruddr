@@ -138,7 +138,12 @@ class DDNSManager:
         log.info("All notifiers started.")
 
     def do_notify(self):
-        """Do an on-demand notify from all notifiers."""
+        """Do an on-demand notify from all notifiers.
+
+        Not all notifiers will support this, but most will.
+
+        Does not raise any exceptions.
+        """
         log.info("Checking once for all notifiers...")
 
         for name, notifier in self.notifiers.items():
@@ -147,7 +152,11 @@ class DDNSManager:
         log.info("Check for all notifiers complete.")
 
     def stop(self):
-        """Stop all running notifiers."""
+        """Stop all running notifiers gracefully. This will allow Python to
+        exit naturally.
+
+        Does not raise any exceptions, even if not yet started.
+        """
         log.info("Stopping all notifiers...")
         for notifier in self.notifiers.values():
             notifier.stop()
