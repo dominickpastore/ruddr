@@ -11,18 +11,18 @@ options apply to all notifier types. Those options are described at
 If none of the built-in notifiers below meet your needs, Ruddr can be extended
 with notifiers from PyPI, or you can write your own (see :ref:`notifier_dev`).
 
-Timed Notifier
+IFace Notifier
 --------------
 
-Type: ``timed``
+Type: ``iface``
 
-A timed notifier periodically checks the IP address of an attached network
+An iface notifier periodically checks the IP address of an attached network
 interface. This is a good choice when Ruddr is running on your router itself.
 
 **Sample config (with defaults commented)**::
 
     [notifier.main]
-    type = timed
+    type = iface
     iface = eth0
     #ipv6_prefix = 64
     #interval = 1800
@@ -76,7 +76,7 @@ Systemd Notifier
 
 Type: ``systemd``
 
-A systemd notifier is *very* similar to a timed notifier, with just one
+A systemd notifier is *very* similar to an iface notifier, with just one
 additional feature: It ties in to systemd-networkd via DBus to detect when
 interfaces go up or down immediately. On systems where systemd-networkd manages
 the network config, this should help minimize the delay between an IP address
@@ -99,7 +99,7 @@ change and Ruddr detecting the change.
 
 **Configuration options:**
 
-Note that the configuration options are exactly the same as the timed notifier,
+Note that the configuration options are exactly the same as the iface notifier,
 since it uses the same exact polling behavior between notifications from
 systemd-networkd.
 

@@ -2,10 +2,7 @@
 
 
 class RuddrException(Exception):
-    """Base class for all Ruddr exceptions except PublishError (which should
-    never be uncaught within Ruddr when raised). Whenever this is raised, a
-    message should be logged first.
-    """
+    """Base class for all Ruddr exceptions"""
 
 
 class RuddrSetupError(RuddrException):

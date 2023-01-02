@@ -3,12 +3,12 @@
 from .notifier import BaseNotifier, Notifier
 from ._getifaceaddrs import get_iface_addrs
 
-from . import timed
+from . import iface
 from . import web
 from . import static
 
 notifiers = {
-    'timed': timed.TimedNotifier,
+    'iface': iface.IFaceNotifier,
     'web': web.WebNotifier,
     'static': static.StaticNotifier,
 }

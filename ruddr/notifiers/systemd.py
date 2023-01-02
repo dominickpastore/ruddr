@@ -61,11 +61,11 @@ class SystemdNotifier(Notifier):
             self.allow_private = False
 
         # It's not clear if systemd-networkd signals in the event the IP
-        # IP address changes but there was no other change in network
-        # connectivity (e.g. DHCP server gives a different lease at renewal).
-        # So, we also check the IP address on a schedule by default just in
-        # case (though this should be uncommon, if even possible). If we want
-        # to disable this, just set the success interval to 0.
+        # address changes but there was no other change in network connectivity
+        # (e.g. DHCP server gives a different lease at renewal). So, we also
+        # check the IP address on a schedule by default just in case (though
+        # this should be uncommon, if even possible). If we want to disable
+        # this, just set the success interval to 0.
         self.set_check_intervals(retry_min_interval=60,
                                  retry_max_interval=21600,
                                  success_interval=21600,

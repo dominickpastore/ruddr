@@ -8,7 +8,7 @@ from ._getifaceaddrs import get_iface_addrs
 from .notifier import Notifier
 
 
-class TimedNotifier(Notifier):
+class IFaceNotifier(Notifier):
     """Ruddr notifier that checks the IP address of a local interface on a
     schedule"""
 

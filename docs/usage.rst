@@ -87,7 +87,7 @@ Here is a sample config::
   url = https://icanhazip.com/
 
   [notifier.wan_ip]
-  type = timed
+  type = iface
   iface = eth0
 
   [updater.dynu]

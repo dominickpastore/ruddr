@@ -31,7 +31,7 @@ def test_basic_config(configfile_factory):
         addrfile = /var/lib/ruddr_addrfile
         
         [notifier.test_notifier]
-        type = timed
+        type = iface
         
         [updater.test_updater]
         type = standard

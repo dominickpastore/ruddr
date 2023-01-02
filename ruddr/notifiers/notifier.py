@@ -191,7 +191,7 @@ class BaseNotifier:
         """Subclasses should call this to determine whether to check for
         current IPv4 addresses at all.
 
-        :return: True or False
+        :return: ``True`` if so, ``False`` if not
         """
         # Will be true if no updaters are configured, or they weren't attached
         # because skip_ipv4
@@ -201,7 +201,7 @@ class BaseNotifier:
         """Subclasses should call this to determine whether to check for
         current IPv6 addresses at all.
 
-        :return: True or False
+        :return: ``True`` if so, ``False`` if not
         """
         # Will be true if no updaters are configured, or they weren't attached
         # because skip_ipv6
@@ -211,7 +211,7 @@ class BaseNotifier:
         """Subclasses must call this to determine if a lack of IPv4 addressing
         is an error.
 
-        :return: True or False
+        :return: ``True`` if so, ``False`` if not
         """
         return self.want_ipv4() and self._ipv4_required
 
@@ -219,25 +219,29 @@ class BaseNotifier:
         """Subclasses must call this to determine if a lack of IPv6 addressing
         is an error.
 
-        :return: True or False
+        :return: ``True`` if so, ``False`` if not
         """
         return self.want_ipv6() and self._ipv6_required
 
     @abstractmethod
     def ipv4_ready(self) -> bool:
-        """Check if all configuration required for IPv4 checks is present.
+        """Check if all configuration required for IPv4 notifying is present.
 
         **Subclasses must override if there is any configuration only required
         for IPv4.**
+
+        :return: ``True`` if so, ``False`` if not
         """
         return True
 
     @abstractmethod
     def ipv6_ready(self) -> bool:
-        """Check if all configuration required for IPv6 checks is present.
+        """Check if all configuration required for IPv6 notifying is present.
 
         **Subclasses must override if there is any configuration only required
         for IPv6.**
+
+        :return: ``True`` if so, ``False`` if not
         """
         return True
 
@@ -296,21 +300,21 @@ class Notifier(BaseNotifier):
     def __init__(self, name: str, config: Dict[str, str]):
         super().__init__(name, config)
 
-        # Ensure can't do_notify when not started
-        self._started_lock = threading.Lock()
-        self._started_lock.acquire()
-        self._do_notify_lock = threading.Lock()
-
         # See set_check_intervals for info on these
         self._retry_min_interval: int = 300
         self._retry_max_interval: int = 86400
         self._success_interval: int = 0
 
-        # Used for retries and polling
+        self._lock = threading.RLock()
+
+        # Ensure can't do_notify, check, or stop when not started, or start
+        # when already started. Must lock to access.
+        self._started = False
+
+        # Used for retries and polling. Must lock to access.
         self._timer = None
         self._seq = 0
         self._retries = 0
-        self._check_lock = threading.RLock()
 
     def set_check_intervals(self,
                             retry_min_interval: int = 300,
@@ -409,13 +413,19 @@ class Notifier(BaseNotifier):
                               "notifier must be an integer > 0")
 
     def start(self) -> None:
-        try:
-            self.setup()
-        except NotImplementedError:
-            self.log.info("Notifier has no setup")
-        else:
-            self.log.info("Notifier is finished with setup")
-        self._started_lock.release()
+        with self._lock:
+            if self._started:
+                self.log.warning("Not starting notifier: Already started")
+                return
+
+            try:
+                self.setup()
+            except NotImplementedError:
+                self.log.info("Notifier has no setup")
+                self._started = True
+            else:
+                self.log.info("Notifier is finished with setup")
+                self._started = True
 
         # Do the first check in the background
         def first_check():
@@ -428,30 +438,30 @@ class Notifier(BaseNotifier):
 
     def stop(self) -> None:
         self.log.info("Stopping notifier")
-        # Stop a scheduled retry or check
-        with self._check_lock:
+        with self._lock:
+            if not self._started:
+                self.log.warning("Not stopping notifier: Already stopped")
+                return
+
+            # Stop a scheduled retry or check
             self.log.debug("Canceling pending checks")
             if self._timer is not None:
                 self._timer.cancel()
-            # Ensure a timer that expired before it could be cancelled but
-            # after the lock was acquired will not actually retry
-            self._seq += 1
 
-        self._started_lock.acquire()
-        self.log.info("Notifier is starting teardown")
-        try:
-            self.teardown()
-        except NotImplementedError:
-            self.log.info("Notifier has no teardown")
+            self.log.info("Notifier is starting teardown")
+            try:
+                self.teardown()
+            except NotImplementedError:
+                self.log.info("Notifier has no teardown")
+                self._started = False
+            else:
+                self._started = False
 
     def do_notify(self) -> None:
-        self.log.debug("Doing on-demand notify")
-
-        # Ensure only one do_notify can touch _started_lock at once, so if it's
-        # locked, we know it's because the notifier isn't started
-        with self._do_notify_lock:
-            started = self._started_lock.acquire(blocking=False)
-            if not started:
+        self.log.debug("On-demand notify waiting for lock")
+        with self._lock:
+            self.log.debug("Doing on-demand notify")
+            if not self._started:
                 self.log.error("Tried to do_notify when not started")
                 raise NotStartedError(f"Notifier {self.name} cannot do_notify when "
                                       "not started")
@@ -459,8 +469,6 @@ class Notifier(BaseNotifier):
                 self.check()
             except NotImplementedError:
                 self.log.info("Notifier does not support on-demand notifications")
-            finally:
-                self._started_lock.release()
 
     @abstractmethod
     def setup(self) -> None:
@@ -483,11 +491,14 @@ class Notifier(BaseNotifier):
 
         **Should be overridden by subclasses if required.**
 
-        When this is called, there will be no pending retries or other checks
-        in progress.
+        When this is called, there will be no pending invocations of
+        :meth:`check_once`, and it's guaranteed that :meth:`setup` is complete.
+        Apart from that, it is up to the implementation to ensure that
+        inconvenient timing won't break any operations happening in background
+        threads (e.g. that were started by :meth:`setup`).
 
-        This must not raise any exceptions, even if called before :meth:`setup`
-        or after :meth:`setup` fails.
+        This must not raise any exceptions (other than
+        :exc:`NotImplementedError` if not implemented).
         """
         raise NotImplementedError
 
@@ -505,27 +516,36 @@ class Notifier(BaseNotifier):
         :raises NotImplementedError: if not supported by this notifier
         """
         self.log.debug("Check waiting for lock")
-        with self._check_lock:
+        with self._lock:
+            if not self._started:
+                self.log.info("Skipping check when notifier not running")
+                return
+
             self._seq += 1
             self._retries = 0
-            self.log.debug("(check seq: %d", self._seq)
+            self.log.debug("(check seq: %d)", self._seq)
             self._check_and_schedule(self._seq)
 
     def _scheduled_check(self, seq: int):
         """Do a scheduled check (retry or poll), verifying that no new check
         has happened meanwhile"""
-        with self._check_lock:
-            if self._seq != seq:
+        with self._lock:
+            if not self._started:
+                # Notifier stopped before we could lock. Abort.
+                self.log.debug("(invocation for seq %d aborted due to notifier"
+                               " stopping)", seq)
+            elif self._seq != seq:
                 # Another update has happened in the time since this retry was
                 # scheduled. Abort.
                 self.log.debug("(invocation for seq %d aborted due to new "
-                               "check or notifier stopping)", seq)
+                               "check)", seq)
             else:
                 self.log.debug("(new invocation for check seq: %d)", seq)
                 self._check_and_schedule(seq)
 
     def _check_and_schedule(self, seq: int):
-        """Do a check, scheduling the next one if necessary after"""
+        """Do a check, scheduling the next one if necessary after. Do not call
+        without holding the lock."""
         try:
             self.check_once()
         except NotifyError:
@@ -534,11 +554,14 @@ class Notifier(BaseNotifier):
             if retry_delay > self._retry_max_interval:
                 retry_delay = self._retry_min_interval
             self._retries += 1
-            self.log.info("Check failed. Retrying in %d secs.", retry_delay)
+            self.log.info("Check failed. Retrying in %d secs. (seq %d)",
+                          retry_delay, seq)
             self._timer = threading.Timer(retry_delay, self._scheduled_check,
                                           args=(seq,))
             self._timer.start()
         else:
+            if self._success_interval <= 0:
+                self.log.debug("(success, seq %d complete), seq")
             self._retries = 0
             self.log.debug("(success for seq %d, next invocation in %d secs)",
                            seq, self._success_interval)

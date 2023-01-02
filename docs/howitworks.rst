@@ -22,7 +22,7 @@ The diagram below represents an example Ruddr configuration:
 
         node [shape=box,color=crimson];
         notifier4 [label="Web notifier"]
-        notifier6 [label="Timed notifier"]
+        notifier6 [label="IFace notifier"]
 
         icanhazip -> notifier4;
         eth0 -> notifier6;
@@ -70,7 +70,7 @@ publish. There are different ways to accomplish this, so there are different
 notifiers available to suit the needs of each environment.
 
 For example, if your router is assigned a public, globally-routable IP address
-by your ISP, the timed notifier can just check the current IP address on your
+by your ISP, the iface notifier can just check the current IP address on your
 WAN interface periodically.
 
 However, if Ruddr is running on a host inside your LAN, behind NAT, you can use
