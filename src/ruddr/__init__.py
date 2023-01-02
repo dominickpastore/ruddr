@@ -10,7 +10,6 @@ from .exceptions import (RuddrException, RuddrSetupError, ConfigError,
                          NotifierSetupError, NotStartedError, NotifyError,
                          PublishError, FatalPublishError)
 from .manager import DDNSManager
-from .notifiers import BaseNotifier, Notifier, get_iface_addrs
+from .notifiers import BaseNotifier, Notifier
 from .updaters import (Updater, BaseUpdater, OneWayUpdater, TwoWayUpdater,
                        TwoWayZoneUpdater)
-from .zones import ZoneSplitter

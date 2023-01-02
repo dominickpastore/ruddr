@@ -17,13 +17,13 @@ import ipaddress
 import netifaces
 
 
-def _get_iface_addrs(if_name):
+def _get_iface_addrs(if_name: str):
     """Lookup current addresses for the named interface.
 
     :param if_name: Name of the address to look up
     :return: A 2-tuple containing a list of IPV4Address followed by a list
              of IPV6Address.
-    :raises ValueError: if there is not interface with the given name.
+    :raises ValueError: if there is no interface with the given name.
     """
     addresses = netifaces.ifaddresses(if_name)
     ipv4 = [a['addr'] for a in addresses[netifaces.AF_INET]]
@@ -39,7 +39,9 @@ def _get_iface_addrs(if_name):
     return (ipv4, ipv6)
 
 
-def get_iface_addrs(if_name, omit_private=True, omit_link_local=True):
+def get_iface_addrs(if_name: str,
+                    omit_private: bool = True,
+                    omit_link_local: bool = True):
     """Lookup current addresses for the named interface. Results will be
     ordered with non-private addresses first, then private (if requested), then
     link-local (if requested).
@@ -50,7 +52,7 @@ def get_iface_addrs(if_name, omit_private=True, omit_link_local=True):
     :param omit_link_local: Whether to omit link-local addresses
     :return: A 2-tuple containing a list of IPV4Address followed by a list
              of IPV6Address.
-    :raises ValueError: if there is not interface with the given name.
+    :raises ValueError: if there is no interface with the given name.
     """
     ipv4, ipv6 = _get_iface_addrs(if_name)
 

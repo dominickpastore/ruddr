@@ -17,11 +17,19 @@ def _allowed_gai_family():
 
 connection.allowed_gai_family = _allowed_gai_family
 
-class FamilyRestriction:
-    """Context manager that causes Urllib3/Requests to only use the specified
-    address family
+class RequestsFamilyRestriction:
+    """Context manager that causes Requests to only use the specified address
+    family.
 
-    :param family: The address family to use
+    For example, to force a request over IPv6::
+
+        with RequestsFamilyRestriction(socket.AF_INET6):
+            r = requests.get("https://icanhazip.com/")
+        # error checking skipped
+        ipv6 = r.text
+
+    :param family: The address family to use (typically a ``socket.AF_*``
+                   constant from Python's :mod:`socket` module)
     """
 
     def __init__(self, family):

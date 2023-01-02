@@ -4,7 +4,7 @@ schedule"""
 import ipaddress
 
 from ruddr.exceptions import NotifyError, ConfigError
-from ._getifaceaddrs import get_iface_addrs
+from ruddr.util import get_iface_addrs
 from .notifier import Notifier
 
 

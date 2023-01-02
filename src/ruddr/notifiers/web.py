@@ -7,7 +7,7 @@ import requests
 
 from ruddr.configuration import USER_AGENT
 from ruddr.exceptions import NotifyError, ConfigError
-from ruddr.restrictfamily import FamilyRestriction
+from ruddr.util import RequestsFamilyRestriction
 from .notifier import Notifier
 
 
@@ -99,7 +99,7 @@ class WebNotifier(Notifier):
         err_ipv6 = False
 
         if self.want_ipv4():
-            with FamilyRestriction(socket.AF_INET):
+            with RequestsFamilyRestriction(socket.AF_INET):
                 try:
                     r = requests.get(self.url4, timeout=self.timeout4,
                                      headers={'User-Agent': USER_AGENT})
@@ -127,7 +127,7 @@ class WebNotifier(Notifier):
                     self.notify_ipv4(ipv4)
 
         if self.want_ipv6():
-            with FamilyRestriction(socket.AF_INET6):
+            with RequestsFamilyRestriction(socket.AF_INET6):
                 try:
                     r = requests.get(self.url6, timeout=self.timeout6,
                                      headers={'User-Agent': USER_AGENT})

@@ -1,7 +1,6 @@
 """Built in notifiers and the notifier base class"""
 
 from .notifier import BaseNotifier, Notifier
-from ._getifaceaddrs import get_iface_addrs
 
 from . import iface
 from . import web
@@ -24,5 +23,4 @@ else:
 __all__ = [
     'BaseNotifier',
     'Notifier',
-    'get_iface_addrs',
 ]

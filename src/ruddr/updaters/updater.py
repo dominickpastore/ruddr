@@ -16,7 +16,7 @@ import dns.resolver
 
 from ruddr.addrfile import Addrfile
 from ruddr.exceptions import PublishError, FatalPublishError, ConfigError
-from ruddr.zones import ZoneSplitter
+from ruddr.util import ZoneSplitter
 
 
 A = TypeVar('A', bound=Union[ipaddress.IPv4Address, ipaddress.IPv6Address])
