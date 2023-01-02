@@ -1,3 +1,4 @@
-include CHANGELOG.md
-graft docs
-prune docs/_build
+# Note: We are using setuptools_scm. All files tracked by git are automatically
+# included in the manifest.
+prune .github
+exclude .gitignore

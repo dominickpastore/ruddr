@@ -1,6 +1,157 @@
 [build-system]
 requires = [
-    "setuptools>=43",
-    "wheel"
+    "setuptools>=61",
+    "setuptools_scm[toml]>=6.2",
 ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "ruddr"
+authors = [
+    { name="Dominick C. Pastore" },
+    { email="ruddr@dcpx.org" },
+]
+description = "Robotic Updater for Dynamic DNS Records"
+readme = "README.md"
+# TODO
+# license.file = "LICENSE.txt"
+classifiers = [
+    "Environment :: No Input/Output (Daemon)",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Telecommunications Industry",
+    "License :: Other/Proprietary License",
+    "Operating System :: POSIX",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Internet",
+    "Topic :: Internet :: Name Service (DNS)",
+    "Topic :: System :: Networking",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
+requires-python = ">=3.7"
+dependencies = [
+    "requests",
+    "netifaces>=0.11.0",
+    "dnspython~=2.0",
+    "tldextract~=3.0",
+    "importlib_metadata; python_version<'3.10'",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+# Systemd notifier, not systemd service support
+systemd = [
+    "PyGObject",
+]
+test = [
+    "flake8",
+    "pytest>=6",
+    "pytest-cov[toml]",
+]
+docs = [
+    "sphinx",
+]
+
+[project.urls]
+Homepage = "https://github.com/dominickpastore/ruddr/"
+Documentation = "https://ruddr.dcpx.org/"
+Repository = "https://github.com/dominickpastore/ruddr/"
+Changelog = "https://github.com/dominickpastore/ruddr/blob/master/CHANGELOG.md"
+"Issue Tracker" = "https://github.com/dominickpastore/ruddr/issues"
+Discussion = "https://github.com/dominickpastore/ruddr/discussions"
+
+[project.scripts]
+ruddr = "ruddr.manager:main"
+
+[tool.setuptools_scm]
+
+# TODO finish merging tox.ini here
+
+# Notes on testing:
+#
+# To run the full test suite in multiple virtual environments, use tox:
+#     pip install -U tox
+#     tox
+#
+# To just run pytest in the current venv, it's enough to do:
+#     pytest
+# or with coverage:
+#     pytest --cov
+#
+# To just check style, use:
+#     flake8 src
+
+[tool.tox]
+legacy_tox_init = """
+[tox]
+min_version = 4.0
+envlist =
+    clean
+    py37
+    py38
+    py39
+    py310
+    py311
+
+[testenv]
+extras =
+    test
+commands =
+    python setup.py check -m -s
+    flake8 ruddr/
+    pytest --cov --cov-append --cov-report=html {posargs}
+
+# Note: If running pytest manually, it's enough to run "pytest"/"pytest --cov"
+
+[testenv:clean]
+deps = coverage[toml]
+skip_install = true
+commands = coverage erase
+"""
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = ["test"]
+# Note: addopts is "additional options." These are included even when running
+# bare "pytest" without tox.
+addopts = "-vv"
+
+[tool.coverage.run]
+branch = true
+source = [
+    "src",
+]
+
+[tool.coverage.report]
+# Include line numbers of missed code
+show_missing = true
+# Skip files with 100% coverage, making it easy to focus on files needing work
+#skip_covered = true
+# Regexes for lines to exclude from consideration
+exclude_lines = [
+    # Have to re-enable the standard pragma
+    "pragma: no cover",
+
+    # Don't complain about missing debug-only code:
+    "def __repr__",
+    "if self\\.debug",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    # TODO Revisit this, because we are sort of abusing NotImplementedError
+    #  (we sometimes do allow it to be raised intentionally)
+    "raise NotImplementedError",
+
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if __name__ == .__main__.:",
+
+    # Don't complain about abstract methods, they aren't run:
+    # TODO revisit this, because we are sort of abusing @abstractmethod
+    "@(abc\\.)?abstractmethod",
+]
