@@ -46,12 +46,18 @@ def _notify(msg):
         sock_name = os.environ['NOTIFY_SOCKET']
     except KeyError:
         return
-    sock_name = os.fsencode(sock_name)
+    #sock_name = os.fsencode(sock_name)
     if sock_name[0] == 0x40:    # 0x40 is @
+        #sock_name = b'\x00' + sock_name[1:]
         sock_name = '\x00' + sock_name[1:]
 
-    with socket.socket(af, socket.SOCK_DGRAM) as sock:
-        sock.sendmsg(msg, sock_name)
+    sock_type = socket.SOCK_DGRAM
+    try:
+        sock_type |= socket.SOCK_CLOEXEC
+    except AttributeError:
+        pass
+    with socket.socket(af, sock_type) as sock:
+        sock.sendmsg([msg], [], 0, sock_name)
 
 def _args_to_bytes(**kwargs):
     """Convert keyword args to a :class:`bytes` object ready to send to the

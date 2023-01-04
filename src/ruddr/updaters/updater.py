@@ -12,6 +12,7 @@ import types
 from abc import abstractmethod
 from typing import Union, Tuple, List, Optional, Dict, TypeVar
 
+import dns.exception
 import dns.resolver
 
 from ruddr.addrfile import Addrfile
@@ -19,7 +20,7 @@ from ruddr.exceptions import PublishError, FatalPublishError, ConfigError
 from ruddr.util import ZoneSplitter
 
 
-A = TypeVar('A', bound=Union[ipaddress.IPv4Address, ipaddress.IPv6Address])
+Addr = TypeVar('Addr', ipaddress.IPv4Address, ipaddress.IPv6Address)
 
 
 class Retry:
@@ -318,11 +319,15 @@ class TwoWayZoneUpdater(Updater):
         self._hosts: List[Tuple[str, Optional[str]]] = []
 
         #: Used by :func:`_get_subdomain_and_zone_for`
-        self._zone_splitter = None
-        self._datadir = datadir
+        self._zone_splitter: Optional[ZoneSplitter] = None
+        self._datadir: str = datadir
 
-    def init_hosts(self, hosts: Union[List[Tuple[str, Optional[str]]], str]):
-        """Provide the list of hosts to be updated.
+    def init_hosts_and_zones(
+        self,
+        hosts: Union[List[Tuple[str, Optional[str]]], str]
+    ):
+        """Provide the list of hosts to be updated, optionally with their zones
+        if configured.
 
         This is separate from :meth:`__init__` so subclasses can rely on the
         logger while doing their config parsing, then pass the list of hosts
@@ -353,9 +358,8 @@ class TwoWayZoneUpdater(Updater):
                              with it, or is a duplicate
         """
         if isinstance(hosts, str):
-            hosts = hosts.split()
             self._hosts = []
-            for host in hosts:
+            for host in hosts.split():
                 fqdn, sep, zone = host.partition('/')
                 if sep == '':
                     zone = None
@@ -780,9 +784,9 @@ class TwoWayZoneUpdater(Updater):
     def _verify_and_group_addrs_by_host(
         self,
         zone: str,
-        records: List[Tuple[str, A, Optional[int]]],
+        records: List[Tuple[str, Addr, Optional[int]]],
         hosts: List[str],
-    ) -> Dict[str, Tuple[List[A], Optional[int]]]:
+    ) -> Dict[str, Tuple[List[Addr], Optional[int]]]:
         """Group the list of records by host and verify that at least one
         record is present for each listed host
 
@@ -1219,7 +1223,7 @@ class TwoWayUpdater(TwoWayZoneUpdater):
         if isinstance(hosts, str):
             hosts = hosts.split()
         # Put every host in root zone
-        super().init_hosts([(host, '') for host in hosts])
+        super().init_hosts_and_zones([(host, '') for host in hosts])
 
     @abstractmethod
     def fetch_all_ipv4s(
@@ -1555,7 +1559,7 @@ class OneWayUpdater(Updater):
         #: Nameserver to use when looking up AAAA records for FQDNs in hosts
         self._nameserver = None
 
-    def init_hosts(
+    def init_params(
         self,
         hosts: Union[
             List[Tuple[str, Union[ipaddress.IPv6Address, str, None]]],
@@ -1716,12 +1720,17 @@ class OneWayUpdater(Updater):
                 current_ipv6 = self._lookup_ipv6(ip_lookup)
             except (OSError, dns.exception.DNSException) as e:
                 self.log.error("Could not look up the current IPv6 address "
-                               "for hostname %s: %s", hostname, e)
+                               "for %s (for host %s): %s",
+                               ip_lookup, hostname, e)
                 raise PublishError(f"Updater {self.name} could not look up "
-                                   "the current IPv6 address for hostname "
-                                   f"{ip_lookup}")
-            self.log.debug("Looked up IPv6 addr %s for hostname %s",
-                           current_ipv6.compressed, hostname)
+                                   f"the current IPv6 address for {ip_lookup}")
+            if current_ipv6 is None:
+                self.log.error("DNS lookup for %s (for host %s) returned no "
+                               "IPv6 addresses", ip_lookup, hostname)
+                raise PublishError(f"Updater {self.name} got no IPv6 when "
+                                   f"looking up {ip_lookup}")
+            self.log.debug("Looked up IPv6 addr %s for hostname %s (with DN "
+                           "%s)", current_ipv6.compressed, hostname, ip_lookup)
         return current_ipv6
 
     def _lookup_ipv6(self, ip_lookup: str) -> Optional[ipaddress.IPv6Address]:

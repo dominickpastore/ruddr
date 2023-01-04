@@ -7,7 +7,7 @@ import logging.handlers
 import os.path
 import signal
 import sys
-from typing import Optional, Any, Union, Dict, Tuple
+from typing import Optional, Any, Union, Dict, Tuple, cast
 
 if sys.version_info < (3, 10):
     from importlib_metadata import entry_points
@@ -243,7 +243,7 @@ def _validate_updater_or_notifier_type(
         imported_class = getattr(imported_module, type_)
     except AttributeError:
         return False
-    existing[(module, type_)] = imported_class
+    existing[cast(Tuple[str, str], (module, type_))] = imported_class
     return True
 
 

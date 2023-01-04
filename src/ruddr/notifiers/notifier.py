@@ -305,16 +305,16 @@ class Notifier(BaseNotifier):
         self._retry_max_interval: int = 86400
         self._success_interval: int = 0
 
-        self._lock = threading.RLock()
+        self._lock: threading.RLock = threading.RLock()
 
         # Ensure can't do_notify, check, or stop when not started, or start
         # when already started. Must lock to access.
-        self._started = False
+        self._started: bool = False
 
         # Used for retries and polling. Must lock to access.
-        self._timer = None
-        self._seq = 0
-        self._retries = 0
+        self._timer: Optional[threading.Timer] = None
+        self._seq: int = 0
+        self._retries: int = 0
 
     def set_check_intervals(self,
                             retry_min_interval: int = 300,
@@ -372,43 +372,61 @@ class Notifier(BaseNotifier):
                              success interval is less than 0, or the values in
                              the config cannot be converted to :class:`int`
         """
-        try:
-            self._retry_min_interval = int(config.get('retry_min_interval',
-                                                      retry_min_interval))
-        except ValueError:
+        self._retry_min_interval = retry_min_interval
+        self._retry_max_interval = retry_max_interval
+
+        if config is not None:
+            try:
+                self._retry_min_interval = int(config['retry_min_interval'])
+            except KeyError:
+                pass
+            except ValueError:
+                self.log.critical("'retry_min_interval' config option must be "
+                                  "an integer > 0")
+                raise ConfigError("'retry_min_interval' option for "
+                                  f"{self.name} notifier must be an "
+                                  "integer > 0")
+
+            try:
+                self._retry_max_interval = int(config['retry_max_interval'])
+            except KeyError:
+                pass
+            except ValueError:
+                self.log.critical("'retry_max_interval' config option must be "
+                                  "an integer > 0")
+                raise ConfigError("'retry_max_interval' option for "
+                                  f"{self.name} notifier must be an "
+                                  "integer > 0")
+
+        if self._retry_min_interval <= 0:
             self.log.critical("'retry_min_interval' config option must be an "
                               "integer > 0")
             raise ConfigError(f"'retry_min_interval' option for {self.name} "
                               "notifier must be an integer > 0")
-        if self._retry_min_interval <= 0:
-            raise ConfigError(f"'retry_min_interval' option for {self.name} "
-                              "notifier must be an integer > 0")
 
-        try:
-            self._retry_max_interval = int(config.get('retry_max_interval',
-                                                      retry_max_interval))
-        except ValueError:
+        if self._retry_max_interval <= 0:
             self.log.critical("'retry_max_interval' config option must be an "
                               "integer > 0")
-            raise ConfigError(f"'retry_max_interval' option for {self.name} "
-                              "notifier must be an integer > 0")
-        if self._retry_max_interval <= 0:
             raise ConfigError(f"'retry_max_interval' option for {self.name} "
                               "notifier must be an integer > 0")
 
         self._success_interval = success_interval
         if self._success_interval == 0:
             return
-        try:
-            self._success_interval = int(config['interval'])
-        except KeyError:
-            pass
-        except ValueError:
+        if config is not None:
+            try:
+                self._success_interval = int(config['interval'])
+            except KeyError:
+                pass
+            except ValueError:
+                self.log.critical("'interval' config option must be an "
+                                  "integer >= 0")
+                raise ConfigError(f"'interval' option for {self.name} "
+                                  "notifier must be an integer > 0")
+
+        if self._success_interval <= 0:
             self.log.critical("'interval' config option must be an "
                               "integer >= 0")
-            raise ConfigError(f"'interval' option for {self.name} "
-                              "notifier must be an integer > 0")
-        if self._success_interval <= 0:
             raise ConfigError(f"'interval' option for {self.name} "
                               "notifier must be an integer > 0")
 

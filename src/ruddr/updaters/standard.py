@@ -48,7 +48,7 @@ class StandardUpdater(OneWayUpdater):
         # Nameserver
         nameserver = config.get('nameserver')
 
-        self.init_hosts(hosts, nameserver, min_retry)
+        self.init_params(hosts, nameserver, min_retry)
 
         # Endpoint
         try:

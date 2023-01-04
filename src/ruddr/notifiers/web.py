@@ -94,7 +94,9 @@ class WebNotifier(Notifier):
         got_ipv4 = None
         got_ipv6 = None
         # True if there is an HTTP error, suggesting something went wrong
-        # rather than this host not being reachable at its old address
+        # rather than this host simply not having connectivity on that address
+        # family right now (the latter case not always being a problem--but
+        # we'll check later)
         err_ipv4 = False
         err_ipv6 = False
 
@@ -103,19 +105,21 @@ class WebNotifier(Notifier):
                 try:
                     r = requests.get(self.url4, timeout=self.timeout4,
                                      headers={'User-Agent': USER_AGENT})
-                    r.raise_for_status()
-                except requests.exceptions.HTTPError:
-                    self.log.error("Received HTTP %d from %s: %s",
-                                   r.status_code, self.url4, r.text)
-                    got_ipv4 = False
-                    err_ipv4 = True
                 except requests.exceptions.RequestException as e:
                     self.log.error("Could not get IPv4 from %s: %s",
                                    self.url4, e)
                     got_ipv4 = False
                 else:
-                    got_ipv4 = True
-                    ipv4_text = r.text
+                    try:
+                        r.raise_for_status()
+                    except requests.exceptions.HTTPError:
+                        self.log.error("Received HTTP %d from %s: %s",
+                                       r.status_code, self.url4, r.text)
+                        got_ipv4 = False
+                        err_ipv4 = True
+                    else:
+                        got_ipv4 = True
+                        ipv4_text = r.text
             if got_ipv4:
                 try:
                     ipv4 = ipaddress.IPv4Address(ipv4_text.strip())
@@ -131,19 +135,21 @@ class WebNotifier(Notifier):
                 try:
                     r = requests.get(self.url6, timeout=self.timeout6,
                                      headers={'User-Agent': USER_AGENT})
-                    r.raise_for_status()
-                except requests.exceptions.HTTPError:
-                    self.log.error("Received HTTP %d from %s: %s",
-                                   r.status_code, self.url6, r.text)
-                    got_ipv6 = False
-                    err_ipv6 = True
                 except requests.exceptions.RequestException as e:
                     self.log.error("Could not get IPv6 from %s: %s",
                                    self.url6, e)
                     got_ipv6 = False
                 else:
-                    got_ipv6 = True
-                    ipv6_text = r.text
+                    try:
+                        r.raise_for_status()
+                    except requests.exceptions.HTTPError:
+                        self.log.error("Received HTTP %d from %s: %s",
+                                       r.status_code, self.url6, r.text)
+                        got_ipv6 = False
+                        err_ipv6 = True
+                    else:
+                        got_ipv6 = True
+                        ipv6_text = r.text
             if got_ipv6:
                 try:
                     ipv6 = ipaddress.IPv6Interface(

@@ -3,7 +3,7 @@
 import ipaddress
 from json import JSONDecodeError
 from pprint import pprint
-from typing import Optional, Tuple, List, Union
+from typing import Optional, Tuple, List, Union, cast
 
 import requests
 
@@ -30,7 +30,7 @@ class GandiUpdater(TwoWayZoneUpdater):
             self.log.critical("'fqdns' config option is required")
             raise ConfigError(f"{self.name} updater requires 'fqdns' config "
                               "option") from None
-        self.init_hosts(fqdns)
+        self.init_hosts_and_zones(fqdns)
 
         # Gandi API key
         try:
@@ -105,8 +105,9 @@ class GandiUpdater(TwoWayZoneUpdater):
             raise PublishError("Unknown response structure from /domains")
         return result
 
-    def _fetch_zone_records(self, zone: str, rec_type: str) -> List[
-        Tuple[str, Union[ipaddress.IPv4Address, ipaddress.IPv6Address], int]
+    def _fetch_zone_records(self, zone: str, rec_type: str) -> Union[
+        List[Tuple[str, ipaddress.IPv4Address, int]],
+        List[Tuple[str, ipaddress.IPv6Address, int]],
     ]:
         """Fetch A or AAAA records for the given zone
 
@@ -123,9 +124,11 @@ class GandiUpdater(TwoWayZoneUpdater):
             raise PublishError(f"Could not fetch {rec_type} records for zone "
                                f"'{zone}'")
 
-        result: List[Tuple[str,
-                           Union[ipaddress.IPv4Address, ipaddress.IPv6Address],
-                           int]] = []
+        result: Union[
+            List[Tuple[str, ipaddress.IPv4Address, int]],
+            List[Tuple[str, ipaddress.IPv6Address, int]],
+        ] = []
+
         try:
             for rec in response:
                 name = rec['rrset_name']
@@ -151,13 +154,15 @@ class GandiUpdater(TwoWayZoneUpdater):
         self,
         zone: str
     ) -> List[Tuple[str, ipaddress.IPv4Address, Optional[int]]]:
-        return self._fetch_zone_records(zone, 'A')
+        return cast(List[Tuple[str, ipaddress.IPv4Address, int]],
+                    self._fetch_zone_records(zone, 'A'))
 
     def fetch_zone_ipv6s(
         self,
         zone: str
     ) -> List[Tuple[str, ipaddress.IPv6Address, Optional[int]]]:
-        return self._fetch_zone_records(zone, 'AAAA')
+        return cast(List[Tuple[str, ipaddress.IPv6Address, int]],
+                    self._fetch_zone_records(zone, 'AAAA'))
 
     def _put_record(self, zone: str, subdomain: str,
                     rec_type: str, addrs: List[str], ttl: int):

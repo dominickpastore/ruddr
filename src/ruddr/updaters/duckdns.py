@@ -37,7 +37,7 @@ class DuckDNSUpdater(OneWayUpdater):
             self.log.debug("'nameserver' was empty. Using system DNS")
             nameserver = None
 
-        self.init_hosts(hosts, nameserver)
+        self.init_params(hosts, nameserver)
 
         # Token
         try:

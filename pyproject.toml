@@ -86,6 +86,18 @@ ruddr = "ruddr.manager:main"
 # To just check style, use:
 #     flake8 src
 
+# TODO Want to add pytype here. Could add it right away with explicit command
+#  line options, but would be nice to add a config for it. pyproject.toml
+#  support isn't here yet though. See https://github.com/google/pytype/issues/645
+#  When added, can probably create a pytype tox env that doesn't explicitly set
+#  the python version
+# Note: Using pytype because it gives fewer false positives the way we actually
+# write the code
+#
+# To run pytype:
+#     pytype src/ruddr --disable ignored-abstractmethod
+# Need to disable ignored-abstractmethod because we sort of abuse it
+
 [tool.tox]
 legacy_tox_init = """
 [tox]
