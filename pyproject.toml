@@ -51,7 +51,8 @@ systemd = [
 test = [
     "flake8",
     "pytest>=6",
-    "pytest-cov[toml]",
+    "pytest-cov",
+    "pytest-mock",
 ]
 docs = [
     "sphinx",
@@ -62,7 +63,7 @@ Homepage = "https://github.com/dominickpastore/ruddr/"
 Documentation = "https://ruddr.dcpx.org/"
 Repository = "https://github.com/dominickpastore/ruddr/"
 Changelog = "https://github.com/dominickpastore/ruddr/blob/master/CHANGELOG.md"
-"Issue Tracker" = "https://github.com/dominickpastore/ruddr/issues"
+"Bug Tracker" = "https://github.com/dominickpastore/ruddr/issues"
 Discussion = "https://github.com/dominickpastore/ruddr/discussions"
 
 [project.scripts]

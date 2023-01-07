@@ -274,7 +274,7 @@ instead.
    Alternatively, you can specify ``skip_ipv4`` or ``skip_ipv6`` on the
    notifier and use regular ``notifier`` in the updater.
 
-Alternatively, if you leave out all ``notifier``, ``notifier4``, and
+Alternatively, if you leave out *all* ``notifier``, ``notifier4``, and
 ``notifier6`` options, Ruddr will use the default
 ``notifier``/``notifier4``/``notifier6`` options from the ``[ruddr]`` section.
 

@@ -5,7 +5,7 @@ import os.path
 import pathlib
 import sys
 
-from typing import Dict, Callable, Union, TextIO, Optional
+from typing import Dict, Callable, Union, Optional, Iterable
 
 if sys.version_info < (3, 10):
     from importlib_metadata import version
@@ -85,9 +85,9 @@ class Config:
 
     def _fill_defaults(self):
         """Fill in defaults if they are not yet set"""
-        if 'datadir' not in self.main:
-            self.main['datadir'] = DEFAULT_DATA_DIR
-        if not os.path.isabs(self.main['datadir']):
+        if 'datadir' not in self._main:
+            self._main['datadir'] = DEFAULT_DATA_DIR
+        if not os.path.isabs(self._main['datadir']):
             raise ConfigError("Config option 'datadir' cannot be a relative"
                               "path")
 
@@ -97,8 +97,8 @@ class Config:
         config_dict: Dict[str, Dict[str, str]],
         validate_type: Callable[[Optional[str], str], bool],
     ) -> None:
-        """Verify that updater or notifier types are assigned and that they are
-        valid
+        """Verify that updater or notifier types are assigned, that they are
+        valid, and that there is at least one
 
         :param kind: ``'Updater'`` or ``'Notifier'``
         :param config_dict: The config dict for those items
@@ -107,6 +107,9 @@ class Config:
 
         :raises ConfigError: if any type is missing or invalid
         """
+        if len(config_dict) == 0:
+            raise ConfigError(f"At least one {kind} is required")
+
         for name, config in config_dict.items():
             module = config.get('module')
             try:
@@ -186,8 +189,11 @@ class Config:
                 del updater_config['notifier']
             except KeyError:
                 pass
-            updater_config['notifier4'] = notifier4
-            updater_config['notifier6'] = notifier6
+            # Both cannot be None, but one can
+            if notifier4 is not None:
+                updater_config['notifier4'] = notifier4
+            if notifier6 is not None:
+                updater_config['notifier6'] = notifier6
 
     def _copy_globals(self) -> None:
         """Copy relevant global (e.g. ``[ruddr]``) config options into updater
@@ -249,12 +255,12 @@ def _process_config(config: configparser.ConfigParser) -> Config:
     notifiers: Dict[str, Dict[str, str]] = dict()
     updaters: Dict[str, Dict[str, str]] = dict()
 
-    for section in config:
+    for section in config.sections():
         if section == 'ruddr':
             main.update(config[section])
             continue
 
-        kind, _, name = section.partition('.')
+        kind, sep, name = section.partition('.')
         if kind == 'notifier':
             notifiers[name] = dict(config[section])
         elif kind == 'updater':
@@ -262,8 +268,12 @@ def _process_config(config: configparser.ConfigParser) -> Config:
         else:
             raise ConfigError("Config section %s is not a notifier "
                               "or updater section" % section)
+        if sep != '.' or name == '':
+            raise ConfigError("Config section %s must have a '.<name>'" %
+                              section)
 
     return Config(main, notifiers, updaters)
+
 
 def read_file_from_path(filename: Union[str, pathlib.Path]) -> Config:
     """Read configuration from the named file or :class:`~pathlib.Path`
@@ -280,7 +290,8 @@ def read_file_from_path(filename: Union[str, pathlib.Path]) -> Config:
         raise ConfigError("Could not read config file %s: %s" %
                           (filename, e.strerror)) from e
 
-def read_file(configfile: TextIO) -> Config:
+
+def read_file(configfile: Iterable[str]) -> Config:
     """Read configuration in from the given file-like object opened in text
     mode
 
@@ -294,5 +305,7 @@ def read_file(configfile: TextIO) -> Config:
         config.read_file(configfile)
     except configparser.Error as e:
         raise ConfigError("Error in config file: %s" % e) from e
+    except OSError as e:
+        raise ConfigError("Could not read config file: %s" % e) from e
 
     return _process_config(config)
