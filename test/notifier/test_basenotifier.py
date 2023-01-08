@@ -2,9 +2,12 @@ import pytest
 import ipaddress
 import time
 
-import mocks
+import doubles
 
 import ruddr
+
+
+# TODO notifier has been rewritten, update tests
 
 
 @pytest.fixture
@@ -17,7 +20,7 @@ def notifier_factory():
         def __call__(self, **kwargs):
             self._count += 1
             config = kwargs
-            return mocks.FakeNotifier(f'fake_notifier_{self._count}', config)
+            return doubles.FakeNotifier(f'fake_notifier_{self._count}', config)
     return NotifierFactory()
 
 
@@ -31,7 +34,7 @@ def updater_factory():
         def __call__(self, **kwargs):
             self._count += 1
             config = kwargs
-            return mocks.MockUpdater(f'mock_updater_{self._count}', config)
+            return doubles.MockUpdater(f'mock_updater_{self._count}', config)
     return UpdaterFactory()
 
 
@@ -43,7 +46,7 @@ def mock_updater(updater_factory):
 
 
 def test_ipv4_ready_false(notifier_factory, mock_updater):
-    """Test attaching updaters with ipv4_ready set to false"""
+    """Test attaching updaters with ipv4_ready set to false is error"""
     fake_notifier = notifier_factory(ipv4_ready='false')
 
     # Expect no exception for IPv6
@@ -53,7 +56,7 @@ def test_ipv4_ready_false(notifier_factory, mock_updater):
 
 
 def test_ipv6_ready_false(notifier_factory, mock_updater):
-    """Test attaching updaters with ipv6_ready set to false"""
+    """Test attaching updaters with ipv6_ready set to false is error"""
     fake_notifier = notifier_factory(ipv6_ready='false')
 
     # Expect no exception for IPv4
@@ -205,7 +208,7 @@ def test_multiple_updaters(notifier_factory, updater_factory):
 def test_schedulednotifier_one_retry():
     """Test ScheduledNotifier retries after failed notify, then not again until
     success interval after a successful notify"""
-    notifier = mocks.MockScheduledNotifier(
+    notifier = doubles.MockScheduledNotifier(
         'mock_notifier',
         7, 1, 5,
         (False, True, True)
@@ -221,7 +224,7 @@ def test_schedulednotifier_two_retry():
     """Test ScheduledNotifier retries after failed notify, then after a longer
     delay after a second failed notify, then not again until the success
     interval after a successful notify"""
-    notifier = mocks.MockScheduledNotifier(
+    notifier = doubles.MockScheduledNotifier(
         'mock_notifier',
         7, 1, 5,
         (False, False, True, True)
@@ -237,7 +240,7 @@ def test_schedulednotifier_many_retry():
     """Test ScheduledNotifier retries after failed notify, continues retrying
     after successively longer delays after repeated failures, then not again
     until the success interval after a successful notify"""
-    notifier = mocks.MockScheduledNotifier(
+    notifier = doubles.MockScheduledNotifier(
         'mock_notifier',
         7, 1, 5,
         (False, False, False, False, False, True, True)
@@ -252,7 +255,7 @@ def test_schedulednotifier_many_retry():
 def test_schedulednotifier_fail_and_manual_success():
     """Test ScheduledNotifier does not check again until the success interval
     after a failed notify and an immediate successful manual notify"""
-    notifier = mocks.MockScheduledNotifier(
+    notifier = doubles.MockScheduledNotifier(
         'mock_notifier',
         7, 1, 5,
         (False, True, True)
@@ -270,7 +273,7 @@ def test_schedulednotifier_two_fail_and_manual_fail():
     longer delay after a second failed notify, then retries after a short
     delay after a failed manual notify, then not again until the success
     interval after a successful notify"""
-    notifier = mocks.MockScheduledNotifier(
+    notifier = doubles.MockScheduledNotifier(
         'mock_notifier',
         7, 1, 5,
         (False, False, False, False, True, True)
@@ -289,7 +292,7 @@ def test_schedulednotifier_two_fail_and_manual_fail():
 def test_schedulednotifier_success():
     """Test ScheduledNotifier repeats successful notify after success
     interval"""
-    notifier = mocks.MockScheduledNotifier(
+    notifier = doubles.MockScheduledNotifier(
         'mock_notifier',
         7, 1, 5,
         (True, True, True)
@@ -303,7 +306,7 @@ def test_schedulednotifier_success():
 
 def test_schedulednotifier_stop():
     """Test ScheduledNotifier stops checking after stopped"""
-    notifier = mocks.MockScheduledNotifier(
+    notifier = doubles.MockScheduledNotifier(
         'mock_notifier',
         7, 1, 5,
         (True, True, True)

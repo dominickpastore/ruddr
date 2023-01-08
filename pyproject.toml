@@ -71,8 +71,6 @@ ruddr = "ruddr.manager:main"
 
 [tool.setuptools_scm]
 
-# TODO finish merging tox.ini here
-
 # Notes on testing:
 #
 # To run the full test suite in multiple virtual environments, use tox:
@@ -90,6 +88,7 @@ ruddr = "ruddr.manager:main"
 # TODO Want to add pytype here. Could add it right away with explicit command
 #  line options, but would be nice to add a config for it. pyproject.toml
 #  support isn't here yet though. See https://github.com/google/pytype/issues/645
+#  (Update: It's in git, but not released yet)
 #  When added, can probably create a pytype tox env that doesn't explicitly set
 #  the python version
 # Note: Using pytype because it gives fewer false positives the way we actually

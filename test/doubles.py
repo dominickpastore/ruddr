@@ -1,6 +1,8 @@
+"""Test doubles for use in test classes and fixtures"""
+
 import time
 
-from ruddr import Updater, Notifier, ScheduledNotifier, NotifyError
+from ruddr import Updater, BaseNotifier, Notifier, NotifyError
 
 
 class MockUpdater(Updater):
@@ -17,8 +19,8 @@ class MockUpdater(Updater):
         self.published_addresses.append(network)
 
 
-class FakeNotifier(Notifier):
-    """A simple notifier that notifies on demand"""
+class FakeNotifier(BaseNotifier):
+    """A simple notifier that notifies on demand. Extends BaseNotifier."""
     # Note: Tests can trigger notifying by calling .notify_ipv4() and
     # .notify_ipv6() directly
 
@@ -37,6 +39,7 @@ class FakeNotifier(Notifier):
         return self._ipv6_ready
 
 
+# TODO This should inherit from regular Notifier now
 class MockScheduledNotifier(ScheduledNotifier):
     """A mock scheduled notifier that keeps track of when checks are scheduled
     and retried"""
