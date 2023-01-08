@@ -564,7 +564,21 @@ Running Tests
 Generating Docs
 ~~~~~~~~~~~~~~~
 
-.. TODO Install with .[docs]
+The documentation is available online at https://ruddr.dcpx.org/, but if you
+would like to generate a local copy (for reference or to preview changes),
+install the ``docs`` extra and build the docs in ``docs/`` as usual for
+Sphinx::
+
+    # Assuming you are in the git repo:
+    pip install .[docs]
+    cd docs
+    make html
+
+Open docs/_build/html/index.html to read them.
+
+You can also generate other formats with ``make <format>``, provided the
+necessary tools are available (e.g. ``make latexpdf`` requires a LaTeX
+distribution to be installed). The output will be in docs/_build/<format>/.
 
 Contributions
 -------------
