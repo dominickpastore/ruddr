@@ -1,11 +1,11 @@
 """Test doubles for use in test classes and fixtures"""
+import itertools
+import threading
 
-import time
-
-from ruddr import Updater, BaseNotifier, Notifier, NotifyError
+import ruddr
 
 
-class MockUpdater(Updater):
+class MockUpdater(ruddr.Updater):
     """Simple mock updater that keeps a list of IP updates it receives"""
 
     def __init__(self, name, config):
@@ -19,7 +19,7 @@ class MockUpdater(Updater):
         self.published_addresses.append(network)
 
 
-class FakeNotifier(BaseNotifier):
+class FakeNotifier(ruddr.BaseNotifier):
     """A simple notifier that notifies on demand. Extends BaseNotifier."""
     # Note: Tests can trigger notifying by calling .notify_ipv4() and
     # .notify_ipv6() directly
@@ -39,30 +39,61 @@ class FakeNotifier(BaseNotifier):
         return self._ipv6_ready
 
 
-# TODO This should inherit from regular Notifier now
-class MockScheduledNotifier(ScheduledNotifier):
+class MockNotifier(ruddr.Notifier):
     """A mock scheduled notifier that keeps track of when checks are scheduled
     and retried"""
 
-    def __init__(self, name, success_interval, fail_min_interval,
-                 fail_max_interval, success_sequence):
-        super().__init__(name, dict())
+    def __init__(self, name, config, success_sequence=None,
+                 setup_implemented=True, teardown_implemented=True,
+                 check_implemented=True):
+        super().__init__(name, config)
 
-        self.success_interval = success_interval
-        self.fail_min_interval = fail_min_interval
-        self.fail_max_interval = fail_max_interval
+        #: The order of successes and fails for check_once
+        if success_sequence is None:
+            self.success_iter = itertools.repeat(True)
+        else:
+            self.success_iter = iter(success_sequence)
 
-        self.success_sequence = list(success_sequence)
+        self.setup_implemented = setup_implemented
+        self.teardown_implemented = teardown_implemented
+        self.check_implemented = check_implemented
 
-        #: Keeps a list of timestamps for when each check happened
-        self.timestamps = []
+        #: The order the abstract methods were called
+        self.call_sequence = []
 
     @property
-    def intervals(self):
-        return [y - x for x, y in zip(self.timestamps, self.timestamps[1:])]
+    def setup_count(self):
+        return sum(call == 'setup' for call in self.call_sequence)
+
+    @property
+    def teardown_count(self):
+        return sum(call == 'teardown' for call in self.call_sequence)
+
+    @property
+    def check_count(self):
+        return sum(call == 'check' for call in self.call_sequence)
+
+    def setup(self):
+        self.call_sequence.append('setup')
+        if not self.setup_implemented:
+            raise NotImplementedError
+
+    def teardown(self):
+        self.call_sequence.append('teardown')
+        if not self.teardown_implemented:
+            raise NotImplementedError
 
     def check_once(self):
-        self.timestamps.append(time.monotonic())
-        success = self.success_sequence.pop(0)
+        self.call_sequence.append('check_once')
+        if not self.check_implemented:
+            raise NotImplementedError
+        success = next(self.success_iter)
         if not success:
-            raise NotifyError
+            raise ruddr.NotifyError
+
+    @staticmethod
+    def join_first_checks():
+        """Wait for any first checks after :meth:`start` to finish"""
+        for thread in threading.enumerate():
+            if thread.name == 'first_check':
+                thread.join()

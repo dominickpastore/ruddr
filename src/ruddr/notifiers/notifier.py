@@ -98,6 +98,16 @@ class BaseNotifier:
             raise ConfigError(f"'ipv6_required' option for {self.name} must"
                               "be boolean (true/yes/on/1/false/no/off/0)")
 
+        if self._skip_ipv4 and self._ipv4_required:
+            self.log.critical("Cannot require IPv4 when it is skipped")
+            raise ConfigError(f"{self.name} updater cannot require IPv4 when "
+                              "it is skipped")
+
+        if self._skip_ipv6 and self._ipv6_required:
+            self.log.critical("Cannot require IPv6 when it is skipped")
+            raise ConfigError(f"{self.name} updater cannot require IPv6 when "
+                              "it is skipped")
+
         self._ipv4_update_funcs: List[
             Callable[[ipaddress.IPv4Address], None]
         ] = []
@@ -289,7 +299,13 @@ class BaseNotifier:
 
 
 class Notifier(BaseNotifier):
-    """A base class for notifiers. Supports
+    """A base class for notifiers. Supports a variety of notifier strategies,
+    such as polling, event-based notifying, and hybrids. See the docs on
+    :ref:`writing your own notifier <notifier_dev>` for more detail on what
+    that means.
+
+    Also handles setting up a logger, setting some useful member variables for
+    subclasses, and attaching to update functions.
 
     :param name: Name of the notifier
     :param config: Dict of config options for this notifier
@@ -452,7 +468,8 @@ class Notifier(BaseNotifier):
             except NotImplementedError:
                 self.log.info("Not doing an immediate check as this notifier "
                               "does not support it")
-        threading.Thread(target=first_check).start()
+        # Name is only used for testing purposes
+        threading.Thread(target=first_check, name='first_check').start()
 
     def stop(self) -> None:
         self.log.info("Stopping notifier")

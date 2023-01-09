@@ -5,49 +5,58 @@ import pytest
 import threading
 
 
-# TODO Make this not use threading to maximize determinism
-class VirtualTimer(threading.Timer):
+class VirtualTimer:
     """Drop-in for :class:`threading.Timer` that uses a virtual clock
-    instead of wall time"""
+    instead of wall time and isn't actually threaded. This allows for
+    deterministic behavior: the function runs immediately when
+    :meth:`start` or :meth:`advance` is called if the virtual time has
+    exceeded the interval time."""
 
     def __init__(self, interval, function, args=None, kwargs=None):
         super().__init__()
-        self.function = function
-        self.args = args if args is not None else []
-        self.kwargs = kwargs if kwargs is not None else {}
-        self.interval = interval
-        self.cond = threading.Condition()
-        self.complete = False
-        self.elapsed = 0.0
+        self._function = function
+        self._args = args if args is not None else []
+        self._kwargs = kwargs if kwargs is not None else {}
+        self._interval = interval
+        self._lock = threading.Lock()
+        self._complete = False
+        self._elapsed = 0.0
+
+        self._started = False
+        self.daemon = False
 
     def cancel(self):
         """Stop the timer if it hasn't finished yet."""
-        with self.cond:
-            self.elapsed = self.interval
-            self.complete = True
-            self.cond.notify_all()
+        with self._lock:
+            self._elapsed = self._interval
+            self._complete = True
 
     def advance(self, seconds):
         """Advance the virtual clock"""
-        with self.cond:
-            self.elapsed += seconds
-            self.cond.notify_all()
+        with self._lock:
+            self._elapsed += seconds
+            self._try_run()
 
     @property
     def remaining(self):
         """Number of seconds remaining, or None if timer is complete"""
-        with self.cond:
-            if self.complete:
+        with self._lock:
+            if self._complete:
                 return None
-            return max(self.interval - self.elapsed, 0)
+            return max(self._interval - self._elapsed, 0)
 
-    def run(self):
-        with self.cond:
-            while self.elapsed < self.interval:
-                self.cond.wait()
-            if not self.complete:
-                self.function(*self.args, **self.kwargs)
-            self.complete = True
+    def _try_run(self):
+        if self._elapsed < self._interval:
+            return
+        if not self._complete:
+            self._function(*self._args, **self._kwargs)
+        self._complete = True
+
+    def start(self):
+        with self._lock:
+            if self._started:
+                raise RuntimeError("Already started")
+            self._try_run()
 
 
 @pytest.fixture
@@ -96,6 +105,10 @@ def advance():
                 if timer.remaining is not None:
                     timer.cancel()
 
+        def count_running(self):
+            """Count the number of timers that have not completed"""
+            return sum(t.remaining is not None for t in self.timers)
+
     advancer = Advancer()
 
     orig_timer = threading.Timer
@@ -103,6 +116,4 @@ def advance():
 
     yield advancer
 
-    # TODO need to cancel timers? Or should we verify that all timers are
-    #  done?
     threading.Timer = orig_timer
