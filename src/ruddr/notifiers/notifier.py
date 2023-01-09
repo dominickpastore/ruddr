@@ -79,10 +79,17 @@ class BaseNotifier:
             raise ConfigError(f"'skip_ipv6' option for {self.name} must"
                               "be boolean (true/yes/on/1/false/no/off/0)")
 
+        if self._skip_ipv4 and self._skip_ipv6:
+            self.log.critical("Cannot skip both IPv4 and IPv6")
+            raise ConfigError(f"Notifier {self.name} cannot skip both IPv4 "
+                              "and IPv6")
+
         try:
-            self._ipv4_required: bool = (config.get('ipv4_required',
-                                                    'true').lower()
-                                         in ('true', 'on', 'yes', '1'))
+            self._ipv4_required: bool = (
+                config.get('ipv4_required',
+                           'false' if self._skip_ipv4 else 'true').lower()
+                in ('true', 'on', 'yes', '1')
+            )
         except ValueError:
             self.log.critical("'ipv4_required' must be boolean (true/yes/on/1/"
                               "false/no/off/0)")

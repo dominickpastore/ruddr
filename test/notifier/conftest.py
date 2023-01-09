@@ -26,7 +26,7 @@ def updater_factory():
         def __call__(self, **kwargs):
             self._count += 1
             config = kwargs
-            return doubles.MockUpdater(f'mock_updater_{self._count}', config)
+            return doubles.MockBaseUpdater(f'mock_updater_{self._count}')
     return UpdaterFactory()
 
 

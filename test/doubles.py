@@ -5,17 +5,20 @@ import threading
 import ruddr
 
 
-class MockUpdater(ruddr.Updater):
+class MockBaseUpdater(ruddr.BaseUpdater):
     """Simple mock updater that keeps a list of IP updates it receives"""
 
-    def __init__(self, name, config):
-        super().__init__(name, config)
+    def __init__(self, name):
+        super().__init__(name, None)
         self.published_addresses = []
 
-    def publish_ipv4(self, address):
+    def initial_update(self):
+        pass
+
+    def update_ipv4(self, address):
         self.published_addresses.append(address)
 
-    def publish_ipv6(self, network):
+    def update_ipv6(self, network):
         self.published_addresses.append(network)
 
 
@@ -29,7 +32,7 @@ class FakeNotifier(ruddr.BaseNotifier):
         # Config vars to test .ipv4_ready() and .ipv6_ready()
         self._ipv4_ready = (config.get('ipv4_ready', 'true').lower() in
                             ('true', 'yes', 'on', '1'))
-        self._ipv6_ready = (config.get('ipv4_ready', 'true').lower() in
+        self._ipv6_ready = (config.get('ipv6_ready', 'true').lower() in
                             ('true', 'yes', 'on', '1'))
 
     def ipv4_ready(self):
