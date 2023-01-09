@@ -1,6 +1,5 @@
 """Test doubles for use in test classes and fixtures"""
 import itertools
-import threading
 
 import ruddr
 
@@ -87,16 +86,13 @@ class MockNotifier(ruddr.Notifier):
             raise NotImplementedError
 
     def check_once(self):
-        self.call_sequence.append('check_once')
+        self.call_sequence.append('check')
         if not self.check_implemented:
             raise NotImplementedError
         success = next(self.success_iter)
         if not success:
             raise ruddr.NotifyError
 
-    @staticmethod
-    def join_first_checks():
-        """Wait for any first checks after :meth:`start` to finish"""
-        for thread in threading.enumerate():
-            if thread.name == 'first_check':
-                thread.join()
+    def join_first_check(self):
+        """Wait for first check after :meth:`start` to finish"""
+        self.first_check.join()

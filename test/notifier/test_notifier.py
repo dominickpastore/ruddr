@@ -17,7 +17,7 @@ def test_setup_teardown_not_implemented(advance):
 
     assert notifier.call_sequence == []
     notifier.start()
-    notifier.join_first_checks()
+    notifier.join_first_check()
     assert notifier.call_sequence == ['setup', 'check']
     advance.by(10)
 
@@ -40,7 +40,7 @@ def test_check_not_implemented(advance):
 
     assert notifier.call_sequence == []
     notifier.start()
-    notifier.join_first_checks()
+    notifier.join_first_check()
     assert notifier.call_sequence == ['setup', 'check']
     advance.by(10)
 
@@ -66,14 +66,14 @@ def test_setup_teardown_not_implemented_with_scheduled_checks(advance):
 
     assert notifier.call_sequence == []
     notifier.start()
-    notifier.join_first_checks()
+    notifier.join_first_check()
     assert notifier.call_sequence == ['setup', 'check']
     advance.by(6)
 
     notifier.do_notify()
-    assert notifier.check_count() == 2
+    assert notifier.check_count == 2
     advance.by(7)
-    assert notifier.check_count() == 3
+    assert notifier.check_count == 3
     advance.by(6)
 
     assert notifier.call_sequence == ['setup',
@@ -96,29 +96,29 @@ def test_default_check_intervals(advance):
 
     assert notifier.call_sequence == []
     notifier.start()
-    notifier.join_first_checks()
+    notifier.join_first_check()
     assert notifier.call_sequence == ['setup', 'check']
     advance.by(300)
 
-    assert notifier.check_count() == 2
+    assert notifier.check_count == 2
     advance.by(600)
-    assert notifier.check_count() == 3
+    assert notifier.check_count == 3
     advance.by(1200)
-    assert notifier.check_count() == 4
+    assert notifier.check_count == 4
     advance.by(2400)
-    assert notifier.check_count() == 5
+    assert notifier.check_count == 5
     advance.by(4800)
-    assert notifier.check_count() == 6
+    assert notifier.check_count == 6
     advance.by(9600)
-    assert notifier.check_count() == 7
+    assert notifier.check_count == 7
     advance.by(19200)
-    assert notifier.check_count() == 8
+    assert notifier.check_count == 8
     advance.by(38400)
-    assert notifier.check_count() == 9
+    assert notifier.check_count == 9
     advance.by(76800)
-    assert notifier.check_count() == 10
+    assert notifier.check_count == 10
     advance.by(86400)
-    assert notifier.check_count() == 11
+    assert notifier.check_count == 11
     advance.by(100000)
 
     assert advance.count_running() == 0, "Unexpected checks pending"
@@ -149,19 +149,19 @@ def test_set_intervals_from_config(advance):
 
     assert notifier.call_sequence == []
     notifier.start()
-    notifier.join_first_checks()
+    notifier.join_first_check()
     assert notifier.call_sequence == ['setup', 'check']
     advance.by(1)
 
-    assert notifier.check_count() == 2
+    assert notifier.check_count == 2
     advance.by(2)
-    assert notifier.check_count() == 3
+    assert notifier.check_count == 3
     advance.by(4)
-    assert notifier.check_count() == 4
+    assert notifier.check_count == 4
     advance.by(5)
-    assert notifier.check_count() == 5
+    assert notifier.check_count == 5
     advance.by(7)
-    assert notifier.check_count() == 6
+    assert notifier.check_count == 6
     advance.by(6)
 
     assert advance.count_running() == 0, "Unexpected checks pending"
@@ -192,7 +192,7 @@ def test_config_not_override_zero_success_interval(advance):
 
     assert notifier.call_sequence == []
     notifier.start()
-    notifier.join_first_checks()
+    notifier.join_first_check()
     assert notifier.call_sequence == ['setup', 'check']
     advance.by(100000)
 
@@ -326,7 +326,7 @@ def test_notifier_sequence(sequence, polling, advance):
     # Setup and first check
     assert notifier.call_sequence == []
     notifier.start()
-    notifier.join_first_checks()
+    notifier.join_first_check()
     assert notifier.call_sequence == ['setup', 'check']
     advance.by(sequence[0][2])
 

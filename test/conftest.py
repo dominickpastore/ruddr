@@ -71,15 +71,15 @@ def advance():
             """Create a new virtual timer under the control of this Advancer"""
             timer = VirtualTimer(*args, **kwargs)
             self.timers.append(timer)
+            return timer
 
         def by_minimum_or(self, seconds: float):
             """Advance virtual time just long enough for at least one timer
             to expire or by the given number of seconds, whichever is less, and
             return the number of seconds leftover"""
-            to_advance = min(
-                seconds,
-                *(t.remaining for t in self.timers if t.remaining is not None),
-            )
+            remaining_times = [seconds] + [t.remaining for t in self.timers
+                                           if t.remaining is not None]
+            to_advance = min(remaining_times)
             for timer in self.timers:
                 timer.advance(to_advance)
             return seconds - to_advance
@@ -112,7 +112,7 @@ def advance():
     advancer = Advancer()
 
     orig_timer = threading.Timer
-    threading.Timer = VirtualTimer
+    threading.Timer = advancer.new_timer
 
     yield advancer
 

@@ -339,6 +339,9 @@ class Notifier(BaseNotifier):
         self._seq: int = 0
         self._retries: int = 0
 
+        # For tests to join the thread doing the first check
+        self.first_check = None
+
     def set_check_intervals(self,
                             retry_min_interval: int = 300,
                             retry_max_interval: int = 86400,
@@ -476,7 +479,8 @@ class Notifier(BaseNotifier):
                 self.log.info("Not doing an immediate check as this notifier "
                               "does not support it")
         # Name is only used for testing purposes
-        threading.Thread(target=first_check, name='first_check').start()
+        self.first_check = threading.Thread(target=first_check)
+        self.first_check.start()
 
     def stop(self) -> None:
         self.log.info("Stopping notifier")
@@ -604,6 +608,7 @@ class Notifier(BaseNotifier):
         else:
             if self._success_interval <= 0:
                 self.log.debug("(success, seq %d complete), seq")
+                return
             self._retries = 0
             self.log.debug("(success for seq %d, next invocation in %d secs)",
                            seq, self._success_interval)
