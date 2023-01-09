@@ -160,17 +160,15 @@ def test_set_intervals_from_config(advance):
     assert notifier.check_count == 4
     advance.by(5)
     assert notifier.check_count == 5
-    advance.by(7)
-    assert notifier.check_count == 6
-    advance.by(6)
+    advance.by(10)
 
     assert advance.count_running() == 0, "Unexpected checks pending"
     assert notifier.teardown_count == 0
-    assert notifier.check_count == 6
+    assert notifier.check_count == 5
     notifier.stop()
     assert advance.count_running() == 0, "Unexpected pending checks after stop"
     assert notifier.setup_count == 1
-    assert notifier.check_count == 6
+    assert notifier.check_count == 5
     assert notifier.teardown_count == 1
 
 
@@ -252,18 +250,18 @@ def test_config_not_override_zero_success_interval(advance):
          (True, False, 6),
          (True, True, 7),
          (True, False, 6),
-     ], False),
+     ], True),
     # setup, initial check, scheduled check, teardown, no more check
     ([
          (True, False, 7),
          (True, False, 6),
-     ], False),
+     ], True),
     # setup, initial check fails, retry succeeds, scheduled check, teardown
     ([
          (False, False, 1),
          (True, False, 7),
          (True, False, 6),
-     ], False),
+     ], True),
     # setup, initial check, scheduled check fails, retry succeeds, scheduled
     # check, teardown
     ([
@@ -271,7 +269,7 @@ def test_config_not_override_zero_success_interval(advance):
          (False, False, 1),
          (True, False, 7),
          (True, False, 6),
-     ], False),
+     ], True),
     # setup, initial check fails, retry succeeds, on demand check, scheduled
     # check, teardown
     ([
@@ -279,7 +277,7 @@ def test_config_not_override_zero_success_interval(advance):
          (True, False, 6),
          (True, True, 7),
          (True, False, 6),
-     ], False),
+     ], True),
     # setup, initial check fails, retry fails 3 times, retry succeeds,
     # scheduled check, teardown
     ([
@@ -289,7 +287,7 @@ def test_config_not_override_zero_success_interval(advance):
          (False, False, 5),
          (True, False, 7),
          (True, False, 6),
-     ], False),
+     ], True),
     # setup, initial check fails, retry fails 4 times, teardown, no more check
     ([
          (False, False, 1),
@@ -297,7 +295,7 @@ def test_config_not_override_zero_success_interval(advance):
          (False, False, 4),
          (False, False, 5),
          (False, False, 4),
-     ], False),
+     ], True),
     # setup, initial check fails, fails twice more, on demand check fails,
     # retry after minimum delay fails, retry succeeds, teardown
     ([
@@ -307,7 +305,7 @@ def test_config_not_override_zero_success_interval(advance):
          (False, True, 1),
          (False, False, 2),
          (True, False, 6),
-     ], False),
+     ], True),
 ])
 def test_notifier_sequence(sequence, polling, advance):
     notifier = doubles.MockNotifier(
@@ -317,11 +315,11 @@ def test_notifier_sequence(sequence, polling, advance):
     )
     if polling:
         notifier.set_check_intervals(retry_min_interval=1,
-                                     retry_max_interval=5)
-    else:
-        notifier.set_check_intervals(retry_min_interval=1,
                                      retry_max_interval=5,
                                      success_interval=7)
+    else:
+        notifier.set_check_intervals(retry_min_interval=1,
+                                     retry_max_interval=5)
 
     # Setup and first check
     assert notifier.call_sequence == []

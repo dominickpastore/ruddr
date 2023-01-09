@@ -46,10 +46,11 @@ class VirtualTimer:
             return max(self._interval - self._elapsed, 0)
 
     def _try_run(self):
+        if self._complete:
+            return
         if self._elapsed < self._interval:
             return
-        if not self._complete:
-            self._function(*self._args, **self._kwargs)
+        self._function(*self._args, **self._kwargs)
         self._complete = True
 
     def start(self):
@@ -80,7 +81,8 @@ def advance():
             remaining_times = [seconds] + [t.remaining for t in self.timers
                                            if t.remaining is not None]
             to_advance = min(remaining_times)
-            for timer in self.timers:
+            # Make copy of self.timers so newly created timers aren't advanced
+            for timer in list(self.timers):
                 timer.advance(to_advance)
             return seconds - to_advance
 

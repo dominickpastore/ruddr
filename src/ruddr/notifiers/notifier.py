@@ -598,7 +598,7 @@ class Notifier(BaseNotifier):
             # Minimum retry interval the first time, doubling each retry after
             retry_delay = self._retry_min_interval * (2 ** self._retries)
             if retry_delay > self._retry_max_interval:
-                retry_delay = self._retry_min_interval
+                retry_delay = self._retry_max_interval
             self._retries += 1
             self.log.info("Check failed. Retrying in %d secs. (seq %d)",
                           retry_delay, seq)
