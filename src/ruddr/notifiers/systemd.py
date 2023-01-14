@@ -184,7 +184,8 @@ class SystemdNotifier(Notifier):
                            signal's parameters
         :param user_data: User data provided when subscribing to the signal
 
-        See https://lazka.github.io/pgi-docs/Gio-2.0/callbacks.html#Gio.DBusSignalCallback
+        See
+        https://lazka.github.io/pgi-docs/Gio-2.0/callbacks.html#Gio.DBusSignalCallback
         """
         # Extract parameters from GLib.Variant
         type_, changed, invalidated = parameters.unpack()

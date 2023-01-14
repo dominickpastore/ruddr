@@ -31,16 +31,16 @@ class HEUpdater(Updater):
             username = config['username']
         except KeyError:
             self.log.critical("'username' config option is required")
-            raise ConfigError(f"{self.name} updater requires 'username' config "
-                              "option") from None
+            raise ConfigError(f"{self.name} updater requires 'username' config"
+                              " option") from None
 
         # HE password
         try:
             password = config['password']
         except KeyError:
             self.log.critical("'password' config option is required")
-            raise ConfigError(f"{self.name} updater requires 'password' config "
-                              "option") from None
+            raise ConfigError(f"{self.name} updater requires 'password' config"
+                              " option") from None
 
         self.auth = (username, password)
 

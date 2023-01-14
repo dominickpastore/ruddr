@@ -89,67 +89,67 @@ def test_ipv6_ready_false_attach_ipv4(notifier_factory, mock_updater):
 def test_want_ipv4_false(notifier_factory, mock_updater):
     """Test want_ipv4 is true when ipv4 update function not attached"""
     fake_notifier = notifier_factory()
-    assert fake_notifier.want_ipv4() == False
+    assert not fake_notifier.want_ipv4()
 
 
 def test_want_ipv4_true(notifier_factory, mock_updater):
     """Test want_ipv4 is true when ipv4 update function attached"""
     fake_notifier = notifier_factory()
     fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
-    assert fake_notifier.want_ipv4() == True
+    assert fake_notifier.want_ipv4()
 
 
 def test_want_ipv6_false(notifier_factory, mock_updater):
     """Test want_ipv6 is true when ipv6 update function not attached"""
     fake_notifier = notifier_factory()
-    assert fake_notifier.want_ipv6() == False
+    assert not fake_notifier.want_ipv6()
 
 
 def test_want_ipv6_true(notifier_factory, mock_updater):
     """Test want_ipv6 is true when ipv6 update function attached"""
     fake_notifier = notifier_factory()
     fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
-    assert fake_notifier.want_ipv6() == True
+    assert fake_notifier.want_ipv6()
 
 
 def test_need_ipv4_false_not_required(notifier_factory, mock_updater):
     """Test need_ipv4 is false when updater attached but not required"""
     fake_notifier = notifier_factory(ipv4_required='false')
     fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
-    assert fake_notifier.need_ipv4() == False
+    assert not fake_notifier.need_ipv4()
 
 
 def test_need_ipv4_false_no_updater(notifier_factory, mock_updater):
     """Test need_ipv4 is false when required but no updater attached"""
     fake_notifier = notifier_factory(ipv4_required='true')
-    assert fake_notifier.need_ipv4() == False
+    assert not fake_notifier.need_ipv4()
 
 
 def test_need_ipv4_true(notifier_factory, mock_updater):
     """Test need_ipv4 is true when required and updater attached"""
     fake_notifier = notifier_factory(ipv4_required='true')
     fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
-    assert fake_notifier.need_ipv4() == True
+    assert fake_notifier.need_ipv4()
 
 
 def test_need_ipv6_false_not_required(notifier_factory, mock_updater):
     """Test need_ipv6 is false when updater attached but not required"""
     fake_notifier = notifier_factory(ipv6_required='false')
     fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
-    assert fake_notifier.need_ipv6() == False
+    assert not fake_notifier.need_ipv6()
 
 
 def test_need_ipv6_false_no_updater(notifier_factory, mock_updater):
     """Test need_ipv6 is false when required but no updater attached"""
     fake_notifier = notifier_factory(ipv6_required='true')
-    assert fake_notifier.need_ipv6() == False
+    assert not fake_notifier.need_ipv6()
 
 
 def test_need_ipv6_true(notifier_factory, mock_updater):
     """Test need_ipv6 is true when required and updater attached"""
     fake_notifier = notifier_factory(ipv6_required='true')
     fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
-    assert fake_notifier.need_ipv6() == True
+    assert fake_notifier.need_ipv6()
 
 
 def test_defaults(notifier_factory, mock_updater):
@@ -158,10 +158,10 @@ def test_defaults(notifier_factory, mock_updater):
     fake_notifier = notifier_factory()
     fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
     fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
-    assert fake_notifier.want_ipv4() == True
-    assert fake_notifier.need_ipv4() == True
-    assert fake_notifier.want_ipv6() == True
-    assert fake_notifier.need_ipv6() == False
+    assert fake_notifier.want_ipv4()
+    assert fake_notifier.need_ipv4()
+    assert fake_notifier.want_ipv6()
+    assert not fake_notifier.need_ipv6()
 
 
 def test_skip_ipv4_attach_ipv4(notifier_factory, mock_updater):

@@ -8,6 +8,7 @@ _allowed_gai_family_orig = connection.allowed_gai_family
 _allowed_family_mutex = threading.RLock()
 _allowed_family = None
 
+
 def _allowed_gai_family():
     with _allowed_family_mutex:
         if _allowed_family is None:
@@ -15,7 +16,9 @@ def _allowed_gai_family():
         else:
             return _allowed_family
 
+
 connection.allowed_gai_family = _allowed_gai_family
+
 
 class RequestsFamilyRestriction:
     """Context manager that causes Requests to only use the specified address

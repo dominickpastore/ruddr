@@ -177,7 +177,7 @@ class FreeDNSUpdater(TwoWayUpdater):
                            response.text)
             raise PublishError(f"Received HTTP {response.status_code} when "
                                f"trying to upcate {fqdn} to {address}")
-            
+
         # This API seems to always return plain text. Errors are in the form
         # "ERROR: message" and successes in the form
         # "Updated <x> host(s) <fqdn> to <ip> in <y> seconds"

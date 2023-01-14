@@ -207,7 +207,7 @@ def test_config_not_override_zero_success_interval(advance):
 # Sequence is list of checks as tuples (successful, on_demand, interval_after)
 # on_demand is ignored for the initial check
 @pytest.mark.parametrize("sequence,polling", [
-    ### Non-polling tests ###
+    # === Non-polling tests ===
     # setup, initial check, teardown
     ([
         (True, False, 10),
@@ -243,7 +243,7 @@ def test_config_not_override_zero_success_interval(advance):
          (True, False, 10),
      ], False),
 
-    ### Polling tests ###
+    # === Polling tests ===
     # setup, initial check, on demand check, scheduled check, teardown, no more
     # check
     ([

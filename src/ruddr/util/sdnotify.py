@@ -21,6 +21,7 @@ So this module does option 3.
 import socket
 import os
 
+
 def _notify(msg):
     """Send the given bytes to the systemd notify socket named in the
     environment. If not on a Unix-like system or no notify socket was named,
@@ -46,9 +47,10 @@ def _notify(msg):
         sock_name = os.environ['NOTIFY_SOCKET']
     except KeyError:
         return
-    #sock_name = os.fsencode(sock_name)
+    # TODO Remove comments if not needed
+    # sock_name = os.fsencode(sock_name)
     if sock_name[0] == 0x40:    # 0x40 is @
-        #sock_name = b'\x00' + sock_name[1:]
+        # sock_name = b'\x00' + sock_name[1:]
         sock_name = '\x00' + sock_name[1:]
 
     sock_type = socket.SOCK_DGRAM
@@ -58,6 +60,7 @@ def _notify(msg):
         pass
     with socket.socket(af, sock_type) as sock:
         sock.sendmsg([msg], [], 0, sock_name)
+
 
 def _args_to_bytes(**kwargs):
     """Convert keyword args to a :class:`bytes` object ready to send to the
@@ -76,6 +79,7 @@ def _args_to_bytes(**kwargs):
         msg += arg_bytes + b'=' + val_bytes + b'\n'
     return bytes(msg)
 
+
 def ready():
     """Send a READY notification to systemd, if on a platform with systemd and
     a notify socket was provided. Otherwise, do nothing.
@@ -87,6 +91,7 @@ def ready():
                      (neither of which is considered an error)
     """
     _notify(_args_to_bytes(READY=1))
+
 
 def reloading():
     """Send a RELOADING notification to systemd, if on a platform with systemd
@@ -101,6 +106,7 @@ def reloading():
     """
     _notify(_args_to_bytes(RELOADING=1))
 
+
 def stopping():
     """Send a STOPPING notification to systemd, if on a platform with systemd
     and a notify socket was provided. Otherwise, do nothing.
@@ -112,6 +118,7 @@ def stopping():
                      (neither of which is considered an error)
     """
     _notify(_args_to_bytes(STOPPING=1))
+
 
 def status(msg):
     """Send a STATUS notification to systemd, if on a platform with systemd
@@ -127,6 +134,7 @@ def status(msg):
     """
     _notify(_args_to_bytes(STATUS=msg))
 
+
 def errno(err):
     """Send an ERRNO notification to systemd, if on a platform with systemd
     and a notify socket was provided. Otherwise, do nothing.
@@ -141,6 +149,7 @@ def errno(err):
                      (neither of which is considered an error)
     """
     _notify(_args_to_bytes(ERRNO=err))
+
 
 def buserror(err):
     """Send a BUSERROR notification to systemd, if on a platform with systemd
@@ -158,6 +167,7 @@ def buserror(err):
     """
     _notify(_args_to_bytes(BUSERROR=err))
 
+
 def watchdog():
     """Send a WATCHDOG=1 notification to systemd, if on a platform with systemd
     and a notify socket was provided. Otherwise, do nothing.
@@ -170,6 +180,7 @@ def watchdog():
                      (neither of which is considered an error)
     """
     _notify(_args_to_bytes(WATCHDOG=1))
+
 
 def watchdog_trigger():
     """Send a WATCHDOG=trigger notification to systemd, if on a platform with
@@ -184,6 +195,7 @@ def watchdog_trigger():
     """
     _notify(_args_to_bytes(WATCHDOG='trigger'))
 
+
 def watchdog_usec(usec):
     """Send a WATCHDOG_USEC notification to systemd, if on a platform with
     systemd and a notify socket was provided. Otherwise, do nothing.
@@ -197,6 +209,7 @@ def watchdog_usec(usec):
                      (neither of which is considered an error)
     """
     _notify(_args_to_bytes(WATCHDOG_USEC=usec))
+
 
 def extend_timeout_usec(usec):
     """Send an EXTEND_TIMEOUT_USEC notification to systemd, if on a platform
@@ -213,6 +226,7 @@ def extend_timeout_usec(usec):
                      (neither of which is considered an error)
     """
     _notify(_args_to_bytes(EXTEND_TIMEOUT_USEC=usec))
+
 
 def notify(**kwargs):
     """Send a notification to systemd with the given variables set. For most

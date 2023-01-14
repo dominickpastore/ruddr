@@ -303,9 +303,6 @@ def main(argv=None):
     except RuddrException:
         log.critical("Unexpected RuddrException", exc_info=True)
         sys.exit(1)
-    except:
-        log.critical("Uncaught exception!", exc_info=True)
-        sys.exit(1)
 
     # Notify systemd, if applicable
     sdnotify.ready()
@@ -325,8 +322,8 @@ def main(argv=None):
     signal.signal(signal.SIGTERM, handle_signals)
 
     # TODO Do we need this? If not, remove it
-    #while True:
-    #    time.sleep(60)
+    # while True:
+    #     time.sleep(60)
 
 
 if __name__ == '__main__':

@@ -2,6 +2,7 @@ import pytest
 
 import doubles
 
+
 @pytest.fixture
 def notifier_factory():
     """Fixture creating a factory for fake :class:`~ruddr.Notifier`"""
@@ -25,7 +26,6 @@ def updater_factory():
 
         def __call__(self, **kwargs):
             self._count += 1
-            config = kwargs
             return doubles.MockBaseUpdater(f'mock_updater_{self._count}')
     return UpdaterFactory()
 
@@ -35,5 +35,3 @@ def mock_updater(updater_factory):
     """Fixture creating a mock :class:`~ruddr.Updater` that keeps a list of
     IP addresses it receives"""
     return updater_factory()
-
-

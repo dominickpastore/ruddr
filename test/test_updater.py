@@ -1,4 +1,4 @@
-import ruddr
+# import ruddr
 
 # TODO NOTES: Some of these tests involve the manager as well. In some cases
 #   (e.g. update same address currently assigned) we can mock the manager and
@@ -24,5 +24,5 @@ import ruddr
 
 # TODO test update retries after failed update, and does not retry again
 
-# TODO test update does not retry after failed update then additional successful
-#  update
+# TODO test update does not retry after failed update then additional
+#  successful update

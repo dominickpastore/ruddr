@@ -85,7 +85,7 @@ class DuckDNSUpdater(OneWayUpdater):
 
         try:
             response.raise_for_status()
-        except requests.exceptions.HTTPError as e:
+        except requests.exceptions.HTTPError:
             self.log.error("Received HTTP %d when trying to update '%s' to "
                            "%s:\n%s", response.status_code, hostname, addr,
                            response.text)

@@ -64,10 +64,10 @@ def test_config_keys(config_factory):
     config = config_factory(
         """[ruddr]
         datadir = /var/lib/ruddr_data
-        
+
         [notifier.test_notifier]
         type = iface
-        
+
         [updater.test_updater]
         type = standard
         notifier = test_notifier
@@ -210,9 +210,9 @@ def test_extra_section_3(config_factory):
             """
             [notifier.test_notifier]
             type = iface
-            
+
             [foo.bar]
-            
+
             [updater.test_updater]
             type = standard
             notifier = test_notifier

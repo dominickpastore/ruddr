@@ -509,12 +509,13 @@ class Notifier(BaseNotifier):
             self.log.debug("Doing on-demand notify")
             if not self._started:
                 self.log.error("Tried to do_notify when not started")
-                raise NotStartedError(f"Notifier {self.name} cannot do_notify when "
-                                      "not started")
+                raise NotStartedError(f"Notifier {self.name} cannot do_notify "
+                                      "when not started")
             try:
                 self.check()
             except NotImplementedError:
-                self.log.info("Notifier does not support on-demand notifications")
+                self.log.info("Notifier does not support on-demand "
+                              "notifications")
 
     @abstractmethod
     def setup(self) -> None:

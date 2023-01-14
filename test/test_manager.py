@@ -1,4 +1,4 @@
-import ruddr
+# import ruddr
 
 
 # TODO Test notifier not attached to updaters is discarded

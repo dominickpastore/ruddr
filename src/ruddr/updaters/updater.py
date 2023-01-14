@@ -170,8 +170,8 @@ class BaseUpdater:
             network: ipaddress.IPv6Network,
             address: ipaddress.IPv6Address
     ) -> ipaddress.IPv6Address:
-        """Replace the prefix portion of the given IPv6 address with the network
-        prefix provided and return the result
+        """Replace the prefix portion of the given IPv6 address with the
+        network prefix provided and return the result
 
         :param network: The network prefix to set
         :param address: The address to set the network prefix on
@@ -628,9 +628,9 @@ class TwoWayZoneUpdater(Updater):
 
     @abstractmethod
     def put_zone_ipv6s(
-            self,
-            zone: str,
-            records: Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]]
+        self,
+        zone: str,
+        records: Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]]
     ):
         """Publish AAAA (IPv6) records for the given zone.
 
@@ -1227,7 +1227,7 @@ class TwoWayUpdater(TwoWayZoneUpdater):
 
     @abstractmethod
     def fetch_all_ipv4s(
-            self
+        self
     ) -> List[Tuple[str, ipaddress.IPv4Address, Optional[int]]]:
         """Get a list of all A (IPv4) records in the account.
 
@@ -1260,7 +1260,7 @@ class TwoWayUpdater(TwoWayZoneUpdater):
 
     @abstractmethod
     def fetch_all_ipv6s(
-            self
+        self
     ) -> List[Tuple[str, ipaddress.IPv6Address, Optional[int]]]:
         """Get a list of all AAAA (IPv6) records in the account.
 
@@ -1292,8 +1292,8 @@ class TwoWayUpdater(TwoWayZoneUpdater):
 
     @abstractmethod
     def fetch_domain_ipv4s(
-            self,
-            domain: str,
+        self,
+        domain: str,
     ) -> List[Tuple[ipaddress.IPv4Address, Optional[int]]]:
         """Get a list of A (IPv4) records for the given domain.
 
@@ -1326,8 +1326,8 @@ class TwoWayUpdater(TwoWayZoneUpdater):
 
     @abstractmethod
     def fetch_domain_ipv6s(
-            self,
-            domain: str,
+        self,
+        domain: str,
     ) -> List[Tuple[ipaddress.IPv6Address, Optional[int]]]:
         """Get a list of AAAA (IPv6) records for the given domain.
 
@@ -1359,9 +1359,8 @@ class TwoWayUpdater(TwoWayZoneUpdater):
 
     @abstractmethod
     def put_all_ipv4s(
-            self,
-            records: Dict[
-                str, Tuple[List[ipaddress.IPv4Address], Optional[int]]],
+        self,
+        records: Dict[str, Tuple[List[ipaddress.IPv4Address], Optional[int]]],
     ):
         """Publish A (IPv4) records for the account.
 
@@ -1389,8 +1388,8 @@ class TwoWayUpdater(TwoWayZoneUpdater):
 
     @abstractmethod
     def put_all_ipv6s(
-            self,
-            records: Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]],
+        self,
+        records: Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]],
     ):
         """Publish AAAA (IPv6) records for the account.
 
@@ -1600,8 +1599,8 @@ class OneWayUpdater(Updater):
         self.min_retry_interval = min_retry
 
     def _split_hosts(
-            self,
-            hosts: str
+        self,
+        hosts: str
     ) -> List[Tuple[str, Optional[Union[ipaddress.IPv6Address, str]]]]:
         """Helper function to split a hosts string into a list of (hostname,
         None|IPv6Address|hostname).

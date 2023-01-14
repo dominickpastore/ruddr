@@ -1,2 +1,4 @@
 [flake8]
 exclude = __pycache__
+per_file_ignores =
+    src/ruddr/__init__.py:F401
