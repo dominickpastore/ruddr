@@ -57,6 +57,11 @@ test = [
 docs = [
     "sphinx",
 ]
+dev = [
+    "tox>=4",
+    "ruddr[test]",
+    "ruddr[docs]",
+]
 
 [project.urls]
 Homepage = "https://github.com/dominickpastore/ruddr/"
@@ -99,7 +104,7 @@ ruddr = "ruddr.manager:main"
 # Need to disable ignored-abstractmethod because we sort of abuse it
 
 [tool.tox]
-legacy_tox_init = """
+legacy_tox_ini = """
 [tox]
 min_version = 4.0
 envlist =
@@ -114,8 +119,7 @@ envlist =
 extras =
     test
 commands =
-    python setup.py check -m -s
-    flake8 ruddr/
+    flake8 src/ test/
     pytest --cov --cov-append --cov-report=html {posargs}
 
 # Note: If running pytest manually, it's enough to run "pytest"/"pytest --cov"
