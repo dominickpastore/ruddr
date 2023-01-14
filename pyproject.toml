@@ -48,19 +48,26 @@ dynamic = ["version"]
 systemd = [
     "PyGObject",
 ]
-test = [
-    "flake8",
+# Extras below only used for development purposes
+staticanalysis = [
+    "flake8>=5",
+    "pytype>=2023.01.10",
+]
+unittest = [
     "pytest>=6",
     "pytest-cov",
     "pytest-mock",
+]
+test = [
+    "ruddr[unittest]",
+    "ruddr[staticanalysis]",
 ]
 docs = [
     "sphinx",
 ]
 dev = [
     "tox>=4",
-    "ruddr[test]",
-    "ruddr[docs]",
+    "ruddr[test,docs]",
 ]
 
 [project.urls]
@@ -88,20 +95,12 @@ ruddr = "ruddr.manager:main"
 #     pytest --cov
 #
 # To just check style, use:
-#     flake8 src
-
-# TODO Want to add pytype here. Could add it right away with explicit command
-#  line options, but would be nice to add a config for it. pyproject.toml
-#  support isn't here yet though. See https://github.com/google/pytype/issues/645
-#  (Update: It's in git, but not released yet)
-#  When added, can probably create a pytype tox env that doesn't explicitly set
-#  the python version
-# Note: Using pytype because it gives fewer false positives the way we actually
-# write the code
+#     flake8 src/ test/
 #
-# To run pytype:
+# To just check types, use:
 #     pytype src/ruddr --disable ignored-abstractmethod
-# Need to disable ignored-abstractmethod because we sort of abuse it
+# Note: We are using pytype because it gives fewer false positives the way we
+# actually write the code
 
 [tool.tox]
 legacy_tox_ini = """
@@ -109,6 +108,7 @@ legacy_tox_ini = """
 min_version = 4.0
 envlist =
     clean
+    analyze
     py37
     py38
     py39
@@ -117,12 +117,17 @@ envlist =
 
 [testenv]
 extras =
-    test
+    unittest
 commands =
-    flake8 src/ test/
     pytest --cov --cov-append --cov-report=html {posargs}
 
-# Note: If running pytest manually, it's enough to run "pytest"/"pytest --cov"
+[testenv:analyze]
+base_python = python3.8
+extras =
+    staticanalysis
+commands =
+    flake8 src/ test/
+    pytype
 
 [testenv:clean]
 deps = coverage[toml]
@@ -170,4 +175,21 @@ exclude_lines = [
     # Don't complain about abstract methods, they aren't run:
     # TODO revisit this, because we are sort of abusing @abstractmethod
     "@(abc\\.)?abstractmethod",
+]
+
+[tool.pytype]
+# Path where source lives and list of directories to process
+pythonpath = "src"
+inputs = [
+    "ruddr"
+]
+# Python version we are targeting
+python_version = "3.7"
+# Run in parallel with same number of jobs as CPUs
+jobs = "auto"
+# Errors to ignore project-wide
+disable = [
+    # We are abusing @abstractmethod for Sphinx documentation purposes. It's
+    # okay if they are not overridden in subclasses.
+    "ignored-abstractmethod",
 ]
