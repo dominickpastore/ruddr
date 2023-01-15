@@ -40,6 +40,7 @@ dependencies = [
     "dnspython~=2.0",
     "tldextract~=3.0",
     "importlib_metadata; python_version<'3.10'",
+    "typing_extensions~=4.0; python_version<'3.8'",
 ]
 dynamic = ["version"]
 
@@ -98,7 +99,7 @@ ruddr = "ruddr.manager:main"
 #     flake8 src/ test/
 #
 # To just check types, use:
-#     pytype src/ruddr --disable ignored-abstractmethod
+#     pytype
 # Note: We are using pytype because it gives fewer false positives the way we
 # actually write the code
 
@@ -179,9 +180,8 @@ exclude_lines = [
 
 [tool.pytype]
 # Path where source lives and list of directories to process
-pythonpath = "src"
 inputs = [
-    "ruddr"
+    "src/ruddr"
 ]
 # Python version we are targeting
 python_version = "3.7"

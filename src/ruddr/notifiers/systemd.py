@@ -1,8 +1,9 @@
 """Ruddr notifier that listens for updates from systemd-networkd over DBus"""
 import threading
+from typing import Any, Tuple, cast
 
-from gi.repository import GLib
-from gi.repository import Gio
+from gi.repository import GLib  # type: ignore
+from gi.repository import Gio   # type: ignore
 import ipaddress
 import socket
 
@@ -168,9 +169,9 @@ class SystemdNotifier(Notifier):
         if iface_name == self.iface:
             self.check()
 
-    def _handle_properties_changed(self, connection, sender_name, object_path,
-                                   interface_name, signal_name, parameters,
-                                   user_data):
+    def _handle_properties_changed(self, connection, sender_name,
+                                   object_path: str, interface_name,
+                                   signal_name, parameters, user_data):
         """Handle a PropertiesChanged signal. Do nothing if it's not on a type
         we care about (org.freedesktop.network1.link). Otherwise, extract the
         useful info and start a potential notify.
@@ -188,7 +189,8 @@ class SystemdNotifier(Notifier):
         https://lazka.github.io/pgi-docs/Gio-2.0/callbacks.html#Gio.DBusSignalCallback
         """
         # Extract parameters from GLib.Variant
-        type_, changed, invalidated = parameters.unpack()
+        type_, changed, invalidated = cast(Tuple[str, Any, Any],
+                                           parameters.unpack())
         self.log.debug("Received signal: type=%r, changed=%r, invalidated=%r, "
                        "path=%r", type_, changed, invalidated, object_path)
 

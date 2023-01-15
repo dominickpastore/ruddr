@@ -309,13 +309,13 @@ def main(argv=None):
 
     # Do an immediate update on SIGUSR1
     def handle_sigusr1(sig, _):
-        log.info("Received signal: %s", signal.strsignal(sig))
+        log.info("Received signal: %s", signal.Signals(sig).name)
         manager.do_notify()
     signal.signal(signal.SIGUSR1, handle_sigusr1)
 
     # Wait for SIGINT (^C) or SIGTERM
     def handle_signals(sig, _):
-        log.info("Received signal: %s", signal.strsignal(sig))
+        log.info("Received signal: %s", signal.Signals(sig).name)
         sdnotify.stopping()
         manager.stop()
     signal.signal(signal.SIGINT, handle_signals)

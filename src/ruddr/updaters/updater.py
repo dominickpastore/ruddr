@@ -12,8 +12,8 @@ import types
 from abc import abstractmethod
 from typing import Union, Tuple, List, Optional, Dict, TypeVar
 
-import dns.exception
-import dns.resolver
+import dns.exception    # type: ignore
+import dns.resolver     # type: ignore
 
 from ruddr.addrfile import Addrfile
 from ruddr.exceptions import PublishError, FatalPublishError, ConfigError

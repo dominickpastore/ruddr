@@ -2,9 +2,21 @@
 
 import os
 import os.path
-from typing import Tuple
+from typing import Tuple, Optional
+import sys
+if sys.version_info < (3, 8):
+    from typing_extensions import Protocol
+else:
+    from typing import Protocol
 
-import tldextract
+import tldextract   # type: ignore
+
+
+class _TLDExtractor(Protocol):
+    def __call__(
+        self, url: str, include_psl_private_domains: Optional[bool] = ...
+    ) -> tldextract.tldextract.ExtractResult:
+        ...
 
 
 class ZoneSplitter:
@@ -22,7 +34,7 @@ class ZoneSplitter:
     def __init__(self, datadir: str):
         self._tld_cache_dir: str = os.path.join(datadir, 'tldextract')
         os.makedirs(os.path.dirname(self._tld_cache_dir), exist_ok=True)
-        self._extract_func = tldextract.TLDExtract(
+        self._extract_func: _TLDExtractor = tldextract.TLDExtract(
             cache_dir=self._tld_cache_dir,
             include_psl_private_domains=True,
         )

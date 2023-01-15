@@ -14,10 +14,14 @@ system's interfaces"""
 # https://stackoverflow.com/questions/20743709/get-ipv6-addresses-in-linux-using-ioctl
 
 import ipaddress
-import netifaces
+from typing import Tuple, List, cast, Dict
+
+import netifaces    # type: ignore
 
 
-def _get_iface_addrs(if_name: str):
+def _get_iface_addrs(
+    if_name: str
+) -> Tuple[List[ipaddress.IPv4Address], List[ipaddress.IPv6Address]]:
     """Lookup current addresses for the named interface.
 
     :param if_name: Name of the address to look up
@@ -25,7 +29,9 @@ def _get_iface_addrs(if_name: str):
              of IPV6Address.
     :raises ValueError: if there is no interface with the given name.
     """
-    addresses = netifaces.ifaddresses(if_name)
+    # Cast due to lack of type stubs for netifaces
+    addresses = cast(Dict[int, List[Dict[str, str]]],
+                     netifaces.ifaddresses(if_name))
     ipv4 = [a['addr'] for a in addresses[netifaces.AF_INET]]
     ipv6 = [a['addr'] for a in addresses[netifaces.AF_INET6]]
 
@@ -39,9 +45,11 @@ def _get_iface_addrs(if_name: str):
     return (ipv4, ipv6)
 
 
-def get_iface_addrs(if_name: str,
-                    omit_private: bool = True,
-                    omit_link_local: bool = True):
+def get_iface_addrs(
+    if_name: str,
+    omit_private: bool = True,
+    omit_link_local: bool = True
+) -> Tuple[List[ipaddress.IPv4Address], List[ipaddress.IPv6Address]]:
     """Lookup current addresses for the named interface. Results will be
     ordered with non-private addresses first, then private (if requested), then
     link-local (if requested).
