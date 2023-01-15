@@ -56,12 +56,13 @@ staticanalysis = [
 ]
 unittest = [
     "pytest>=6",
-    "pytest-cov",
     "pytest-mock",
+    "coverage[toml]"
 ]
 test = [
     "ruddr[unittest]",
     "ruddr[staticanalysis]",
+    "pytest-cov",
 ]
 docs = [
     "sphinx",
@@ -94,6 +95,8 @@ ruddr = "ruddr.manager:main"
 #     pytest
 # or with coverage:
 #     pytest --cov
+# (Tox uses coverage.py directly rather than pytest-cov for more control, but
+# pytest-cov is simpler for a single test run)
 #
 # To just check style, use:
 #     flake8 src/ test/
@@ -115,14 +118,19 @@ envlist =
     py39
     py310
     py311
+    report
 
 [testenv]
+# Note: Options set here copy to other testenvs unless set differently there
+depends = clean
+use_develop = true
 extras =
     unittest
 commands =
-    pytest --cov --cov-append --cov-report=html {posargs}
+    coverage run -m pytest {posargs}
 
 [testenv:analyze]
+use_develop = false
 base_python = python3.8
 extras =
     staticanalysis
@@ -130,10 +138,32 @@ commands =
     flake8 src/ test/
     pytype
 
-[testenv:clean]
+[testenv:report]
+depends =
+    py37
+    py38
+    py39
+    py310
+    py311
+use_develop = false
+extras =
 deps = coverage[toml]
 skip_install = true
-commands = coverage erase
+commands =
+    coverage report
+    coverage html
+
+[testenv:clean]
+depends =
+use_develop = false
+deps = coverage[toml]
+extras =
+skip_install = true
+allowlist_externals =
+    rm
+commands =
+    rm -rf htmlcov
+    coverage erase
 """
 
 [tool.pytest.ini_options]
@@ -152,8 +182,6 @@ source = [
 [tool.coverage.report]
 # Include line numbers of missed code
 show_missing = true
-# Skip files with 100% coverage, making it easy to focus on files needing work
-#skip_covered = true
 # Regexes for lines to exclude from consideration
 exclude_lines = [
     # Have to re-enable the standard pragma
@@ -170,7 +198,6 @@ exclude_lines = [
     "raise NotImplementedError",
 
     # Don't complain if non-runnable code isn't run:
-    "if 0:",
     "if __name__ == .__main__.:",
 
     # Don't complain about abstract methods, they aren't run:
