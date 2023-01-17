@@ -83,6 +83,10 @@ Discussion = "https://github.com/dominickpastore/ruddr/discussions"
 [project.scripts]
 ruddr = "ruddr.manager:main"
 
+# For unit tests only
+[project.entry-points."ruddr.notifier"]
+_test = "ruddr.notifiers.static:StaticNotifier"
+
 [tool.setuptools_scm]
 
 # Notes on testing:

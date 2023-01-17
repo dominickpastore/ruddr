@@ -1,3 +1,4 @@
+import doubles
 import ruddr.manager
 
 import pytest
@@ -45,19 +46,158 @@ def test_validate_updater_type(mocker, updater_factory, expected):
     )
 
 
-# TODO Add tests for _validate_updater_or_notifier_type. It can do updaters
-#  only since the behavior is exactly the same for notifiers.
-# TODO Type is built-in updater
-# TODO Type is entry_point updater (added to updaters dict)
-# TODO Type is built-in updater but entry_point with same name exists, built-in
-#  takes priority
-# TODO Type does not match built-in or entry_point updater
-# TODO Module and type is importable (added to updaters dict)
-# TODO Module and type is not importable
-# TODO Module and type already in updaters dict
-# TODO Module and type is importable, type matches built-in (added to updaters
-#  dict)
-# TODO Module and type already in updaters dict, type matches built-in
+def test_validate_updater_or_notifier_type_built_in():
+    """Test _validate_updater_or_notifier_type with a "built-in" notifier"""
+    notifiers = {
+        'test': doubles.FakeNotifier,
+    }
+    result = ruddr.manager._validate_updater_or_notifier_type(
+        'notifier', notifiers, None, 'test'
+    )
+    assert result
+    assert notifiers == {
+        'test': doubles.FakeNotifier,
+    }
+
+
+def test_validate_updater_or_notifier_type_entry_point():
+    """Test _validate_updater_or_notifier_type with an entry_point notifier"""
+    notifiers = {
+        'test': doubles.FakeNotifier,
+    }
+    result = ruddr.manager._validate_updater_or_notifier_type(
+        'notifier', notifiers, None, '_test'
+    )
+    assert result
+    assert notifiers == {
+        'test': doubles.FakeNotifier,
+        '_test': ruddr.notifiers.static.StaticNotifier,
+    }
+
+
+def test_validate_updater_or_notifier_type_built_in_entry_point_conflict():
+    """Test _validate_updater_or_notifier_type with a type matching both a
+    built-in and an entry_point notifier and ensure built-in isn't replaced"""
+    notifiers = {
+        '_test': doubles.FakeNotifier,
+    }
+    result = ruddr.manager._validate_updater_or_notifier_type(
+        'notifier', notifiers, None, '_test'
+    )
+    assert result
+    assert notifiers == {
+        '_test': doubles.FakeNotifier,
+    }
+
+
+def test_validate_updater_or_notifier_type_no_such_type():
+    """Test _validate_updater_or_notifier_type with a type that doesn't match
+    anything"""
+    notifiers = {
+        'test': doubles.FakeNotifier,
+    }
+    result = ruddr.manager._validate_updater_or_notifier_type(
+        'notifier', notifiers, None, 'test_invalid'
+    )
+    assert not result
+    assert notifiers == {
+        'test': doubles.FakeNotifier,
+    }
+
+
+def test_validate_updater_or_notifier_type_class():
+    """Test _validate_updater_or_notifier_type with a module and class"""
+    notifiers = {
+        'test': doubles.FakeNotifier,
+    }
+    result = ruddr.manager._validate_updater_or_notifier_type(
+        'notifier', notifiers, 'doubles', 'MockNotifier'
+    )
+    assert result
+    assert notifiers == {
+        'test': doubles.FakeNotifier,
+        ('doubles', 'MockNotifier'): doubles.MockNotifier
+    }
+
+
+def test_validate_updater_or_notifier_type_module_not_importable():
+    """Test _validate_updater_or_notifier_type with a module and class but
+    module not importable"""
+    notifiers = {
+        'test': doubles.FakeNotifier,
+    }
+    result = ruddr.manager._validate_updater_or_notifier_type(
+        'notifier', notifiers, 'invalid', 'MockNotifier'
+    )
+    assert not result
+    assert notifiers == {
+        'test': doubles.FakeNotifier,
+    }
+
+
+def test_validate_updater_or_notifier_type_class_not_in_module():
+    """Test _validate_updater_or_notifier_type with a module and class but
+    class not in module"""
+    notifiers = {
+        'test': doubles.FakeNotifier,
+    }
+    result = ruddr.manager._validate_updater_or_notifier_type(
+        'notifier', notifiers, 'doubles', 'InvalidNotifier'
+    )
+    assert not result
+    assert notifiers == {
+        'test': doubles.FakeNotifier,
+    }
+
+
+def test_validate_updater_or_notifier_type_class_already_imported():
+    """Test _validate_updater_or_notifier_type with a module and class already
+    imported"""
+    notifiers = {
+        'test': doubles.FakeNotifier,
+        ('doubles', 'MockNotifier'): doubles.MockNotifier
+    }
+    result = ruddr.manager._validate_updater_or_notifier_type(
+        'notifier', notifiers, 'doubles', 'MockNotifier'
+    )
+    assert result
+    assert notifiers == {
+        'test': doubles.FakeNotifier,
+        ('doubles', 'MockNotifier'): doubles.MockNotifier,
+    }
+
+
+def test_validate_updater_or_notifier_type_class_matches_built_in():
+    """Test _validate_updater_or_notifier_type with a module and class where
+    class name matches a built-in notifier"""
+    notifiers = {
+        'MockNotifier': doubles.FakeNotifier,
+    }
+    result = ruddr.manager._validate_updater_or_notifier_type(
+        'notifier', notifiers, 'doubles', 'MockNotifier'
+    )
+    assert result
+    assert notifiers == {
+        'MockNotifier': doubles.FakeNotifier,
+        ('doubles', 'MockNotifier'): doubles.MockNotifier,
+    }
+
+
+def test_validate_updater_or_notifier_type_class_imported_matches_built_in():
+    """Test _validate_updater_or_notifier_type with a module and class already
+    imported where class name matches a built-in notifier"""
+    notifiers = {
+        'MockNotifier': doubles.FakeNotifier,
+        ('doubles', 'MockNotifier'): doubles.MockNotifier,
+    }
+    result = ruddr.manager._validate_updater_or_notifier_type(
+        'notifier', notifiers, 'doubles', 'MockNotifier'
+    )
+    assert result
+    assert notifiers == {
+        'MockNotifier': doubles.FakeNotifier,
+        ('doubles', 'MockNotifier'): doubles.MockNotifier,
+    }
 
 
 # TODO Manager creates notifier with type only and passes in name and config
