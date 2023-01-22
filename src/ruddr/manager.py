@@ -115,6 +115,7 @@ class DDNSManager:
         for name in list(self.notifiers.keys()):
             if not (self.notifiers[name].want_ipv4() or
                     self.notifiers[name].want_ipv6()):
+                log.warning("Notifier %s not attached to any updater", name)
                 del self.notifiers[name]
 
     def start(self):
