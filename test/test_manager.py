@@ -6,200 +6,193 @@ import ruddr.manager
 import pytest
 
 
-@pytest.mark.parametrize('expected', [True, False])
-def test_validate_notifier_type(mocker, notifier_factory, expected):
-    """Test validate_notifier_type calls _validate_updater_or_notifier_type
-    with 'notifier'"""
-    validator = mocker.patch(
-        "ruddr.manager._validate_updater_or_notifier_type",
-        return_value=expected,
-    )
-    notifiers = {
-        'test': notifier_factory(),
-    }
-    mocker.patch("ruddr.manager.notifiers.notifiers", new=notifiers)
+class TestUpdaterNotifierValidation:
+    @pytest.mark.parametrize('expected', [True, False])
+    def test_validate_notifier_type(self, mocker, notifier_factory, expected):
+        """Test validate_notifier_type calls _validate_updater_or_notifier_type
+        with 'notifier'"""
+        validator = mocker.patch(
+            "ruddr.manager._validate_updater_or_notifier_type",
+            return_value=expected,
+        )
+        notifiers = {
+            'test': notifier_factory(),
+        }
+        mocker.patch("ruddr.manager.notifiers.notifiers", new=notifiers)
 
-    result = ruddr.manager.validate_notifier_type('testmod', 'testtype')
+        result = ruddr.manager.validate_notifier_type('testmod', 'testtype')
 
-    assert result == expected
-    assert validator.call_args == (
-        ("notifier", notifiers, 'testmod', 'testtype'),
-    )
+        assert result == expected
+        assert validator.call_args == (
+            ("notifier", notifiers, 'testmod', 'testtype'),
+        )
 
+    @pytest.mark.parametrize('expected', [True, False])
+    def test_validate_updater_type(self, mocker, updater_factory, expected):
+        """Test validate_updater_type calls _validate_updater_or_notifier_type
+        with 'updater'"""
+        validator = mocker.patch(
+            "ruddr.manager._validate_updater_or_notifier_type",
+            return_value=expected,
+        )
+        updaters = {
+            'test': updater_factory(),
+        }
+        mocker.patch("ruddr.manager.updaters.updaters", new=updaters)
 
-@pytest.mark.parametrize('expected', [True, False])
-def test_validate_updater_type(mocker, updater_factory, expected):
-    """Test validate_updater_type calls _validate_updater_or_notifier_type
-    with 'updater'"""
-    validator = mocker.patch(
-        "ruddr.manager._validate_updater_or_notifier_type",
-        return_value=expected,
-    )
-    updaters = {
-        'test': updater_factory(),
-    }
-    mocker.patch("ruddr.manager.updaters.updaters", new=updaters)
+        result = ruddr.manager.validate_updater_type('testmod', 'testtype')
 
-    result = ruddr.manager.validate_updater_type('testmod', 'testtype')
+        assert result == expected
+        assert validator.call_args == (
+            ("updater", updaters, 'testmod', 'testtype'),
+        )
 
-    assert result == expected
-    assert validator.call_args == (
-        ("updater", updaters, 'testmod', 'testtype'),
-    )
+    def test_built_in(self):
+        """Test _validate_updater_or_notifier_type with a "built-in"
+        notifier"""
+        notifiers = {
+            'test': doubles.FakeNotifier,
+        }
+        result = ruddr.manager._validate_updater_or_notifier_type(
+            'notifier', notifiers, None, 'test'
+        )
+        assert result
+        assert notifiers == {
+            'test': doubles.FakeNotifier,
+        }
 
+    def test_entry_point(self):
+        """Test _validate_updater_or_notifier_type with an entry_point
+        notifier"""
+        notifiers = {
+            'test': doubles.FakeNotifier,
+        }
+        result = ruddr.manager._validate_updater_or_notifier_type(
+            'notifier', notifiers, None, '_test'
+        )
+        assert result
+        assert notifiers == {
+            'test': doubles.FakeNotifier,
+            '_test': ruddr.notifiers.static.StaticNotifier,
+        }
 
-def test_validate_updater_or_notifier_type_built_in():
-    """Test _validate_updater_or_notifier_type with a "built-in" notifier"""
-    notifiers = {
-        'test': doubles.FakeNotifier,
-    }
-    result = ruddr.manager._validate_updater_or_notifier_type(
-        'notifier', notifiers, None, 'test'
-    )
-    assert result
-    assert notifiers == {
-        'test': doubles.FakeNotifier,
-    }
+    def test_built_in_entry_point_conflict(self):
+        """Test _validate_updater_or_notifier_type with a type matching both a
+        built-in and an entry_point notifier and ensure built-in isn't
+        replaced"""
+        notifiers = {
+            '_test': doubles.FakeNotifier,
+        }
+        result = ruddr.manager._validate_updater_or_notifier_type(
+            'notifier', notifiers, None, '_test'
+        )
+        assert result
+        assert notifiers == {
+            '_test': doubles.FakeNotifier,
+        }
 
+    def test_no_such_type(self):
+        """Test _validate_updater_or_notifier_type with a type that doesn't
+        match anything"""
+        notifiers = {
+            'test': doubles.FakeNotifier,
+        }
+        result = ruddr.manager._validate_updater_or_notifier_type(
+            'notifier', notifiers, None, 'test_invalid'
+        )
+        assert not result
+        assert notifiers == {
+            'test': doubles.FakeNotifier,
+        }
 
-def test_validate_updater_or_notifier_type_entry_point():
-    """Test _validate_updater_or_notifier_type with an entry_point notifier"""
-    notifiers = {
-        'test': doubles.FakeNotifier,
-    }
-    result = ruddr.manager._validate_updater_or_notifier_type(
-        'notifier', notifiers, None, '_test'
-    )
-    assert result
-    assert notifiers == {
-        'test': doubles.FakeNotifier,
-        '_test': ruddr.notifiers.static.StaticNotifier,
-    }
+    def test_module_and_class(self):
+        """Test _validate_updater_or_notifier_type with a module and class"""
+        notifiers = {
+            'test': doubles.FakeNotifier,
+        }
+        result = ruddr.manager._validate_updater_or_notifier_type(
+            'notifier', notifiers, 'doubles', 'MockNotifier'
+        )
+        assert result
+        assert notifiers == {
+            'test': doubles.FakeNotifier,
+            ('doubles', 'MockNotifier'): doubles.MockNotifier
+        }
 
+    def test_module_not_importable(self):
+        """Test _validate_updater_or_notifier_type with a module and class but
+        module not importable"""
+        notifiers = {
+            'test': doubles.FakeNotifier,
+        }
+        result = ruddr.manager._validate_updater_or_notifier_type(
+            'notifier', notifiers, 'invalid', 'MockNotifier'
+        )
+        assert not result
+        assert notifiers == {
+            'test': doubles.FakeNotifier,
+        }
 
-def test_validate_updater_or_notifier_type_built_in_entry_point_conflict():
-    """Test _validate_updater_or_notifier_type with a type matching both a
-    built-in and an entry_point notifier and ensure built-in isn't replaced"""
-    notifiers = {
-        '_test': doubles.FakeNotifier,
-    }
-    result = ruddr.manager._validate_updater_or_notifier_type(
-        'notifier', notifiers, None, '_test'
-    )
-    assert result
-    assert notifiers == {
-        '_test': doubles.FakeNotifier,
-    }
+    def test_class_not_in_module(self):
+        """Test _validate_updater_or_notifier_type with a module and class but
+        class not in module"""
+        notifiers = {
+            'test': doubles.FakeNotifier,
+        }
+        result = ruddr.manager._validate_updater_or_notifier_type(
+            'notifier', notifiers, 'doubles', 'InvalidNotifier'
+        )
+        assert not result
+        assert notifiers == {
+            'test': doubles.FakeNotifier,
+        }
 
+    def test_module_and_class_already_imported(self):
+        """Test _validate_updater_or_notifier_type with a module and class
+        already imported"""
+        notifiers = {
+            'test': doubles.FakeNotifier,
+            ('doubles', 'MockNotifier'): doubles.MockNotifier
+        }
+        result = ruddr.manager._validate_updater_or_notifier_type(
+            'notifier', notifiers, 'doubles', 'MockNotifier'
+        )
+        assert result
+        assert notifiers == {
+            'test': doubles.FakeNotifier,
+            ('doubles', 'MockNotifier'): doubles.MockNotifier,
+        }
 
-def test_validate_updater_or_notifier_type_no_such_type():
-    """Test _validate_updater_or_notifier_type with a type that doesn't match
-    anything"""
-    notifiers = {
-        'test': doubles.FakeNotifier,
-    }
-    result = ruddr.manager._validate_updater_or_notifier_type(
-        'notifier', notifiers, None, 'test_invalid'
-    )
-    assert not result
-    assert notifiers == {
-        'test': doubles.FakeNotifier,
-    }
+    def test_class_matches_built_in(self):
+        """Test _validate_updater_or_notifier_type with a module and class
+        where class name matches a built-in notifier"""
+        notifiers = {
+            'MockNotifier': doubles.FakeNotifier,
+        }
+        result = ruddr.manager._validate_updater_or_notifier_type(
+            'notifier', notifiers, 'doubles', 'MockNotifier'
+        )
+        assert result
+        assert notifiers == {
+            'MockNotifier': doubles.FakeNotifier,
+            ('doubles', 'MockNotifier'): doubles.MockNotifier,
+        }
 
-
-def test_validate_updater_or_notifier_type_class():
-    """Test _validate_updater_or_notifier_type with a module and class"""
-    notifiers = {
-        'test': doubles.FakeNotifier,
-    }
-    result = ruddr.manager._validate_updater_or_notifier_type(
-        'notifier', notifiers, 'doubles', 'MockNotifier'
-    )
-    assert result
-    assert notifiers == {
-        'test': doubles.FakeNotifier,
-        ('doubles', 'MockNotifier'): doubles.MockNotifier
-    }
-
-
-def test_validate_updater_or_notifier_type_module_not_importable():
-    """Test _validate_updater_or_notifier_type with a module and class but
-    module not importable"""
-    notifiers = {
-        'test': doubles.FakeNotifier,
-    }
-    result = ruddr.manager._validate_updater_or_notifier_type(
-        'notifier', notifiers, 'invalid', 'MockNotifier'
-    )
-    assert not result
-    assert notifiers == {
-        'test': doubles.FakeNotifier,
-    }
-
-
-def test_validate_updater_or_notifier_type_class_not_in_module():
-    """Test _validate_updater_or_notifier_type with a module and class but
-    class not in module"""
-    notifiers = {
-        'test': doubles.FakeNotifier,
-    }
-    result = ruddr.manager._validate_updater_or_notifier_type(
-        'notifier', notifiers, 'doubles', 'InvalidNotifier'
-    )
-    assert not result
-    assert notifiers == {
-        'test': doubles.FakeNotifier,
-    }
-
-
-def test_validate_updater_or_notifier_type_class_already_imported():
-    """Test _validate_updater_or_notifier_type with a module and class already
-    imported"""
-    notifiers = {
-        'test': doubles.FakeNotifier,
-        ('doubles', 'MockNotifier'): doubles.MockNotifier
-    }
-    result = ruddr.manager._validate_updater_or_notifier_type(
-        'notifier', notifiers, 'doubles', 'MockNotifier'
-    )
-    assert result
-    assert notifiers == {
-        'test': doubles.FakeNotifier,
-        ('doubles', 'MockNotifier'): doubles.MockNotifier,
-    }
-
-
-def test_validate_updater_or_notifier_type_class_matches_built_in():
-    """Test _validate_updater_or_notifier_type with a module and class where
-    class name matches a built-in notifier"""
-    notifiers = {
-        'MockNotifier': doubles.FakeNotifier,
-    }
-    result = ruddr.manager._validate_updater_or_notifier_type(
-        'notifier', notifiers, 'doubles', 'MockNotifier'
-    )
-    assert result
-    assert notifiers == {
-        'MockNotifier': doubles.FakeNotifier,
-        ('doubles', 'MockNotifier'): doubles.MockNotifier,
-    }
-
-
-def test_validate_updater_or_notifier_type_class_imported_matches_built_in():
-    """Test _validate_updater_or_notifier_type with a module and class already
-    imported where class name matches a built-in notifier"""
-    notifiers = {
-        'MockNotifier': doubles.FakeNotifier,
-        ('doubles', 'MockNotifier'): doubles.MockNotifier,
-    }
-    result = ruddr.manager._validate_updater_or_notifier_type(
-        'notifier', notifiers, 'doubles', 'MockNotifier'
-    )
-    assert result
-    assert notifiers == {
-        'MockNotifier': doubles.FakeNotifier,
-        ('doubles', 'MockNotifier'): doubles.MockNotifier,
-    }
+    def test_class_imported_matches_built_in(self):
+        """Test _validate_updater_or_notifier_type with a module and class
+        already imported where class name matches a built-in notifier"""
+        notifiers = {
+            'MockNotifier': doubles.FakeNotifier,
+            ('doubles', 'MockNotifier'): doubles.MockNotifier,
+        }
+        result = ruddr.manager._validate_updater_or_notifier_type(
+            'notifier', notifiers, 'doubles', 'MockNotifier'
+        )
+        assert result
+        assert notifiers == {
+            'MockNotifier': doubles.FakeNotifier,
+            ('doubles', 'MockNotifier'): doubles.MockNotifier,
+        }
 
 
 @pytest.fixture
