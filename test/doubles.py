@@ -2,6 +2,7 @@
 import itertools
 
 import ruddr
+from ruddr import NotifierSetupError
 
 
 class MockBaseUpdater(ruddr.BaseUpdater):
@@ -49,7 +50,7 @@ class MockNotifier(ruddr.Notifier):
 
     def __init__(self, name, config, success_sequence=None,
                  setup_implemented=True, teardown_implemented=True,
-                 check_implemented=True):
+                 check_implemented=True, setup_error=False):
         super().__init__(name, config)
 
         #: The order of successes and fails for check_once
@@ -61,9 +62,13 @@ class MockNotifier(ruddr.Notifier):
         self.setup_implemented = setup_implemented
         self.teardown_implemented = teardown_implemented
         self.check_implemented = check_implemented
+        self.setup_error = setup_error
 
         #: The order the abstract methods were called
         self.call_sequence = []
+
+        # Used only for test_manager.py
+        self.stop_count = 0
 
     @property
     def setup_count(self):
@@ -81,6 +86,8 @@ class MockNotifier(ruddr.Notifier):
         self.call_sequence.append('setup')
         if not self.setup_implemented:
             raise NotImplementedError
+        if self.setup_error:
+            raise NotifierSetupError
 
     def teardown(self):
         self.call_sequence.append('teardown')
@@ -94,6 +101,11 @@ class MockNotifier(ruddr.Notifier):
         success = next(self.success_iter)
         if not success:
             raise ruddr.NotifyError
+
+    # test_manager needs to tell if stop was called even if start was not
+    def stop(self) -> None:
+        self.stop_count += 1
+        super().stop()
 
     def join_first_check(self):
         """Wait for first check after :meth:`start` to finish"""

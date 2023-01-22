@@ -473,9 +473,9 @@ class TestDDNSManager:
 
         config = ruddr.Config(main={}, notifiers=notifiers, updaters=updaters)
         manager = ruddr.manager.DDNSManager(config)
+        assert len(self.notifiers) == 2
 
         manager.start()
-        assert len(self.notifiers) == 2
         assert self.notifiers['test_notifier'].setup_count == 0
         assert self.notifiers['test_notifier2'].setup_count == 1
         assert self.notifiers['test_notifier'].check_count == 0
@@ -499,4 +499,33 @@ class TestDDNSManager:
         assert self.notifiers['test_notifier'].teardown_count == 0
         assert self.notifiers['test_notifier2'].teardown_count == 1
 
-    # TODO Notifiers are stopped after one raises NotifierSetupError
+    @pytest.mark.parametrize('which', ['test_notifier', 'test_notifier2'])
+    def test_notifiers_stopped_after_error(self, which):
+        """Test that DDNSManager stops all notifiers if one notifier raises
+        NotifierSetupError"""
+        notifiers = {
+            'test_notifier': {
+                'type': 'mock',
+            },
+            'test_notifier2': {
+                'type': 'mock',
+            }
+        }
+        updaters = {
+            'test_updater': {
+                'type': 'test',
+                'notifier4': 'test_notifier',
+                'notifier6': 'test_notifier2',
+            }
+        }
+
+        config = ruddr.Config(main={}, notifiers=notifiers, updaters=updaters)
+        manager = ruddr.manager.DDNSManager(config)
+        assert len(self.notifiers) == 2
+
+        self.notifiers[which].setup_error = True
+
+        with pytest.raises(ruddr.NotifierSetupError):
+            manager.start()
+        assert self.notifiers['test_notifier2'].stop_count == 1
+        assert self.notifiers['test_notifier'].stop_count == 1

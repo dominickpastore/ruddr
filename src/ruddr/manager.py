@@ -146,10 +146,8 @@ class DDNSManager:
         Does not raise any exceptions.
         """
         log.info("Checking once for all notifiers...")
-
-        for name, notifier in self.notifiers.items():
+        for notifier in self.notifiers.values():
             notifier.do_notify()
-
         log.info("Check for all notifiers complete.")
 
     def stop(self):
