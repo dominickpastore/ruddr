@@ -7,8 +7,9 @@ import ruddr
 class MockBaseUpdater(ruddr.BaseUpdater):
     """Simple mock updater that keeps a list of IP updates it receives"""
 
-    def __init__(self, name):
-        super().__init__(name, None)
+    def __init__(self, name, addrfile=None, config=None):
+        super().__init__(name, addrfile)
+        self.config = config
         self.published_addresses = []
 
     def initial_update(self):
@@ -28,6 +29,7 @@ class FakeNotifier(ruddr.BaseNotifier):
 
     def __init__(self, name, config):
         super().__init__(name, config)
+        self.config = config
         # Config vars to test .ipv4_ready() and .ipv6_ready()
         self._ipv4_ready = (config.get('ipv4_ready', 'true').lower() in
                             ('true', 'yes', 'on', '1'))
@@ -42,8 +44,8 @@ class FakeNotifier(ruddr.BaseNotifier):
 
 
 class MockNotifier(ruddr.Notifier):
-    """A mock scheduled notifier that keeps track of when checks are scheduled
-    and retried"""
+    """A mock Notifier whose checks succeed and fail in a predetermined order
+    and which tracks when calls were made"""
 
     def __init__(self, name, config, success_sequence=None,
                  setup_implemented=True, teardown_implemented=True,

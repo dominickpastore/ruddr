@@ -37,7 +37,7 @@ class DDNSManager:
 
     def __init__(self, config: configuration.Config):
         try:
-            config.finalize(validate_notifier_type, validate_notifier_type)
+            config.finalize(validate_notifier_type, validate_updater_type)
         except ConfigError as e:
             log.critical("Config error: %s", e)
             raise

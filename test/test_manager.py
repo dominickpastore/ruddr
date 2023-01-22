@@ -1,3 +1,5 @@
+import ipaddress
+
 import doubles
 import ruddr.manager
 
@@ -200,19 +202,232 @@ def test_validate_updater_or_notifier_type_class_imported_matches_built_in():
     }
 
 
-# TODO Manager creates notifier with type only and passes in name and config
-# TODO Manager creates notifier with module and type and passes in name and
-#  config
-# TODO Manager creates updater with type only and passes in name, config, and
-#  addrfile
-# TODO Manager creates updater with module and type and passes in name, config,
-#  and addrfile
+@pytest.fixture
+def mock_built_ins(mocker):
+    """Fixture setting up the lists of built-in notifiers and updaters with
+    mocks"""
+    notifiers = {
+        'test': doubles.FakeNotifier
+    }
+    updaters = {
+        'test': doubles.MockBaseUpdater
+    }
+    mocker.patch("ruddr.manager.notifiers.notifiers", new=notifiers)
+    mocker.patch("ruddr.manager.updaters.updaters", new=updaters)
 
 
-# TODO Notifier is attached to updater with notifier4
-# TODO Notifier is attached to updater with notifier6
-# TODO Notifier is attached to updater with notifier4 and notifier6
-# TODO Notifier is attached to different updaters with notifier4 and notifier6
+def test_manager_creates_built_in_notifier(mock_built_ins):
+    """Test that DDNSManager creates a notifier using type only and passes in
+    its name and config"""
+    config = ruddr.Config(
+        main={},
+        notifiers={
+            'test_notifier': {
+                'type': 'test',
+                'test_key': 'test_val',
+            }
+        },
+        updaters={
+            'test_updater': {
+                'type': 'test',
+                'notifier': 'test_notifier',
+            }
+        },
+    )
+    manager = ruddr.manager.DDNSManager(config)
+    assert len(manager.notifiers) == 1
+    assert type(manager.notifiers['test_notifier']) == doubles.FakeNotifier
+    assert manager.notifiers['test_notifier'].name == 'test_notifier'
+    assert manager.notifiers['test_notifier'].config['test_key'] == 'test_val'
+
+
+def test_manager_creates_custom_notifier(mock_built_ins):
+    """Test that DDNSManager creates a notifier using module and type and
+    passes in its name and config"""
+    config = ruddr.Config(
+        main={},
+        notifiers={
+            'test_notifier': {
+                'module': 'doubles',
+                'type': 'FakeNotifier',
+                'test_key': 'test_val',
+            }
+        },
+        updaters={
+            'test_updater': {
+                'type': 'test',
+                'notifier': 'test_notifier',
+            }
+        },
+    )
+    manager = ruddr.manager.DDNSManager(config)
+    assert len(manager.notifiers) == 1
+    assert type(manager.notifiers['test_notifier']) == doubles.FakeNotifier
+    assert manager.notifiers['test_notifier'].name == 'test_notifier'
+    assert manager.notifiers['test_notifier'].config['test_key'] == 'test_val'
+
+
+def test_manager_creates_built_in_updater(mock_built_ins):
+    """Test that DDNSManager creates an updater using type only and passes in
+    its name and config"""
+    config = ruddr.Config(
+        main={},
+        notifiers={
+            'test_notifier': {
+                'type': 'test',
+            }
+        },
+        updaters={
+            'test_updater': {
+                'type': 'test',
+                'notifier': 'test_notifier',
+                'test_key': 'test_val',
+            }
+        },
+    )
+    manager = ruddr.manager.DDNSManager(config)
+    assert len(manager.updaters) == 1
+    assert type(manager.updaters['test_updater']) == doubles.MockBaseUpdater
+    assert manager.updaters['test_updater'].name == 'test_updater'
+    assert manager.updaters['test_updater'].config['test_key'] == 'test_val'
+    assert manager.updaters['test_updater'].addrfile == manager.addrfile
+
+
+def test_manager_creates_custom_updater(mock_built_ins):
+    """Test that DDNSManager creates an updater using module and type and
+    passes in its name and config"""
+    config = ruddr.Config(
+        main={},
+        notifiers={
+            'test_notifier': {
+                'type': 'test',
+            }
+        },
+        updaters={
+            'test_updater': {
+                'module': 'doubles',
+                'type': 'MockBaseUpdater',
+                'notifier': 'test_notifier',
+                'test_key': 'test_val',
+            }
+        },
+    )
+    manager = ruddr.manager.DDNSManager(config)
+    assert len(manager.updaters) == 1
+    assert type(manager.updaters['test_updater']) == doubles.MockBaseUpdater
+    assert manager.updaters['test_updater'].name == 'test_updater'
+    assert manager.updaters['test_updater'].config['test_key'] == 'test_val'
+    assert manager.updaters['test_updater'].addrfile == manager.addrfile
+
+
+def test_manager_attaches_notifier4(mock_built_ins):
+    """Test that DDNSManager attaches a notifier to an updater with
+    notifier4"""
+    config = ruddr.Config(
+        main={},
+        notifiers={
+            'test_notifier': {
+                'type': 'test',
+            }
+        },
+        updaters={
+            'test_updater': {
+                'type': 'test',
+                'notifier4': 'test_notifier',
+            }
+        },
+    )
+    manager = ruddr.manager.DDNSManager(config)
+    notifier = manager.notifiers['test_notifier']
+    updater = manager.updaters['test_updater']
+    notifier.notify_ipv4(ipaddress.IPv4Address('1.2.3.4'))
+    notifier.notify_ipv6(ipaddress.IPv6Network('1234::/64'))
+    assert updater.published_addresses == [ipaddress.IPv4Address('1.2.3.4')]
+
+
+def test_manager_attaches_notifier6(mock_built_ins):
+    """Test that DDNSManager attaches a notifier to an updater with
+    notifier6"""
+    config = ruddr.Config(
+        main={},
+        notifiers={
+            'test_notifier': {
+                'type': 'test',
+            }
+        },
+        updaters={
+            'test_updater': {
+                'type': 'test',
+                'notifier6': 'test_notifier',
+            }
+        },
+    )
+    manager = ruddr.manager.DDNSManager(config)
+    notifier = manager.notifiers['test_notifier']
+    updater = manager.updaters['test_updater']
+    notifier.notify_ipv4(ipaddress.IPv4Address('1.2.3.4'))
+    notifier.notify_ipv6(ipaddress.IPv6Network('1234::/64'))
+    assert updater.published_addresses == [ipaddress.IPv6Network('1234::/64')]
+
+
+def test_manager_attaches_notifier4_and_notifier6(mock_built_ins):
+    """Test that DDNSManager attaches a notifier to an updater with
+    notifier4 and notifier6"""
+    config = ruddr.Config(
+        main={},
+        notifiers={
+            'test_notifier': {
+                'type': 'test',
+            }
+        },
+        updaters={
+            'test_updater': {
+                'type': 'test',
+                'notifier4': 'test_notifier',
+                'notifier6': 'test_notifier',
+            }
+        },
+    )
+    manager = ruddr.manager.DDNSManager(config)
+    notifier = manager.notifiers['test_notifier']
+    updater = manager.updaters['test_updater']
+    notifier.notify_ipv4(ipaddress.IPv4Address('1.2.3.4'))
+    notifier.notify_ipv6(ipaddress.IPv6Network('1234::/64'))
+    assert updater.published_addresses == [ipaddress.IPv4Address('1.2.3.4'),
+                                           ipaddress.IPv6Network('1234::/64')]
+
+
+def test_manager_attaches_different_notifier4_and_notifier6(mock_built_ins):
+    """Test that DDNSManager attaches two notifiers to an updater with
+    different notifier4 and notifier6"""
+    config = ruddr.Config(
+        main={},
+        notifiers={
+            'test_notifier': {
+                'type': 'test',
+            },
+            'test_notifier2': {
+                'type': 'test',
+            }
+        },
+        updaters={
+            'test_updater': {
+                'type': 'test',
+                'notifier4': 'test_notifier',
+                'notifier6': 'test_notifier2',
+            }
+        },
+    )
+    manager = ruddr.manager.DDNSManager(config)
+    notifier = manager.notifiers['test_notifier']
+    notifier2 = manager.notifiers['test_notifier2']
+    updater = manager.updaters['test_updater']
+    notifier.notify_ipv4(ipaddress.IPv4Address('1.2.3.4'))
+    notifier.notify_ipv6(ipaddress.IPv6Network('1234::/64'))
+    notifier2.notify_ipv4(ipaddress.IPv4Address('5.6.7.8'))
+    notifier2.notify_ipv6(ipaddress.IPv6Network('5678::/64'))
+    assert updater.published_addresses == [ipaddress.IPv4Address('1.2.3.4'),
+                                           ipaddress.IPv6Network('5678::/64')]
 
 
 # TODO Test notifier that doesn't want IPv4 or IPv6 is not started with start
