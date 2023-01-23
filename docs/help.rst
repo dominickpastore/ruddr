@@ -1,39 +1,46 @@
 Help Resources
 ==============
 
-.. TODO discussions page
-
 Frequently Asked Questions
 --------------------------
-
-.. TODO
 
 Why another dynamic DNS client?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. TODO Existing clients don't support IPv6 well, if at all. Also scratching a
-   bit of a personal itch, with the need to support a DNS provider whose API
-   wasn't part of existing popular clients.
+This project started as a way to scratch a personal itch: Existing dynamic DNS
+clients don't support IPv6 in a very useful way (if at all).
+
+Existing clients check the public address of the current host and keep that
+address updated at your dynamic DNS provider. That works well for IPv4, where
+network address translation is the norm, since that one address is shared by
+the entire network. For IPv6, that same strategy *can* work, but since ISPs
+typically delegate an entire IPv6 prefix to your network, each host generally
+has its own globally-routable IPv6 address. If you have more than one host,
+that means each one has to run its own DDNS client.
+
+Ruddr works like most clients for IPv4, but takes a different strategy for
+IPv6: It monitors only the network prefix portion of the address. When it
+detects a change, it updates the address for multiple hosts by replacing only
+their prefixes, preserving the existing host portions. That way, it can update
+addresses for the entire network, while still using only monitoring the current
+address on a single host.
 
 What if I don't want IPv6?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If hosts in your network don't receive IPv6 addresses (other than link-local
-addresses, which Ruddr always ignores), there is no need to do anything
-special. Ruddr won't publish IPv6 addresses if it doesn't find any.
+addresses, which Ruddr always ignores), Ruddr will usually do the right thing
+be default: If no IPv6 addresses are found, it won't publish any. However,
+being explicit will ensure Ruddr doesn't waste resources looking for an IPv6
+address when it doesn't need to (and ensures there are no surprises if a host
+does happen to obtain an IPv6 address somehow).
 
-.. TODO Does it *unpublish* IPv6 addresses if there was one and it's no longer
-   there? What about if IPv6 updating is deconfigured?
-
-However, if you would like to explicitly disable publishing IPv6 addresses,
-there are two ways:
+There are two ways to explicitly disable publishing IPv6 addresses:
 
 1. Set ``skip_ipv6 = true`` in the config sections for each of your notifiers.
 
 2. Use the ``notifier4`` configuration option instead of ``notifier``. (See
    :ref:`updater_config`).
-
-.. TODO Does this unset a previously published IPv6 address?
 
 What if I want IPv6, but I want behavior like IPv4 (i.e. no prefix logic)?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -65,12 +72,86 @@ needs the Public Suffix List, it will download a new copy.
 
 .. _Public Suffix List: https://publicsuffix.org/
 
+I just set up Ruddr on a new host but it's not publishing the address! Why not?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Some updaters (particularly those that work with a DNS provider's general API,
+rather than a dedicated dynamic DNS service) will only publish new addresses
+when there's already an existing DNS record for the host. If your provider has
+a web-based control panel, try putting in A and/or AAAA records for all the
+hosts that need to be kept updated.
+
+If the records-to-be-updated already exist, the issue will need further
+investigation. Try posting a question in the discussions_ tab on GitHub.
+
+I disabled IPv6. Why is Ruddr leaving my IPv6 address set?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ruddr does not unpublish any address without a new one to publish in its place.
+(If it does unpublish an address, that is a bug, and you should `report it
+<submit an issue>`_.) There are two reasons for this:
+
+- Ruddr avoids touching any addresses it's not configured to touch, in order to
+  avoid unexpectedly breaking non-dynamic addresses. This includes not touching
+  IPv6 addresses for a host when it's configured to only update IPv4, and vice
+  versa.
+
+- If Ruddr *is* configured to handle IPv6 but the notifier can't currently
+  obtain an IPv6 address, Ruddr assumes it may be a transient issue (e.g. a
+  link is down). In that case, the last address may still be valid, and Ruddr
+  does not want to risk unsetting a potentially valid address.
+
 Issues and Bugs
 ---------------
 
-.. TODO How to report
+If you have found an issue with Ruddr, feel free to `submit an issue`_ on
+GitHub. All issues and bug reports are welcome, but there are a few things you
+can do to help things move more smoothly:
+
+- Mention which versions of Python and Ruddr you have installed. If you are not
+  sure, you can check with::
+
+      python3 --version
+      pip show ruddr
+
+- Describe the incorrect behavior you are observing and the behavior you
+  expected.
+
+- If there are any error messages or stack traces, include those in the report.
+
+- Paste a copy of the configuration you are using.
+
+- Include any other information you think might be relevant (e.g. your OS and
+  CPU architecture, concerning log messages, etc.)
+
+Of course, not all of the above will apply to all types of issues. For example,
+if you are having a problem with installation, it does not make sense to
+include your Ruddr configuration.
+
+But just to reiterate, *all* issues and bug reports are welcome, event if they
+are light on details.
 
 Feature Requests
 ----------------
 
-.. TODO How to request
+If there is a feature missing from Ruddr that you would like to see added, or
+a provider that you would like to see support for, feel free to `submit an
+issue`_ on GitHub for that as well. Alternatively, you can post on the
+discussions_ tab if you prefer.
+
+Suggestions for improving the documentation are also very welcome. You can
+`submit an issue`_ or post on the discussions_ tab for that as well.
+
+Additional Help
+---------------
+
+The goal is to make this documentation as thorough as possible, but if you find
+you need a bit of human help, feel free to post in the discussions_ tab on
+GitHub. I do my best to keep an eye on those and respond.
+
+Currently, there is no mailing list, IRC channel, or discord server. The
+project is not yet big enough to warrant them.
+
+.. _discussions: https://github.com/dominickpastore/ruddr/discussions
+.. _submit an issue: https://github.com/dominickpastore/ruddr/issues
+.. _submit a pull request: https://github.com/dominickpastore/ruddr/pull
