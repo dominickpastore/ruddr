@@ -390,17 +390,24 @@ Low-Level Updater Base Classes
 .. autoclass:: BaseUpdater
    :members:
 
-Using your Custom Updater
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Using your Custom Updater or Notifier
+-------------------------------------
 
-Once you have a custom updater class, there are two ways to start using it.
+Once you have a custom updater or notifier class, there are two ways to start
+using it.
+
+.. TODO Generalize instructions below for updaters OR notifiers
 
 **The first way** is by module name and class name. For this to work, the
-module containing your updater class must be in the module search path.
-Typically, this means you'll either have to install it or make sure the
+module containing your updater/notifier class must be in the module search
+path. Typically, this means you'll either have to install it or make sure the
 ``PYTHONPATH`` environment variable includes the path to your module when Ruddr
-is run. Then, if your updater is class ``MyUpdater`` in a file named
-``myupdater.py``, you can use an updater configuration like this::
+is run. Then, you can use the ``module`` and ``type`` options in your updater
+or notifier config, and Ruddr will import and use it.
+
+For example, suppose you have an updater class ``MyUpdater`` in a file named
+``myupdater.py``. Assuming that Python file is in some directory in your
+``PYTHONPATH``, you can use an updater configuration like this::
 
     [updater.main]
     module = myupdater
@@ -408,19 +415,20 @@ is run. Then, if your updater is class ``MyUpdater`` in a file named
     # ...
 
 **The second way** to start using it is by creating a Python package with a
-``ruddr.updater`` entry point. This requires slightly more work upfront (you
-have to create a ``pyproject.toml``), but has the advantage that it becomes
-very easy to publish your updater to PyPI for others to use, if you so choose.
-If you want to go this route, you can follow these steps:
+``ruddr.updater`` or ``ruddr.notifier`` entry point. This requires slightly
+more work upfront (you have to create a ``pyproject.toml``), but has the
+advantage that it becomes very easy to publish your updater or notifier to PyPI
+for others to use, if you so choose. If you want to go this route, you can
+follow these steps:
 
 1. Set up an empty directory for your package and put the module containing
-   your updater inside. In the simplest case, the module may be a single
-   ``.py`` file, but it can be a package with submodules, etc. For simplicity,
-   we will assume the module is a single Python file, ``myupdater.py``, and
-   the updater class inside is ``MyUpdater``.
+   your updater or notifier inside. In the simplest case, the module may be a
+   single ``.py`` file, but it can be a package with submodules, etc. For
+   demonstration, we will assume you have a notifier in a single-file Python
+   module, ``mynotifier.py``, and the notifier class inside is ``MyNotifier``.
 
-2. If you intend to share your updater, e.g. on PyPI, GitHub, or otherwise, you
-   may want to create a ``README.md`` in the same directory.
+2. If you intend to share your updater or notifier, e.g. on PyPI, GitHub, or
+   otherwise, you may want to create a ``README.md`` in the same directory.
 
 3. Create a file ``pyproject.toml`` in the directory with contents similar to
    this::
@@ -431,12 +439,12 @@ If you want to go this route, you can follow these steps:
 
        [project]
        # This becomes the package name on PyPI, if you choose to publish it
-       name = "ruddr_updater_myupdater"
+       name = "ruddr_notifier_mynotifier"
        version = "0.0.1"
        authors = [
            { name="Your Name", email="your_email@example.com" },
        ]
-       description = "My Ruddr Updater"
+       description = "My Ruddr Notifier"
        # Uncomment the next line if you created a README
        #readme = "README.md"
        requires-python = ">=3.7"
@@ -444,23 +452,23 @@ If you want to go this route, you can follow these steps:
            "Programming Language :: Python :: 3",
        ]
 
-       [project.entry-points."ruddr.updater"]
-       my_updater = "myupdater:MyUpdater"
+       [project.entry-points."ruddr.notifier"]
+       my_notifier = "mynotifier:MyNotifier"
 
    Be sure to set the name, version, authors, and description as appropriate,
    but that last section is the important part. In that example, an entry point
-   named ``my_updater`` is created in the ``ruddr.updater`` group, and it
-   points to the ``MyUpdater`` class in the ``myupdater`` package.
+   named ``my_notifier`` is created in the ``ruddr.notifier`` group, and it
+   points to the ``MyNotifier`` class in the ``mynotifier`` module.
 
 4. You now have an installable Python package. Use ``pip install -U .`` to
    install it from the current directory. (If you wish to make it public, you
    can also publish it to PyPI and install it by name.)
 
-5. The entry point name, ``my_updater`` in the example above, can be used as
-   the updater ``type`` in your Ruddr config, for example::
+5. Once installed, the entry point name, ``my_notifier`` in the example above,
+   can be used as the notifier ``type`` in your Ruddr config. For example::
 
-       [updater.main]
-       type = my_updater
+       [notifier.main]
+       type = my_notifier
        # ...
 
 Using Ruddr as a Library
