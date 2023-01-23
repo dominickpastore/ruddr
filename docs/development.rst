@@ -18,8 +18,6 @@ contributing to the project. In any case, this page is for you.
 
 .. module:: ruddr
 
-.. TODO Note exceptions under each section they affect
-
 .. _notifier_dev:
 
 Writing Your Own Notifier
@@ -396,8 +394,6 @@ Using your Custom Updater or Notifier
 Once you have a custom updater or notifier class, there are two ways to start
 using it.
 
-.. TODO Generalize instructions below for updaters OR notifiers
-
 **The first way** is by module name and class name. For this to work, the
 module containing your updater/notifier class must be in the module search
 path. Typically, this means you'll either have to install it or make sure the
@@ -484,7 +480,8 @@ into other Python programs as a library as well. The steps boil down to this:
 
 3. Call :func:`~DDNSManager.start` on the :class:`DDNSManager` you created.
    This will return once Ruddr finishes starting. Ruddr runs in background
-   non-daemon threads.
+   non-daemon threads ("non-daemon" meaning that your program will not end
+   until they are stopped as described in the next step).
 
 4. When ready for Ruddr to stop, call :func:`~DDNSManager.stop` on your
    :class`DDNSManager` object. Ruddr will halt the background threads
@@ -574,8 +571,8 @@ Generating Docs
 
 The documentation is available online at https://ruddr.dcpx.org/, but if you
 would like to generate a local copy (for reference or to preview changes),
-install the ``docs`` extra and build the docs in ``docs/`` as usual for
-Sphinx::
+install the ``docs`` extra (the ``dev`` extra includes the ``docs`` extra) and
+build the docs in ``docs/`` as usual for Sphinx::
 
     # Assuming you are in the git repo:
     pip install .[docs]
