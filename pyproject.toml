@@ -60,15 +60,14 @@ unittest = [
     "coverage[toml]"
 ]
 test = [
-    "ruddr[unittest]",
-    "ruddr[staticanalysis]",
+    "ruddr[unittest,staticanalysis]",
     "pytest-cov",
+    "tox>=4",
 ]
 docs = [
     "sphinx",
 ]
 dev = [
-    "tox>=4",
     "ruddr[test,docs]",
 ]
 
@@ -92,7 +91,6 @@ _test = "ruddr.notifiers.static:StaticNotifier"
 # Notes on testing:
 #
 # To run the full test suite in multiple virtual environments, use tox:
-#     pip install -U tox
 #     tox
 #
 # To just run pytest in the current venv, it's enough to do:

@@ -550,21 +550,53 @@ and when it's appropriate for subclasses to raise them.
 Development on Ruddr Itself
 ---------------------------
 
-.. TODO
+Everything discussed so far on this page has been about development that ties
+into Ruddr. This section is for development *on Ruddr itself*, for example
+fixing bugs or adding new features.
 
 Installation for Development
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. TODO Installing from repository
+The latest sources for Ruddr are available on GitHub_. Once you have cloned the
+repo, the easiest way to work on development is to optionally set up a virtual
+environment, then install directly out of the repo with the ``dev`` extra.
+
+Assuming you have a shell open in the repo::
+
+    # Optionally, set up a virtual environment
+    python3 -m venv venv
+    . venv/bin/activate
+    # Install in develop mode with the "dev" extra
+    pip install -U -e .[dev]
+
+The ``dev`` extra includes everything required to check style, check types,
+run unit tests, and regenerate the documentation.
 
 Running Tests
 ~~~~~~~~~~~~~
 
-.. TODO Currently only tests are for style. Install with .[test]
+Ruddr's full set of checks and tests can be run with tox. It includes style
+checks and linting, type checking, and unit tests with coverage. If you
+installed with the ``dev`` extra above, you have everything you need.
+(Alternatively, the ``test`` extra includes just the testing tools from the
+``dev`` extra.)
 
-.. TODO Run full test suite with tox. HTML coverage report generated.
-   Can also run individual tools: "flake8", "python setup.py check -m -s",
-   "pytest", "pytest --cov", "pytest --cov-report=html"
+To run the full test suite, make sure your virtual environment is active (if
+you are using one) and run the ``tox`` command::
+
+   # Skip this line if not using a virtual environment
+   . venv/bin/activate
+   tox
+
+This will first run ``flake8`` and ``pytype``. Then it will run ``pytest`` with
+coverage on each supported version of Python. Lastly, it will generate the
+coverage report in the terminal and write it to htmlcov/index.html.
+
+These tools can also be run individually:
+
+- ``flake8 src/ test/``
+- ``pytype``
+- ``pytest --cov``
 
 Generating Docs
 ~~~~~~~~~~~~~~~
@@ -602,3 +634,5 @@ Other Code Contributions
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. TODO
+
+.. _GitHub: https://github.com/dominickpastore/ruddr
