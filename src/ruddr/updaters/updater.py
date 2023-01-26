@@ -212,6 +212,7 @@ class Updater(BaseUpdater):
         if address is None:
             self.log.info("Skipping update with no address (will not "
                           "de-publish)")
+            return
         if not self.addrfile.needs_ipv4_update(self.name, address):
             self.log.debug("Skipping update as %s is current address",
                            address.exploded)
@@ -241,6 +242,7 @@ class Updater(BaseUpdater):
         if prefix is None:
             self.log.info("Skipping update with no prefix (will not "
                           "de-publish)")
+            return
         if not self.addrfile.needs_ipv6_update(self.name, prefix):
             self.log.debug("Skipping update as %s is current address",
                            prefix.compressed)
