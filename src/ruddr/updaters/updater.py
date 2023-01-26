@@ -10,7 +10,8 @@ import types
 # purely to get Sphinx to mark methods as abstract. Thus, we intentionally do
 # NOT use ABCMeta or inherit from ABC.
 from abc import abstractmethod
-from typing import Union, Tuple, List, Optional, Dict, TypeVar
+from typing import (Union, Tuple, List, Optional, Dict, TypeVar, Sequence,
+                    Mapping, Callable)
 
 import dns.exception    # type: ignore
 import dns.resolver     # type: ignore
@@ -39,13 +40,13 @@ class Retry:
 
     def __init__(self, func):
         functools.update_wrapper(self, func)
-        self.func = func
-        self.retrying = False
-        self.last_args = None
-        self.last_kwargs = None
-        self.seq = 0
-        self.retries = 0
-        self.lock = threading.RLock()
+        self.func: Callable = func
+        self.retrying: bool = False
+        self.last_args: Optional[Sequence] = None
+        self.last_kwargs: Optional[Mapping] = None
+        self.seq: int = 0
+        self.retries: int = 0
+        self.lock: threading.RLock = threading.RLock()
 
     # Emulate binding behavior in normal functions that become methods.
     # See https://docs.python.org/3/howto/descriptor.html#functions-and-methods
@@ -59,7 +60,9 @@ class Retry:
             return self
         return types.MethodType(self, obj)
 
-    def __call__(self, obj, *args, **kwargs):
+    # TODO #32: from __future__ import anotations means this doesn't have to be
+    #  a string
+    def __call__(self, obj: 'BaseUpdater', *args, **kwargs):
         with self.lock:
             if (self.retrying and
                     self.last_args == args and self.last_kwargs == kwargs):
@@ -71,7 +74,7 @@ class Retry:
             obj.log.debug("(Update seq: %d)", self.seq)
             self.wrapper(self.seq, obj, *args, **kwargs)
 
-    def retry(self, seq, obj, *args, **kwargs):
+    def retry(self, seq: int, obj: 'BaseUpdater', *args, **kwargs):
         """Retry the function. Verifies that no attempt has been made in the
         meantime."""
         with self.lock:
@@ -84,7 +87,7 @@ class Retry:
                 obj.log.debug("(Retry for update seq: %d)", seq)
                 self.wrapper(seq, obj, *args, **kwargs)
 
-    def wrapper(self, seq, obj, *args, **kwargs):
+    def wrapper(self, seq: int, obj: 'BaseUpdater', *args, **kwargs):
         """Run the function and schedule a retry if it failed"""
         try:
             self.func(obj, *args, **kwargs)
@@ -121,25 +124,27 @@ class BaseUpdater:
     :param addrfile: The :class:`~ruddr.Addrfile` object
     """
 
-    def __init__(self, name, addrfile):
+    def __init__(self, name: str, addrfile: Addrfile):
         #: Updater name (from config section heading)
-        self.name = name
+        self.name: str = name
 
         #: Logger (see standard :mod:`logging` module)
         # NOTE: This name is also used by @Retry
-        self.log = logging.getLogger(f'ruddr.updater.{self.name}')
+        self.log: logging.Logger = logging.getLogger(
+            f'ruddr.updater.{self.name}'
+        )
 
         #: Addrfile for avoiding duplicate updates
-        self.addrfile = addrfile
+        self.addrfile: Addrfile = addrfile
 
         #: Minimum retry interval (some providers may require a minimum delay
         #: when there are server errors, in which case, subclasses can modify
         #: this)
-        self.min_retry_interval = 300
+        self.min_retry_interval: int = 300
 
         #: ``@Retry`` will set this to ``True`` when there has been a fatal
         #: error and no more updates should be issued.
-        self.halt = False
+        self.halt: bool = False
 
     def initial_update(self):
         """Do the initial update: Check the addrfile, and if either address is
@@ -147,7 +152,7 @@ class BaseUpdater:
         """
         raise NotImplementedError
 
-    def update_ipv4(self, address):
+    def update_ipv4(self, address: ipaddress.IPv4Address):
         """Receive a new IPv4 address from the attached notifier. If it does
         not match the current address, call the subclass' publish function,
         update the addrfile if successful, and retry if not.
@@ -156,7 +161,7 @@ class BaseUpdater:
         """
         raise NotImplementedError
 
-    def update_ipv6(self, address):
+    def update_ipv6(self, address: ipaddress.IPv6Network):
         """Receive a new IPv6 prefix from the attached notifier. If it does
         not match the current prefix, call the subclass' publish function,
         update the addrfile if successful, and retry if not.
@@ -204,7 +209,7 @@ class Updater(BaseUpdater):
             self.update_ipv6(ipv6)
 
     @Retry
-    def update_ipv4(self, address):
+    def update_ipv4(self, address: ipaddress.IPv4Address):
         """:meta private:"""
         if self.halt:
             return
@@ -234,7 +239,7 @@ class Updater(BaseUpdater):
         self.addrfile.set_ipv4(self.name, address)
 
     @Retry
-    def update_ipv6(self, prefix):
+    def update_ipv6(self, prefix: ipaddress.IPv6Network):
         """:meta private:"""
         if self.halt:
             return
