@@ -22,7 +22,7 @@ import json
 import logging
 import os
 import os.path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Union
 
 log = logging.getLogger('ruddr')
 
@@ -39,37 +39,52 @@ class _IPJSONEncoder(json.JSONEncoder):
 
 def _extract_addr_tuple(entry, type_str, addr_constructor):
     if not isinstance(entry, list):
-        log.warning(f"Malformed {type_str} entry in addrfile. Ignoring.")
-        return (None, False)
-    else:
-        if len(entry) != 2:
-            log.warning(f"Malformed {type_str} entry in addrfile. Ignoring.")
-            return (None, False)
-        try:
-            entry[0] = addr_constructor(entry[0])
-        except ValueError as e:
-            log.warning(f"Malformed {type_str} in addrfile: {e}. Ignoring.")
-            return (None, False)
-        if not isinstance(entry[1], bool):
-            log.warning(f"Malformed {type_str} entry in addrfile. Ignoring.")
-            return (None, False)
+        log.warning(f"Malformed {type_str} entry in addrfile.")
+        raise ValueError
+    if len(entry) != 2:
+        log.warning(f"Malformed {type_str} entry in addrfile.")
+        raise ValueError
+    if not isinstance(entry[1], bool):
+        log.warning(f"Malformed {type_str} entry in addrfile.")
+        raise ValueError
+
+    if entry[0] is None:
+        return (entry[0], entry[1])
+
+    if not isinstance(entry[0], str):
+        log.warning(f"Malformed {type_str} entry in addrfile.")
+        raise ValueError
+    try:
+        addr = addr_constructor(entry[0])
+    except ValueError as e:
+        log.warning(f"Malformed {type_str} in addrfile: {e}.")
+        raise ValueError
+    return (addr, entry[1])
 
 
 def _decode_ips(d):
     """Object hook that decodes (ipaddr, is_current) pairs for "ipv4" and
-    "ipv6" keys. If the pairs are malformed, logs the error and treats it as
-    a non-current, unknown address (``(None, False)``).
+    "ipv6" keys. If the pairs are malformed, logs the error and returns None
+    in place of the object (which must be handled later in validation).
     """
     if 'ipv4' in d:
-        d['ipv4'] = _extract_addr_tuple(d['ipv4'],
-                                        'IPv4',
-                                        ipaddress.IPv4Address)
+        try:
+            addr = _extract_addr_tuple(d['ipv4'],
+                                       'IPv4',
+                                       ipaddress.IPv4Address)
+        except ValueError:
+            return None
+        d['ipv4'] = addr
     if 'ipv6' in d:
-        d['ipv6'] = _extract_addr_tuple(
-            d['ipv6'],
-            'IPv6',
-            lambda x: ipaddress.IPv6Interface(x).network
-        )
+        try:
+            addr = _extract_addr_tuple(
+                d['ipv6'],
+                'IPv6',
+                lambda x: ipaddress.IPv6Interface(x).network
+            )
+        except ValueError:
+            return None
+        d['ipv6'] = addr
     return d
 
 
@@ -83,9 +98,11 @@ class Addrfile:
         self.path = path
 
         #: Address data. Stores the contents of the addrfile between writes.
-        self.addresses: dict = self._read_addrfile()
+        self._addresses: Dict[str, Dict[str, Tuple[
+            Union[ipaddress.IPv4Address, ipaddress.IPv6Network, None], bool
+        ]]] = self._read_addrfile()
 
-    def _read_and_check_if_dict(self):
+    def _read_and_check_if_dict(self) -> Optional[dict]:
         """Read the addrfile in, confirm it is a dict, and return the dict"""
         try:
             with open(self.path, 'r') as f:
@@ -106,7 +123,12 @@ class Addrfile:
 
         return addresses
 
-    def _validate_updater_entries(self, addresses):
+    def _validate_updater_entries(
+        self,
+        addresses: dict
+    ) -> Dict[str, Dict[str, Tuple[
+        Union[ipaddress.IPv4Address, ipaddress.IPv6Network, None], bool
+    ]]]:
         """Validate that each updater's entry is a dict with the correct keys
         (values for each key are validated by object_hook during parsing)"""
         for name, addrs in list(addresses.items()):
@@ -121,6 +143,8 @@ class Addrfile:
                 continue
 
             for key in addrs:
+                # JSON object hook enforces structure of values here. If there
+                # was a problem, addrs would have been None.
                 if key not in ('ipv4', 'ipv6'):
                     log.warning("Addrfile %s has unexpected JSON structure "
                                 "for key %s. Will recreate that key.",
@@ -132,7 +156,9 @@ class Addrfile:
                     break
         return addresses
 
-    def _read_addrfile(self):
+    def _read_addrfile(self) -> Dict[str, Dict[str, Tuple[
+        Union[ipaddress.IPv4Address, ipaddress.IPv6Network, None], bool
+    ]]]:
         """Read the addrfile in. If it cannot be read or is malformed, log and
         return without touching :attr:`self.addresses`."""
         addresses = self._read_and_check_if_dict()
@@ -147,11 +173,12 @@ class Addrfile:
         try:
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
             with open(self.path, 'w') as f:
-                json.dump(self.addresses, f, cls=_IPJSONEncoder,
+                json.dump(self._addresses, f, cls=_IPJSONEncoder,
                           sort_keys=True, indent=4)
         except OSError as e:
             log.error("Could not write addrfile %s: %s",
                       self.path, e.strerror)
+            raise
 
     def get_ipv4(self,
                  name: str) -> Tuple[Optional[ipaddress.IPv4Address], bool]:
@@ -172,7 +199,7 @@ class Addrfile:
                  IPv4 address is intentionally de-published).
         """
         try:
-            addrs = self.addresses[name]
+            addrs = self._addresses[name]
         except KeyError:
             return (None, False)
 
@@ -200,7 +227,7 @@ class Addrfile:
                  IPv6 prefix is intentionally de-published).
         """
         try:
-            addrs = self.addresses[name]
+            addrs = self._addresses[name]
         except KeyError:
             return (None, False)
 
@@ -215,11 +242,13 @@ class Addrfile:
         :param name: The name of the updater
         :param address: The IPv4 address to write, or None if the IPv4 address
                         was unpublished
+
+        :raises OSError: if addrfile could not be written
         """
-        if name in self.addresses:
-            self.addresses[name]['ipv4'] = (address, True)
+        if name in self._addresses:
+            self._addresses[name]['ipv4'] = (address, True)
         else:
-            self.addresses[name] = {'ipv4': (address, True)}
+            self._addresses[name] = {'ipv4': (address, True)}
         self._write_addrfile()
 
     def set_ipv6(self, name: str, prefix: Optional[ipaddress.IPv6Network]):
@@ -228,11 +257,13 @@ class Addrfile:
         :param name: The name of the updater
         :param prefix: The IPv6 prefix to write, or None if the IPv6 prefix was
                        unpublished
+
+        :raises OSError: if addrfile could not be written
         """
-        if name in self.addresses:
-            self.addresses[name]['ipv6'] = (prefix, True)
+        if name in self._addresses:
+            self._addresses[name]['ipv6'] = (prefix, True)
         else:
-            self.addresses[name] = {'ipv6': (prefix, True)}
+            self._addresses[name] = {'ipv6': (prefix, True)}
         self._write_addrfile()
 
     def invalidate_ipv4(self,
@@ -242,11 +273,13 @@ class Addrfile:
 
         :param name: The name of the updater
         :param address: The desired IPv4 address that failed to publish
+
+        :raises OSError: if addrfile could not be written
         """
-        if name in self.addresses:
-            self.addresses[name]['ipv4'] = (address, False)
+        if name in self._addresses:
+            self._addresses[name]['ipv4'] = (address, False)
         else:
-            self.addresses[name] = {'ipv4': (address, False)}
+            self._addresses[name] = {'ipv4': (address, False)}
         self._write_addrfile()
 
     def invalidate_ipv6(self,
@@ -256,11 +289,13 @@ class Addrfile:
 
         :param name: The name of the updater
         :param prefix: The desired IPv6 prefix that failed to publish
+
+        :raises OSError: if addrfile could not be written
         """
-        if name in self.addresses:
-            self.addresses[name]['ipv6'] = (prefix, False)
+        if name in self._addresses:
+            self._addresses[name]['ipv6'] = (prefix, False)
         else:
-            self.addresses[name] = {'ipv6': (prefix, False)}
+            self._addresses[name] = {'ipv6': (prefix, False)}
         self._write_addrfile()
 
     def needs_ipv4_update(self,

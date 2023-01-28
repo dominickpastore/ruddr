@@ -1,13 +1,7 @@
-import errno
-
 import pytest
 
+import doubles
 import ruddr.configuration
-
-
-class BrokenFile:
-    def __iter__(self):
-        raise OSError(errno.ETIMEDOUT, "timeout")
 
 
 @pytest.fixture
@@ -45,18 +39,16 @@ def test_nonexistent_file(tmp_path):
 
 def test_read_file_read_error():
     """Test read error for read_file"""
-    f = BrokenFile()
+    f = doubles.BrokenFile()
 
     with pytest.raises(ruddr.ConfigError):
         ruddr.configuration.read_file(f)
 
 
-def test_read_file_from_path_read_error(mocker, tmp_path):
+def test_read_file_from_path_read_error(tmp_path):
     """Test read error for read_file_from_path"""
-    mocker.patch('__main__.open', return_value=BrokenFile())
-
     with pytest.raises(ruddr.ConfigError):
-        ruddr.configuration.read_file_from_path(tmp_path / 'config.ini')
+        ruddr.configuration.read_file_from_path(tmp_path / 'bad_config.ini')
 
 
 def test_config_keys(config_factory):

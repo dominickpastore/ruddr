@@ -4,6 +4,7 @@ from typing import List
 import pytest
 
 import doubles
+import ruddr.addrfile
 
 
 class VirtualTimer:
@@ -154,3 +155,9 @@ def mock_updater(updater_factory):
     """Fixture creating a mock :class:`~ruddr.Updater` that keeps a list of
     IP addresses it receives"""
     return updater_factory()
+
+
+@pytest.fixture
+def empty_addrfile(tmp_path):
+    """Fixture creating an empty :class:`~ruddr.Addrfile`"""
+    return ruddr.addrfile.Addrfile(tmp_path / 'addrfile')

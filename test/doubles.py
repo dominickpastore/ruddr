@@ -1,8 +1,39 @@
 """Test doubles for use in test classes and fixtures"""
+import errno
 import itertools
 
 import ruddr
 from ruddr import NotifierSetupError
+
+
+class BrokenFile:
+    """File-like object that raises an exception when being read from"""
+    def __init__(self, write_broken=False):
+        self.write_broken = write_broken
+
+    def __iter__(self):
+        if self.write_broken:
+            return iter([])
+        else:
+            raise OSError(errno.ETIMEDOUT, "timeout")
+
+    def read(self, *_):
+        if self.write_broken:
+            return ""
+        else:
+            raise OSError(errno.ETIMEDOUT, "timeout")
+
+    def write(self, *_):
+        if self.write_broken:
+            raise OSError(errno.ETIMEDOUT, "timeout")
+        else:
+            return 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
 
 
 class MockBaseUpdater(ruddr.BaseUpdater):

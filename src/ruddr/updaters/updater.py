@@ -225,7 +225,12 @@ class Updater(BaseUpdater):
 
         # Invalidate current address before publishing. If publishing fails,
         # current address is indeterminate.
-        self.addrfile.invalidate_ipv4(self.name, address)
+        try:
+            self.addrfile.invalidate_ipv4(self.name, address)
+        except OSError as e:
+            self.log.critical("Could not invalidate IPv4 in addrfile: %s", e)
+            raise FatalPublishError(f"Updater {self.name} could not invalidate"
+                                    "IPv4 in addrfile") from e
 
         try:
             self.publish_ipv4(address)
@@ -236,7 +241,13 @@ class Updater(BaseUpdater):
             self.log.debug("Updater does not implement IPv4 updates")
             return
 
-        self.addrfile.set_ipv4(self.name, address)
+        try:
+            self.addrfile.set_ipv4(self.name, address)
+        except OSError as e:
+            self.log.critical("New IPv4 could not be written to addrfile: "
+                              "%s", e)
+            raise FatalPublishError(f"Updater {self.name} could not write "
+                                    "IPv4 to addrfile") from e
 
     @Retry
     def update_ipv6(self, prefix: ipaddress.IPv6Network):
@@ -255,7 +266,12 @@ class Updater(BaseUpdater):
 
         # Invalidate current prefix before publishing. If publishing fails,
         # current prefix is indeterminate.
-        self.addrfile.invalidate_ipv6(self.name, prefix)
+        try:
+            self.addrfile.invalidate_ipv6(self.name, prefix)
+        except OSError as e:
+            self.log.critical("Could not invalidate IPv6 in addrfile: %s", e)
+            raise FatalPublishError(f"Updater {self.name} could not invalidate"
+                                    "IPv6 in addrfile") from e
 
         try:
             self.publish_ipv6(prefix)
@@ -266,7 +282,13 @@ class Updater(BaseUpdater):
             self.log.debug("Updater does not implement IPv6 updates")
             return
 
-        self.addrfile.set_ipv6(self.name, prefix)
+        try:
+            self.addrfile.set_ipv6(self.name, prefix)
+        except OSError as e:
+            self.log.critical("New IPv6 could not be written to addrfile: "
+                              "%s", e)
+            raise FatalPublishError(f"Updater {self.name} could not write "
+                                    "IPv6 to addrfile") from e
 
     def publish_ipv4(self, address: ipaddress.IPv4Address):
         """Publish a new IPv4 address to the appropriate DDNS provider. Will
