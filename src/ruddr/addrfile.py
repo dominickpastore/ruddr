@@ -22,7 +22,7 @@ import json
 import logging
 import os
 import os.path
-from typing import Optional, Tuple, Dict, Union
+from typing import Optional, Tuple, Dict, Union, cast
 
 log = logging.getLogger('ruddr')
 
@@ -204,7 +204,9 @@ class Addrfile:
             return (None, False)
 
         try:
-            return addrs['ipv4']
+            # We know addrs['ipv4'] only contains IPv4Address
+            return cast(Tuple[Optional[ipaddress.IPv4Address], bool],
+                        addrs['ipv4'])
         except KeyError:
             return (None, False)
 
@@ -232,7 +234,9 @@ class Addrfile:
             return (None, False)
 
         try:
-            return addrs['ipv6']
+            # We know addrs['ipv6'] only contains IPv6Network
+            return cast(Tuple[Optional[ipaddress.IPv6Network], bool],
+                        addrs['ipv6'])
         except KeyError:
             return (None, False)
 
