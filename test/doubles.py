@@ -39,10 +39,27 @@ class BrokenFile:
 class MockBaseUpdater(ruddr.BaseUpdater):
     """Simple mock updater that keeps a list of IP updates it receives"""
 
-    def __init__(self, name, addrfile=None, config=None):
+    def __init__(self, name, addrfile=None, config=None, err_sequence=None):
         super().__init__(name, addrfile)
         self.config = config
         self.published_addresses = []
+
+        #: The order of successes and fails for retry_test. None means success,
+        #: an error means raise that error
+        if err_sequence is None:
+            self.err_iter = itertools.repeat(None)
+        else:
+            self.err_iter = iter(err_sequence)
+        #: The list of calls to retry_test
+        self.retry_sequence = []
+
+    @ruddr.updaters.updater.Retry
+    def retry_test(self, param: int):
+        """A dummy function to test @Retry. Only used in test_baseupdater."""
+        self.retry_sequence.append(param)
+        error = next(self.err_iter)
+        if error is not None:
+            raise error
 
     def initial_update(self):
         pass

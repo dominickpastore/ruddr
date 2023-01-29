@@ -71,6 +71,8 @@ class Retry:
                 return
             self.seq += 1
             self.retries = 0
+            self.last_args = args
+            self.last_kwargs = kwargs
             obj.log.debug("(Update seq: %d)", self.seq)
             self.wrapper(self.seq, obj, *args, **kwargs)
 

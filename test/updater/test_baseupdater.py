@@ -1,110 +1,176 @@
-# TODO remove when done
-"""
-BaseUpdater
-- Has basic members like name, log, addrfile
-- Abstract methods initial_update, update_ipv4, update_ipv6
-- Static method replace_ipv6_prefix
-- Can have methods marked @Retry
-"""
+import ipaddress
+import logging
 
-# TODO Test basic vars ...
-# TODO Test replace_ipv6_prefix ...
-# TODO Test @Retry and self.halt by creating an updater with a custom @Retry
-#  method (including all combos of intervals) ...
+import pytest
 
-"""
-Updater
-- Abstract methods publish_ipv4, publish_ipv6
-- Does an initial update (which should retry if necessary)
-- Retry logic for regular updates
-- Note at top of test file for this class that retry logic is tested thoroughly
-  in test_baseupdater.py
-"""
+import ruddr
+from ruddr import FatalPublishError, PublishError
 
-# TODO Test initial update updates ipv4 if not current and updates addrfile
-# TODO Test initial update updates ipv6 if not current and updates addrfile
-# TODO Test initial update retries ipv4 on failure (even when ipv6 succeeds)
-#  and marks failure in addrfile
-# TODO Test initial update retries ipv6 on failure (even when ipv4 succeeds)
-#  and marks failure in addrfile
-# TODO Test initial update stops retrying both on fatal error after IPv4
-#  and marks failure in addrfile
-# TODO Test initial update stops retrying both on fatal error after IPv6
-#  and marks failure in addrfile
 
-# TODO Test update_ipv4 succeeds, invalidating old address in addrfile first,
-#  updating addrfile after
-# TODO Test update_ipv6 succeeds, invalidating old address in addrfile first,
-#  updating addrfile after
-# TODO Test update_ipv4 does nothing when given None, but stops trying to
-#  retry
-# TODO Test update_ipv6 does nothing when given None, but stops trying to
-#  retry
-# TODO Test update_ipv4 does nothing when given same address as addrfile
-# TODO Test update_ipv6 does nothing when given same address as addrfile
-# TODO Test update_ipv4 does nothing when publish_ipv4 not implemented
-# TODO Test update_ipv6 does nothing when publish_ipv6 not implemented
-# TODO Test update_ipv4 retries after failure, even when IPv6 succeeds, and
-#  invalidates old address until succeeding, at which point it stops retrying
-#  and updates addrfile
-# TODO Test update_ipv6 retries after failure, even when IPv4 succeeds, and
-#  invalidates old address until succeeding, at which point it stops retrying
-#  and updates addrfile
-# TODO Test update_ipv4 and update_ipv6 stops retrying on fatal error during
-#  update_ipv4
-# TODO Test update_ipv4 and update_ipv6 stops retrying on fatal error during
-#  update_ipv6
+def test_member_vars(updater_factory, empty_addrfile):
+    """Test BaseUpdater has basic member variables name, log, and addrfile"""
+    updater = updater_factory(addrfile=empty_addrfile)
+    assert updater.name == "mock_updater_1"
+    assert isinstance(updater.log, logging.Logger)
+    assert updater.log.name == f"ruddr.updater.{updater.name}"
+    assert updater.addrfile is empty_addrfile
 
-"""
-TwoWayZoneUpdater
-- init_hosts_and_zones, as str and structured
-- publish_ipv4
-- publish_ipv6
-- subdomain_of
-- fqdn_of
-"""
-# TODO Test publish_ipv4 with all the variations of method availability ...
-# TODO Test publish_ipv6 with all the variations of method availability ...
-# TODO Test init_hosts_and_zones with structured hosts, and do an IPv6 update
-#  to confirm it works (all others tests will use string hosts)
-# TODO Test subdomain_of ...
-# TODO Test fqdn_of ...
+@pytest.mark.parametrize('sequence', [
+    # (Error|None, 'new'|'repeat'|'retry', delay until next)
+    # Error ignored for repeat calls
+    # Last delay must extend until any pending retries expire
 
-"""
-TwoWayUpdater
-- init_hosts, as str and list
-- Implements the TwoWayZoneUpdater methods as thin wrappers
-"""
-# TODO after TwoWayZoneUpdater
-# TODO mostly thin wrapper over TwoWayZoneUpdater abstract methods. Call the
-#  abstract methods and verify that this class's abstract methods are called
-#  appropriately. ...
+    # 0: Single successful call
+    [(None, 'new', 1)],
+    # 1: Two successful calls
+    [(None, 'new', 1),
+     (None, 'new', 0)],
+    # 2: Fail, retry succeeds
+    [(PublishError, 'new', 300),
+     (None, 'retry', 0)],
+    # 3: Fail, new call before retry
+    [(PublishError, 'new', 100),
+     (None, 'new', 200)],
+    # 4: Fail, retry fail, success
+    [(PublishError, 'new', 300),
+     (PublishError, 'retry', 600),
+     (None, 'retry', 0)],
+    # 5: Fail, retry fail, repeat call before retry, retry happens as scheduled
+    [(PublishError, 'new', 300),
+     (PublishError, 'retry', 100),
+     (None, 'repeat', 500),
+     (None, 'retry', 0)],
+    # 6: Fail, retry fail, success, fail, retry after min delay
+    [(PublishError, 'new', 300),
+     (PublishError, 'retry', 600),
+     (None, 'retry', 0),
+     (PublishError, 'new', 300),
+     (None, 'retry', 0)],
+    # 7: Fail, retry fail, retry fail, new call fail, retry after min delay
+    [(PublishError, 'new', 300),
+     (PublishError, 'retry', 600),
+     (PublishError, 'retry', 1100),
+     (PublishError, 'new', 300),
+     (None, 'retry', 0)],
+    # 8: Fail, retry fail until max delay hit, retry fail one more time,
+    #    success
+    [(PublishError, 'new', 300),
+     (PublishError, 'retry', 600),
+     (PublishError, 'retry', 1200),
+     (PublishError, 'retry', 2400),
+     (PublishError, 'retry', 4800),
+     (PublishError, 'retry', 9600),
+     (PublishError, 'retry', 19200),
+     (PublishError, 'retry', 38400),
+     (PublishError, 'retry', 76800),
+     (PublishError, 'retry', 86400),
+     (PublishError, 'retry', 86400),
+     (None, 'retry', 0)],
+    # 9: Fail, retry fail until max delay hit, retry fail one more time, new
+    #    call fail, retry after min delay
+    [(PublishError, 'new', 300),
+     (PublishError, 'retry', 600),
+     (PublishError, 'retry', 1200),
+     (PublishError, 'retry', 2400),
+     (PublishError, 'retry', 4800),
+     (PublishError, 'retry', 9600),
+     (PublishError, 'retry', 19200),
+     (PublishError, 'retry', 38400),
+     (PublishError, 'retry', 76800),
+     (PublishError, 'retry', 86400),
+     (PublishError, 'retry', 86300),
+     (PublishError, 'new', 300),
+     (None, 'retry', 0)],
+    # 10: Fatal right away
+    [(FatalPublishError, 'new', 0)],
+    # 11: Success, fatal
+    [(None, 'new', 1),
+     (FatalPublishError, 'new', 0)],
+    # 12: Fail, retry fail, retry fail, fatal
+    [(PublishError, 'new', 300),
+     (PublishError, 'retry', 600),
+     (PublishError, 'retry', 1200),
+     (FatalPublishError, 'retry', 0)],
+    # 13: Fail, retry fail, retry fail, new call fatal
+    [(PublishError, 'new', 300),
+     (PublishError, 'retry', 600),
+     (PublishError, 'retry', 1100),
+     (FatalPublishError, 'new', 100)],
+    # 14: Fail, retry fail until max delay hit, retry fail one more time, fatal
+    [(PublishError, 'new', 300),
+     (PublishError, 'retry', 600),
+     (PublishError, 'retry', 1200),
+     (PublishError, 'retry', 2400),
+     (PublishError, 'retry', 4800),
+     (PublishError, 'retry', 9600),
+     (PublishError, 'retry', 19200),
+     (PublishError, 'retry', 38400),
+     (PublishError, 'retry', 76800),
+     (PublishError, 'retry', 86400),
+     (PublishError, 'retry', 86400),
+     (FatalPublishError, 'retry', 0)],
+])
+def test_retry(sequence, updater_factory, advance):
+    err_sequence = [x[0] for x in sequence]
+    updater = updater_factory(err_sequence=err_sequence)
 
-"""
-OneWayUpdater
-- init_params, as str and structured
-- publish_ipv4
-- publish_ipv6
-"""
+    # Check retry sequence
+    arg = 0
+    expected_seq = []
+    expect_retry = False
+    halted = False
+    for err, kind, delay in sequence:
+        # kind 'new' = new call with new param
+        # kind 'repeat' = new call with same param (ignored)
+        # kind 'retry' = automatic retry
+        if kind == 'new':
+            arg += 1
+            updater.retry_test(arg)
+            expected_seq.append(arg)
+        elif kind == 'repeat':
+            updater.retry_test(arg)
+        elif expect_retry:
+            expected_seq.append(arg)
 
-# TODO Test publish_ipv4 calls publish_ipv4_one_host on all hosts, no matter
-#  how they are configured for IPv6
-# TODO Test publish_ipv4 calls publish_ipv4_one_host on all hosts even when
-#  some (or all) raise PublishError
-# TODO Test publish_ipv6 does nothing for hosts without an IPv6 lookup method,
-#  but no PublishError
-# TODO Test publish_ipv6 calls publish_ipv6_one_host using hardcoded addr
-# TODO Test publish_ipv6 calls publish_ipv6_one_host using DNS lookup
-# TODO Test publish_ipv6 raises PublishError when DNS lookup server unreachable
-# TODO Test publish_ipv6 raises PublishError when DNS lookup has no AAAA record
-# TODO Test publish_ipv6 calls publish_ipv6_one_host on remaining hosts even
-#  when one has no IPv6 lookup method (parameterized: (none, addr, server),
-#  (server, none, addr), (addr, server, none))
-# TODO Test publish_ipv4 calls publish_ipv4_one_host on all hosts even when
-#  some (or all) raise PublishError
+        assert updater.retry_sequence == expected_seq
 
-# TODO Test init_params with structured hosts, providing nameserver, and
-#  providing retry interval and check that it uses the hosts, nameserver, and
-#  retry interval (try an IPv6 update to confirm)
-#  (init_params with string hosts, default None nameserver, and default retry
-#  interval should be tested by the other tests.)
+        if kind != 'repeat':
+            expect_retry = err is not None
+        advance.by(delay)
+        if isinstance(err, FatalPublishError):
+            halted = True
+
+    if halted:
+        assert updater.halt
+    assert updater.retry_sequence == expected_seq
+    # No more retries
+    assert advance.count_running() == 0
+
+
+@pytest.mark.parametrize(('network', 'address', 'expected'), [
+    (ipaddress.IPv6Network('::/128'),
+     ipaddress.IPv6Address('1:1:1:1:1:1:1:1'),
+     ipaddress.IPv6Address('::')),
+    (ipaddress.IPv6Network('::2/128'),
+     ipaddress.IPv6Address('1:1:1:1:1:1:1:1'),
+     ipaddress.IPv6Address('::2')),
+    (ipaddress.IPv6Network('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128'),
+     ipaddress.IPv6Address('1:1:1:1:1:1:1:1'),
+     ipaddress.IPv6Address('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')),
+    (ipaddress.IPv6Network('2222::/64'),
+     ipaddress.IPv6Address('1:1:1:1:1:1:1:1'),
+     ipaddress.IPv6Address('2222::1:1:1:1')),
+    (ipaddress.IPv6Network('::/64'),
+     ipaddress.IPv6Address('1:1:1:1:1:1:1:1'),
+     ipaddress.IPv6Address('::1:1:1:1')),
+    (ipaddress.IPv6Network('ffff:ffff:ffff:ffff::/64'),
+     ipaddress.IPv6Address('1:1:1:1:1:1:1:1'),
+     ipaddress.IPv6Address('ffff:ffff:ffff:ffff:1:1:1:1')),
+    (ipaddress.IPv6Network('::/0'),
+     ipaddress.IPv6Address('1:1:1:1:1:1:1:1'),
+     ipaddress.IPv6Address('1:1:1:1:1:1:1:1')),
+])
+def test_replace_ipv6_prefix(network, address, expected):
+    assert ruddr.updaters.BaseUpdater.replace_ipv6_prefix(
+        network, address
+    ) == expected

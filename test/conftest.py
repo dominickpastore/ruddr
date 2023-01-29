@@ -146,7 +146,8 @@ def updater_factory():
 
         def __call__(self, **kwargs):
             self._count += 1
-            return doubles.MockBaseUpdater(f'mock_updater_{self._count}')
+            return doubles.MockBaseUpdater(f'mock_updater_{self._count}',
+                                           **kwargs)
     return UpdaterFactory()
 
 
