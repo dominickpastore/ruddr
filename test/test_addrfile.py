@@ -10,6 +10,7 @@ import ruddr.addrfile
 @pytest.fixture
 def addrfile_factory(tmp_path):
     count = 0
+
     def factory(contents: str):
         nonlocal count
         count += 1

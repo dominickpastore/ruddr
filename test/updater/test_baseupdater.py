@@ -15,6 +15,7 @@ def test_member_vars(updater_factory, empty_addrfile):
     assert updater.log.name == f"ruddr.updater.{updater.name}"
     assert updater.addrfile is empty_addrfile
 
+
 @pytest.mark.parametrize('sequence', [
     # (Error|None, 'new'|'repeat'|'retry', delay until next)
     # Error ignored for repeat calls
