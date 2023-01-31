@@ -202,12 +202,15 @@ class Updater(BaseUpdater):
 
     def initial_update(self):
         """:meta private:"""
+        self.log.debug("Doing initial update")
         ipv4, is_current = self.addrfile.get_ipv4(self.name)
         if not is_current:
+            self.log.info("IPv4 not known to be current, doing initial update")
             self.update_ipv4(ipv4)
 
         ipv6, is_current = self.addrfile.get_ipv6(self.name)
         if not is_current:
+            self.log.info("IPv6 not known to be current, doing initial update")
             self.update_ipv6(ipv6)
 
     @Retry
@@ -216,8 +219,11 @@ class Updater(BaseUpdater):
         if self.halt:
             return
 
+        # TODO This won't behave well and shouldn't be allowed. If an address
+        #  can't currently be found the notifier should just not notify.
+        # TODO Also update Addrfile.set_ipv4 not to accept None.
         if address is None:
-            self.log.info("Skipping update with no address (will not "
+            self.log.info("Skipping update with no address (will not try to "
                           "de-publish)")
             return
         if not self.addrfile.needs_ipv4_update(self.name, address):
@@ -257,8 +263,11 @@ class Updater(BaseUpdater):
         if self.halt:
             return
 
+        # TODO This won't behave well and shouldn't be allowed. If an address
+        #  can't currently be found the notifier should just not notify.
+        # TODO Also update Addrfile.set_ipv6 not to accept None.
         if prefix is None:
-            self.log.info("Skipping update with no prefix (will not "
+            self.log.info("Skipping update with no prefix (will not try to "
                           "de-publish)")
             return
         if not self.addrfile.needs_ipv6_update(self.name, prefix):

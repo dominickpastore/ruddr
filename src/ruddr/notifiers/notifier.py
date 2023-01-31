@@ -122,6 +122,10 @@ class BaseNotifier:
             Callable[[ipaddress.IPv6Network], None]
         ] = []
 
+        # Ensure multithreaded notifiers are only notifying once at a time (in
+        # case updater is not reentrant)
+        self._notify_lock: threading.Lock = threading.Lock()
+
     def attach_ipv4_updater(
         self, update_func: Callable[[ipaddress.IPv4Address], None],
     ) -> None:
@@ -188,8 +192,9 @@ class BaseNotifier:
         """
         self.log.debug("Notifier %s notifying attached updaters of IPv4 %s",
                        self.name, address.exploded)
-        for update_func in self._ipv4_update_funcs:
-            update_func(address)
+        with self._notify_lock:
+            for update_func in self._ipv4_update_funcs:
+                update_func(address)
 
     def notify_ipv6(self, prefix: ipaddress.IPv6Network) -> None:
         """Subclasses must call this to notify all the attached IPv6 updaters
@@ -201,8 +206,9 @@ class BaseNotifier:
         """
         self.log.debug("Notifier %s notifying attached updaters of IPv6 %s",
                        self.name, prefix.compressed)
-        for update_func in self._ipv6_update_funcs:
-            update_func(prefix)
+        with self._notify_lock:
+            for update_func in self._ipv6_update_funcs:
+                update_func(prefix)
 
     def want_ipv4(self) -> bool:
         """Subclasses should call this to determine whether to check for

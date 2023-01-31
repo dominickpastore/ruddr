@@ -1,9 +1,11 @@
 """Test doubles for use in test classes and fixtures"""
 import errno
+import ipaddress
 import itertools
+from typing import List
 
 import ruddr
-from ruddr import NotifierSetupError
+from ruddr import NotifierSetupError, Addrfile
 
 
 class BrokenFile:
@@ -34,41 +36,6 @@ class BrokenFile:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
-
-
-class MockBaseUpdater(ruddr.BaseUpdater):
-    """Simple mock updater that keeps a list of IP updates it receives"""
-
-    def __init__(self, name, addrfile=None, config=None, err_sequence=None):
-        super().__init__(name, addrfile)
-        self.config = config
-        self.published_addresses = []
-
-        #: The order of successes and fails for retry_test. None means success,
-        #: an error means raise that error
-        if err_sequence is None:
-            self.err_iter = itertools.repeat(None)
-        else:
-            self.err_iter = iter(err_sequence)
-        #: The list of calls to retry_test
-        self.retry_sequence = []
-
-    @ruddr.updaters.updater.Retry
-    def retry_test(self, param: int):
-        """A dummy function to test @Retry. Only used in test_baseupdater."""
-        self.retry_sequence.append(param)
-        error = next(self.err_iter)
-        if error is not None:
-            raise error
-
-    def initial_update(self):
-        pass
-
-    def update_ipv4(self, address):
-        self.published_addresses.append(address)
-
-    def update_ipv6(self, network):
-        self.published_addresses.append(network)
 
 
 class FakeNotifier(ruddr.BaseNotifier):
@@ -158,3 +125,77 @@ class MockNotifier(ruddr.Notifier):
     def join_first_check(self):
         """Wait for first check after :meth:`start` to finish"""
         self.first_check.join()
+
+
+class MockBaseUpdater(ruddr.BaseUpdater):
+    """Simple mock updater that keeps a list of IP updates it receives"""
+
+    def __init__(self, name, addrfile=None, config=None, err_sequence=None):
+        super().__init__(name, addrfile)
+        self.config = config
+        self.published_addresses = []
+
+        #: The order of successes and fails for retry_test. None means success,
+        #: an error means raise that error
+        if err_sequence is None:
+            self.err_iter = itertools.repeat(None)
+        else:
+            self.err_iter = iter(err_sequence)
+        #: The list of calls to retry_test
+        self.retry_sequence = []
+
+    @ruddr.updaters.updater.Retry
+    def retry_test(self, param: int):
+        """A dummy function to test @Retry. Only used in test_baseupdater."""
+        self.retry_sequence.append(param)
+        error = next(self.err_iter)
+        if error is not None:
+            raise error
+
+    def initial_update(self):
+        pass
+
+    def update_ipv4(self, address):
+        self.published_addresses.append(address)
+
+    def update_ipv6(self, network):
+        self.published_addresses.append(network)
+
+
+class MockUpdater(ruddr.Updater):
+    """Mock Updater that tracks calls to its abstract functions"""
+
+    def __init__(self, name: str, addrfile: Addrfile,
+                 ipv4_errors=None, ipv6_errors=None,
+                 ipv4_implemented=True, ipv6_implemented=True):
+        super().__init__(name, addrfile)
+        self.ipv4s_published: List[ipaddress.IPv4Address] = []
+        self.ipv6s_published: List[ipaddress.IPv6Network] = []
+
+        if ipv4_errors is None:
+            self.ipv4_iter = itertools.repeat(None)
+        else:
+            self.ipv4_iter = iter(ipv4_errors)
+        if ipv6_errors is None:
+            self.ipv6_iter = itertools.repeat(None)
+        else:
+            self.ipv6_iter = iter(ipv6_errors)
+
+        self.ipv4_implemented = ipv4_implemented
+        self.ipv6_implemented = ipv6_implemented
+
+    def publish_ipv4(self, address: ipaddress.IPv4Address):
+        self.ipv4s_published.append(address)
+        if not self.ipv4_implemented:
+            raise NotImplementedError
+        error = next(self.ipv4_iter)
+        if error is not None:
+            raise error
+
+    def publish_ipv6(self, network: ipaddress.IPv6Network):
+        self.ipv6s_published.append(network)
+        if not self.ipv6_implemented:
+            raise NotImplementedError
+        error = next(self.ipv6_iter)
+        if error is not None:
+            raise error
