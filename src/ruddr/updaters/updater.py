@@ -1762,7 +1762,8 @@ class OneWayUpdater(Updater):
                                "for %s (for host %s): %s",
                                ip_lookup, hostname, e)
                 raise PublishError(f"Updater {self.name} could not look up "
-                                   f"the current IPv6 address for {ip_lookup}")
+                                   "the current IPv6 address for "
+                                   f"{ip_lookup}") from e
             if current_ipv6 is None:
                 self.log.error("DNS lookup for %s (for host %s) returned no "
                                "IPv6 addresses", ip_lookup, hostname)

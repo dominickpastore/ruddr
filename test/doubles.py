@@ -1,11 +1,12 @@
 """Test doubles for use in test classes and fixtures"""
+import collections
 import errno
 import ipaddress
 import itertools
-from typing import List
+from typing import List, Tuple, Set
 
 import ruddr
-from ruddr import NotifierSetupError, Addrfile
+from ruddr import NotifierSetupError, Addrfile, PublishError
 
 
 class BrokenFile:
@@ -199,3 +200,49 @@ class MockUpdater(ruddr.Updater):
         error = next(self.ipv6_iter)
         if error is not None:
             raise error
+
+
+class MockOneWayUpdater(ruddr.OneWayUpdater):
+    """Mock OneWayUpdater that tracks calls to its abstract functions"""
+
+    def __init__(self, name: str, addrfile: Addrfile,
+                 ipv4_implemented=True, ipv6_implemented=True,
+                 ipv4_errors=None, ipv6_errors=None):
+        super().__init__(name, addrfile)
+        self.ipv4s_published: collections.Counter[
+            Tuple[str, ipaddress.IPv4Address]
+        ] = collections.Counter()
+        self.ipv6s_published: collections.Counter[
+            Tuple[str, ipaddress.IPv6Address]
+        ] = collections.Counter()
+
+        self.ipv4_implemented = ipv4_implemented
+        self.ipv6_implemented = ipv6_implemented
+
+        # Sets of hostnames which should raise PublishError when published
+        self.ipv4_errors: Set[str] = set()
+        if ipv4_errors is not None:
+            for host in ipv4_errors:
+                self.ipv4_errors.add(host)
+        self.ipv6_errors: Set[str] = set()
+        if ipv6_errors is not None:
+            for host in ipv6_errors:
+                self.ipv6_errors.add(host)
+
+    def publish_ipv4_one_host(self,
+                              hostname: str,
+                              address: ipaddress.IPv4Address):
+        self.ipv4s_published[(hostname, address)] += 1
+        if not self.ipv4_implemented:
+            raise NotImplementedError
+        if hostname in self.ipv4_errors:
+            raise PublishError
+
+    def publish_ipv6_one_host(self,
+                              hostname: str,
+                              address: ipaddress.IPv6Address):
+        self.ipv6s_published[(hostname, address)] += 1
+        if not self.ipv6_implemented:
+            raise NotImplementedError
+        if hostname in self.ipv6_errors:
+            raise PublishError
