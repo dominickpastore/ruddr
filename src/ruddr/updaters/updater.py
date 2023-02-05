@@ -346,6 +346,43 @@ class TwoWayZoneUpdater(Updater):
     supports all of the above by allowing only the appropriate methods to be
     implemented.
 
+    The update process for this type of updater works as follows:
+
+    1. The list of hosts is organized into zones:
+
+       - Hosts with hardcoded zone in the config are placed in that zone
+       - If there are any hosts remaining, first try :meth:`get_zones` to
+         get a list of zones, and assign zones from that. If there are still
+         any hosts that don't fit into zones, it's a :exc:`PublishError`.
+       - If :meth:`get_zones` is not implemented, any hosts without hardcoded
+         zones are assigned to zones using the `public suffix list`_.
+
+    2. For each zone:
+
+       a. Fetch A/AAAA records for the zone
+
+          - First try :meth:`fetch_zone_ipv4s`/:meth:`fetch_zone_ipv6s` to
+            fetch records for the entire zone at once.
+          - If that's not implemented, fetch records for each host using
+            :meth:`fetch_subdomain_ipv4s`/:meth:`fetch_subdomain_ipv6s`.
+
+       b. Create replacement records for the hosts to be updated. If there is
+          not an existing record for a host, it's a :exc:`PublishError`. If
+          there are multiple existing records, they are replaced with a single
+          one for IPv4, and they are all updated for IPv6. Other records are
+          left untouched.
+
+       c. Write the A/AAAA records for the zone
+
+          - Try :meth:`put_zone_ipv4s`/:meth:`put_zone_ipv6s` to write the
+            entire zone at once, if implemented. (This is only tried if
+            :meth:`fetch_zone_ipv4s`/:meth:`fetch_zone_ipv6s` was implemented.)
+          - Otherwise, use
+            :meth:`put_subdomain_ipv4`/:meth:`put_subdomain_ipv6s` to write
+            each host's records.
+
+    .. _public suffix list: https://publicsuffix.org/
+
     :param name: Name of the updater (from config section heading)
     :param addrfile: The :class:`~ruddr.Addrfile` object
     :param datadir: The configured data directory
@@ -1237,6 +1274,31 @@ class TwoWayUpdater(TwoWayZoneUpdater):
     the account but update domains individually. This class supports all of the
     above by allowing only the appropriate methods to be implemented.
 
+    The update process for this type of updater works as follows:
+
+    1. Fetch A/AAAA records
+
+       - First try :meth:`fetch_all_ipv4s`/:meth:`fetch_all_ipv6s` to
+         fetch records for the entire account at once.
+       - If that's not implemented, fetch records for each host using
+         :meth:`fetch_domain_ipv4s`/:meth:`fetch_domain_ipv6s`.
+
+    2. Create replacement records for the hosts to be updated. If there is
+       not an existing record for a host, it's a :exc:`PublishError`. If
+       there are multiple existing records, they are replaced with a single
+       one for IPv4, and they are all updated for IPv6. Other records (if there
+       are any in the account) are left untouched.
+
+    3. Write the A/AAAA records
+
+       - Try :meth:`put_all_ipv4s`/:meth:`put_all_ipv6s` to write all records
+         at once, if implemented. (This is only tried if
+         :meth:`fetch_all_ipv4s`/:meth:`fetch_all_ipv6s` was implemented.)
+       - Otherwise, use :meth:`put_domain_ipv4`/:meth:`put_domain_ipv6s` to
+         write each host's records.
+
+    .. _public suffix list: https://publicsuffix.org/
+
     :param name: Name of the updater (from config section heading)
     :param addrfile: The :class:`~ruddr.Addrfile` object
     :param datadir: The configured data directory
@@ -1578,6 +1640,27 @@ class OneWayUpdater(Updater):
     the current address for IPv6 updates since it only updates the prefix. This
     class handles that requirement either by using hardcoded IPv6 addresses or
     by looking up the current IPv6 address in DNS.
+
+    The update process for this type of updater works as follows:
+
+    1. The list of hosts to be updated is fetched from config.
+
+       - For an IPv4 update, :meth:`publish_ipv4_one_host` is called for each
+         host, and the process is done.
+       - For an IPv6 update, the process continues with the next steps.
+
+    2. For IPv6, Ruddr obtains a "current" address for each host ("current" in
+       quotes because only the host portion of the address actually matters,
+       since that's the part it needs to reuse).
+
+       - If an address for the host is hardcoded in config, it uses that.
+       - If an FQDN was provided for the host, it looks up that domain name in
+         DNS, optionally at a specific nameserver.
+       - Otherwise, if neither was given, it skips this host for IPv6 updates.
+
+    3. Ruddr takes the host portion from each address in step 2 and combines it
+       with the new prefix from the notifier to get the new address, then calls
+       :meth:`publish_ipv6_one_host` on each one.
 
     :param name: Name of the updater (from config section heading)
     :param addrfile: The :class:`~ruddr.Addrfile` object
