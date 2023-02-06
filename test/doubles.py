@@ -3,7 +3,7 @@ import collections
 import errno
 import ipaddress
 import itertools
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, Optional, Dict
 
 import ruddr
 from ruddr import NotifierSetupError, Addrfile, PublishError
@@ -246,3 +246,137 @@ class MockOneWayUpdater(ruddr.OneWayUpdater):
             raise NotImplementedError
         if hostname in self.ipv6_errors:
             raise PublishError
+
+
+class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
+    """Mock TwoWayZoneUpdater that tracks calls to its abstract methods"""
+
+    def __init__(self, name: str, addrfile: Addrfile, datadir,
+                 get_zones_result=None,
+                 fetch_zone_ipv4s_result=None,
+                 fetch_zone_ipv6s_result=None,
+                 fetch_subdomain_ipv4s_result=None,
+                 fetch_subdomain_ipv6s_result=None,
+                 put_zone_ipv4s_result=None,
+                 put_zone_ipv6s_result=None,
+                 put_subdomain_ipv4_result=None,
+                 put_subdomain_ipv6s_result=None):
+        super().__init__(name, addrfile, str(datadir))
+
+        self.get_zones_result = get_zones_result
+        self.fetch_zone_ipv4s_result = fetch_zone_ipv4s_result
+        self.fetch_zone_ipv6s_result = fetch_zone_ipv6s_result
+        self.fetch_subdomain_ipv4s_result = fetch_subdomain_ipv4s_result
+        self.fetch_subdomain_ipv6s_result = fetch_subdomain_ipv6s_result
+        self.put_zone_ipv4s_result = put_zone_ipv4s_result
+        self.put_zone_ipv6s_result = put_zone_ipv6s_result
+        self.put_subdomain_ipv4_result = put_subdomain_ipv4_result
+        self.put_subdomain_ipv6s_result = put_subdomain_ipv6s_result
+
+        self.get_zones_call_count = 0
+        self.fetch_zone_ipv4s_calls = []
+        self.fetch_zone_ipv6s_calls = []
+        self.fetch_subdomain_ipv4s_calls = []
+        self.fetch_subdomain_ipv6s_calls = []
+        self.put_zone_ipv4s_calls = []
+        self.put_zone_ipv6s_calls = []
+        self.put_subdomain_ipv4_calls = []
+        self.put_subdomain_ipv6s_calls = []
+
+    def get_zones(self) -> List[str]:
+        self.get_zones_call_count += 1
+        if self.get_zones_result is None:
+            raise NotImplementedError
+        return self.get_zones_result
+
+    def fetch_zone_ipv4s(
+        self, zone: str
+    ) -> List[Tuple[str, ipaddress.IPv4Address, Optional[int]]]:
+        self.fetch_zone_ipv4s_calls.append(zone)
+        if self.fetch_zone_ipv4s_result is None:
+            raise NotImplementedError
+        result = self.fetch_zone_ipv4s_result[zone]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def fetch_zone_ipv6s(
+        self, zone: str
+    ) -> List[Tuple[str, ipaddress.IPv6Address, Optional[int]]]:
+        self.fetch_zone_ipv6s_calls.append(zone)
+        if self.fetch_zone_ipv6s_result is None:
+            raise NotImplementedError
+        result = self.fetch_zone_ipv6s_result[zone]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def fetch_subdomain_ipv4s(
+        self, subdomain: str, zone: str
+    ) -> List[Tuple[ipaddress.IPv4Address, Optional[int]]]:
+        self.fetch_subdomain_ipv4s_calls.append((subdomain, zone))
+        if self.fetch_subdomain_ipv4s_result is None:
+            raise NotImplementedError
+        result = self.fetch_subdomain_ipv4s_result[(subdomain, zone)]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def fetch_subdomain_ipv6s(
+        self, subdomain: str, zone: str
+    ) -> List[Tuple[ipaddress.IPv6Address, Optional[int]]]:
+        self.fetch_subdomain_ipv6s_calls.append((subdomain, zone))
+        if self.fetch_subdomain_ipv6s_result is None:
+            raise NotImplementedError
+        result = self.fetch_subdomain_ipv6s_result[(subdomain, zone)]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def put_zone_ipv4s(
+        self,
+        zone: str,
+        records: Dict[str, Tuple[List[ipaddress.IPv4Address], Optional[int]]]
+    ):
+        self.put_zone_ipv4s_calls.append((zone, records))
+        if self.put_zone_ipv4s_result is None:
+            raise NotImplementedError
+        result = self.put_zone_ipv4s_result[zone]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def put_zone_ipv6s(
+        self,
+        zone: str,
+        records: Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]]
+    ):
+        self.put_zone_ipv6s_calls.append((zone, records))
+        if self.put_zone_ipv6s_result is None:
+            raise NotImplementedError
+        result = self.put_zone_ipv6s_result[zone]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def put_subdomain_ipv4(self, subdomain: str, zone: str,
+                           address: ipaddress.IPv4Address, ttl: Optional[int]):
+        self.put_subdomain_ipv4_calls.append((subdomain, zone, address, ttl))
+        if self.put_subdomain_ipv4_result is None:
+            raise NotImplementedError
+        result = self.put_subdomain_ipv4_result[(subdomain, zone)]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def put_subdomain_ipv6s(self, subdomain: str, zone: str,
+                            addresses: List[ipaddress.IPv6Address],
+                            ttl: Optional[int]):
+        self.put_subdomain_ipv6s_calls.append((subdomain, zone,
+                                               addresses, ttl))
+        if self.put_subdomain_ipv6s_result is None:
+            raise NotImplementedError
+        result = self.put_subdomain_ipv6s_result[(subdomain, zone)]
+        if isinstance(result, Exception):
+            raise result
+        return result

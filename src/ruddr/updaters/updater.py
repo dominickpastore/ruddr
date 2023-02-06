@@ -847,7 +847,8 @@ class TwoWayZoneUpdater(Updater):
                 if not zones_fetched:
                     self.log.debug("Fetching zones")
                     try:
-                        self.get_zones()
+                        zones = self.get_zones()
+                        # TODO Sort zones by longest first
                     except NotImplementedError:
                         self.log.debug("get_zones() not implemented, will use"
                                        "PSL")
@@ -1320,7 +1321,7 @@ class TwoWayUpdater(TwoWayZoneUpdater):
         of domain names.
 
         :param hosts: The list of hosts to be updated
-        :raises ConfigError: if there is a duplicated
+        :raises ConfigError: if there is a duplicate
         """
         if isinstance(hosts, str):
             hosts = hosts.split()
