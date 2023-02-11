@@ -487,6 +487,11 @@ into other Python programs as a library as well. The steps boil down to this:
    :class`DDNSManager` object. Ruddr will halt the background threads
    gracefully.
 
+An immediate update (if possible) can be triggered on a started
+:class:`DDNSManager` by calling its :func:`~DDNSManager.do_notify` method.
+This is not always possible if the configured notifiers do not support it,
+though most do.
+
 See the next section for the APIs involved.
 
 .. warning::
@@ -496,11 +501,11 @@ See the next section for the APIs involved.
    ready to handle those exceptions. Both of them can be caught under
    :exc:`RuddrSetupError`.
 
-.. note::
-   An immediate update (if possible) can be triggered on a started
-   :class:`DDNSManager` by calling its :func:`~DDNSManager.do_notify` method.
-   This is not always possible if the configured notifier does not support it,
-   though most do.
+.. TODO Can do_notify raise errors?
+
+.. TODO Note that while exceptions do carry messages, errors are always logged,
+   more reliable because can have multiple errors but only one exception and
+   they are attached to specific loggers
 
 Manager and Config API
 ~~~~~~~~~~~~~~~~~~~~~~

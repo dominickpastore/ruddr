@@ -299,9 +299,6 @@ def main(argv=None):
     except RuddrSetupError:
         log.critical("Ruddr failed to start.")
         sys.exit(1)
-    except RuddrException:
-        log.critical("Unexpected RuddrException", exc_info=True)
-        sys.exit(1)
 
     # Notify systemd, if applicable
     sdnotify.ready()
@@ -309,6 +306,7 @@ def main(argv=None):
     # Do an immediate update on SIGUSR1
     def handle_sigusr1(sig, _):
         log.info("Received signal: %s", signal.Signals(sig).name)
+        # TODO can exceptions happen here?
         manager.do_notify()
     signal.signal(signal.SIGUSR1, handle_sigusr1)
 
@@ -316,6 +314,7 @@ def main(argv=None):
     def handle_signals(sig, _):
         log.info("Received signal: %s", signal.Signals(sig).name)
         sdnotify.stopping()
+        # TODO can exceptions happen here?
         manager.stop()
     signal.signal(signal.SIGINT, handle_signals)
     signal.signal(signal.SIGTERM, handle_signals)
