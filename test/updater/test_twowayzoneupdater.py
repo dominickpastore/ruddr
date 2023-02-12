@@ -485,7 +485,6 @@ class TestFetchZoneIPv4sImplemented:
         ]
         assert updater.put_subdomain_ipv4_calls == []
 
-
 # TODO fetch_zone_ipv4s implemented, multiple records on each host replaced
 #  with single (extra records left alone)
 # TODO fetch_zone_ipv4s implemented, put_zone_ipv4s raises PublishError, other

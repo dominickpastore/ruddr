@@ -24,18 +24,6 @@ import ruddr.util
 Addr = TypeVar('Addr', ipaddress.IPv4Address, ipaddress.IPv6Address)
 
 
-def _pick_error(curr_err: Optional[PublishError],
-                new_err: Optional[PublishError]):
-    """Return the current error, unless there isn't one or new_err is a higher
-    priority error"""
-    if curr_err is None:
-        return new_err
-    if (not isinstance(curr_err, FatalPublishError) and
-            isinstance(new_err, FatalPublishError)):
-        return new_err
-    return curr_err
-
-
 class Retry:
     """A decorator that makes a function retry periodically until success.
     Success is defined by not raising :exc:`~ruddr.PublishError`. The first
@@ -199,6 +187,18 @@ class BaseUpdater:
         """
         host = int(address) & ((1 << (128 - network.prefixlen)) - 1)
         return network[host]
+
+    @staticmethod
+    def pick_error(curr_err: Optional[PublishError],
+                   new_err: Optional[PublishError]):
+        """Return the current error, unless there isn't one or new_err is a
+        higher priority error"""
+        if curr_err is None:
+            return new_err
+        if (not isinstance(curr_err, FatalPublishError) and
+                isinstance(new_err, FatalPublishError)):
+            return new_err
+        return curr_err
 
 
 class Updater(BaseUpdater):
@@ -999,7 +999,7 @@ class TwoWayZoneUpdater(Updater):
                 # Subclass should already log, so use debug here
                 self.log.debug("Could not fetch A records for domain "
                                f"{self.fqdn_of(subdomain, zone)}: %s", e)
-                error = _pick_error(error, e)
+                error = self.pick_error(error, e)
                 continue
 
             if len(domain_records) == 0:
@@ -1066,7 +1066,7 @@ class TwoWayZoneUpdater(Updater):
                 # Subclass should already log, so use debug here
                 self.log.debug("Could not put A record for domain "
                                f"{self.fqdn_of(subdomain, zone)}: %s", e)
-                error = _pick_error(error, e)
+                error = self.pick_error(error, e)
                 continue
         if error is not None:
             raise error
@@ -1083,10 +1083,10 @@ class TwoWayZoneUpdater(Updater):
                 records, by_zone, err = self._get_ipv4_records(zone,
                                                                subdomains)
             except PublishError as e:
-                error = _pick_error(error, e)
+                error = self.pick_error(error, e)
                 continue
             if err is not None:
-                error = _pick_error(error, err)
+                error = self.pick_error(error, err)
 
             # Update records
             for subdomain in subdomains:
@@ -1099,7 +1099,7 @@ class TwoWayZoneUpdater(Updater):
             try:
                 self._put_ipv4_records(zone, subdomains, records, by_zone)
             except PublishError as e:
-                error = _pick_error(error, e)
+                error = self.pick_error(error, e)
                 continue
 
         if error is not None:
@@ -1156,7 +1156,7 @@ class TwoWayZoneUpdater(Updater):
                 # Subclass should already log, so use debug here
                 self.log.debug("Could not fetch AAAA records for domain "
                                f"{self.fqdn_of(subdomain, zone)}: %s", e)
-                error = _pick_error(error, e)
+                error = self.pick_error(error, e)
                 continue
 
             if len(domain_records) == 0:
@@ -1219,7 +1219,7 @@ class TwoWayZoneUpdater(Updater):
                 # Subclass should already log, so use debug here
                 self.log.debug("Could not put AAAA record for domain "
                                f"{self.fqdn_of(subdomain, zone)}: %s", e)
-                error = _pick_error(error, e)
+                error = self.pick_error(error, e)
                 continue
         if error is not None:
             raise error
@@ -1236,10 +1236,10 @@ class TwoWayZoneUpdater(Updater):
                 records, by_zone, err = self._get_ipv6_records(zone,
                                                                subdomains)
             except PublishError as e:
-                error = _pick_error(error, e)
+                error = self.pick_error(error, e)
                 continue
             if err is not None:
-                error = _pick_error(error, err)
+                error = self.pick_error(error, err)
 
             # Update records
             for subdomain in subdomains:
@@ -1255,7 +1255,7 @@ class TwoWayZoneUpdater(Updater):
             try:
                 self._put_ipv6_records(zone, subdomains, records, by_zone)
             except PublishError as e:
-                error = _pick_error(error, e)
+                error = self.pick_error(error, e)
                 continue
 
         if error is not None:
@@ -1824,7 +1824,7 @@ class OneWayUpdater(Updater):
             try:
                 self.publish_ipv4_one_host(host, address)
             except PublishError as e:
-                error = _pick_error(error, e)
+                error = self.pick_error(error, e)
         if error is not None:
             raise error
 
@@ -1857,7 +1857,7 @@ class OneWayUpdater(Updater):
                 new_ipv6 = self.replace_ipv6_prefix(network, current_ip)
                 self.publish_ipv6_one_host(host, new_ipv6)
             except PublishError as e:
-                error = _pick_error(error, e)
+                error = self.pick_error(error, e)
         if error is not None:
             raise error
 
