@@ -24,6 +24,18 @@ import ruddr.util
 Addr = TypeVar('Addr', ipaddress.IPv4Address, ipaddress.IPv6Address)
 
 
+def _pick_error(curr_err: Optional[PublishError],
+                new_err: Optional[PublishError]):
+    """Return the current error, unless there isn't one or new_err is a higher
+    priority error"""
+    if curr_err is None:
+        return new_err
+    if (not isinstance(curr_err, FatalPublishError) and
+            isinstance(new_err, FatalPublishError)):
+        return new_err
+    return curr_err
+
+
 class Retry:
     """A decorator that makes a function retry periodically until success.
     Success is defined by not raising :exc:`~ruddr.PublishError`. The first
@@ -894,15 +906,20 @@ class TwoWayZoneUpdater(Updater):
         zone: str,
         records: List[Tuple[str, Addr, Optional[int]]],
         hosts: List[str],
-    ) -> Dict[str, Tuple[List[Addr], Optional[int]]]:
+    ) -> Tuple[
+        Dict[str, Tuple[List[Addr], Optional[int]]], Optional[PublishError]
+    ]:
         """Group the list of records by host and verify that at least one
-        record is present for each listed host
+        record is present for each listed host. If so, the return value will
+        be ``(records_dict, None)``. If not, the return value will be
+        ``(records_dict, PublishError)``.
 
         :param zone: The zone the records are from
         :param records: A list of records from :func:`fetch_zone_ipv4s` or
                         :func:`fetch_zone_ipv6s`
         :param hosts: A list of subdomains
-        :return: Records grouped by host: a :class:`dict` where keys are the
+        :return: Records grouped by host, plus None or a PublishError.
+                 For the former: a :class:`dict` where keys are the
                  subdomain and values are 2-tuples ``(addrs, ttl)`` where
                  ``addrs`` is a list of :class:`~ipaddress.IPv4Address` or
                  :class:`~ipaddress.IPv6Address` and ``ttl`` is the lowest TTL
@@ -920,14 +937,16 @@ class TwoWayZoneUpdater(Updater):
             else:
                 result[next_host] = [next_addr], next_ttl
 
+        error = None
         for host in hosts:
             if host not in result:
                 self.log.error("No A record for subdomain %s in zone %s",
                                host, zone)
-                raise PublishError(f"Updater {self.name} found no A records "
-                                   f"for subdomain {host} in zone {zone}")
+                error = PublishError(f"Updater {self.name} found no A records "
+                                     f"for subdomain {host} in zone {zone}")
+                break
 
-        return result
+        return (result, error)
 
     def _get_ipv4_records(
         self,
@@ -935,19 +954,21 @@ class TwoWayZoneUpdater(Updater):
         subdomains: List[str],
     ) -> Tuple[
         Dict[str, Tuple[List[ipaddress.IPv4Address], Optional[int]]],
-        Union[bool, PublishError]
+        bool,
+        Optional[PublishError]
     ]:
-        """Get A records, group by subdomain, and return whether they could be
-        fetched by zone. Can also return a :exc:`PublishError` as the second
-        element in the tuple, indicating it was not fetched by zone and at
-        least one :exc:`PublishError` occurred (:exc:`PublishError` while
-        fetching by zone is simply raised because there can't be partial
-        success in that case)
+        """Get A records, group by subdomain, and return whether they were
+        fetched by zone. If the third element of the returned tuple is not
+        ``None``, it will contain a :exc:`PublishError` that was encountered
+        while fetching records, which must be re-raised by the caller at some
+        point. But if :meth:`fetch_zone_ipv4s` is implemented and fails, or
+        neither :meth:`fetch_zone_ipv4s` nor :meth:`fetch_subdomain_ipv4s` are
+        implemented, an exception will be raised instead.
 
         :param zone: Zone to fetch records for
         :param subdomains: Subdomains to fetch
-        :return: ``(records_by_subdomain, by_zone|PublishError)``
-        :raises PublishError: if there was a problem fetching records
+        :return: ``(records_by_subdomain, by_zone, PublishError)``
+        :raises PublishError: if :meth:`fetch_zone_ipv4s` raised one
         :raises FatalPublishError: if necessary methods are not implemented
         """
         # First try using fetch_zone_ipv4s
@@ -957,9 +978,10 @@ class TwoWayZoneUpdater(Updater):
             self.log.debug("fetch_zone_ipv4s not implemented, will fall "
                            "back to fetching by domain")
         else:
-            records = self._verify_and_group_addrs_by_host(zone, records,
-                                                           subdomains)
-            return records, True
+            records, error = self._verify_and_group_addrs_by_host(
+                zone, records, subdomains
+            )
+            return records, True, error
 
         # Use fetch_subdomain_ipv4s if it didn't work
         records = dict()
@@ -977,18 +999,24 @@ class TwoWayZoneUpdater(Updater):
                 # Subclass should already log, so use debug here
                 self.log.debug("Could not fetch A records for domain "
                                f"{self.fqdn_of(subdomain, zone)}: %s", e)
-                if error is None:
-                    error = e
+                error = _pick_error(error, e)
                 continue
+
+            if len(domain_records) == 0:
+                # Well-behaved subclasses should raise PublishError, but in
+                # case they don't, handle the case where they return []
+                self.log.error("No A records for domain "
+                               f"{self.fqdn_of(subdomain, zone)}")
+                if error is None:
+                    error = PublishError("No A records for domain "
+                                         f"{self.fqdn_of(subdomain, zone)} in "
+                                         f"updater {self.name}")
 
             ttl = min((rec[1] for rec in domain_records if rec[1] is not None),
                       default=None)
             domain_record_addrs = [rec[0] for rec in domain_records]
             records[subdomain] = (domain_record_addrs, ttl)
-        if error is None:
-            return records, False
-        else:
-            return records, error
+        return records, False, error
 
     def _put_ipv4_records(
         self,
@@ -1038,8 +1066,7 @@ class TwoWayZoneUpdater(Updater):
                 # Subclass should already log, so use debug here
                 self.log.debug("Could not put A record for domain "
                                f"{self.fqdn_of(subdomain, zone)}: %s", e)
-                if error is None:
-                    error = e
+                error = _pick_error(error, e)
                 continue
         if error is not None:
             raise error
@@ -1053,37 +1080,26 @@ class TwoWayZoneUpdater(Updater):
             # Fetch zone's records
             self.log.debug("Fetching A records")
             try:
-                records, by_zone = self._get_ipv4_records(zone, subdomains)
+                records, by_zone, err = self._get_ipv4_records(zone,
+                                                               subdomains)
             except PublishError as e:
-                if error is None:
-                    error = e
+                error = _pick_error(error, e)
                 continue
-            if isinstance(by_zone, PublishError):
-                if error is None:
-                    error = by_zone
-                by_zone = False
+            if err is not None:
+                error = _pick_error(error, err)
 
             # Update records
             for subdomain in subdomains:
                 if subdomain in records:
                     ttl = records[subdomain][1]
                     records[subdomain] = ([address], ttl)
-                elif by_zone:
-                    fqdn = self.fqdn_of(subdomain, zone)
-                    self.log.warning("Updater did not find A record for %s",
-                                     fqdn)
-                    if error is None:
-                        error = PublishError(f"Updater {self.name} did not "
-                                             "find A record for domain "
-                                             f"{fqdn}")
 
             # Put zone's records
             self.log.debug("Putting A records")
             try:
                 self._put_ipv4_records(zone, subdomains, records, by_zone)
             except PublishError as e:
-                if error is None:
-                    error = e
+                error = _pick_error(error, e)
                 continue
 
         if error is not None:
@@ -1095,19 +1111,21 @@ class TwoWayZoneUpdater(Updater):
         subdomains: List[str],
     ) -> Tuple[
         Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]],
-        Union[bool, PublishError]
+        bool,
+        Optional[PublishError]
     ]:
-        """Get AAAA records, group by subdomain, and return whether they could
-        be fetched by zone. Can also return a :exc:`PublishError` as the
-        second element in the tuple, indicating it was not fetched by zone and
-        at least one :exc:`PublishError` occurred (:exc:`PublishError`
-        while fetching by zone is simply raised because there can't be partial
-        success in that case)
+        """Get AAAA records, group by subdomain, and return whether they were
+        fetched by zone. If the third element of the returned tuple is not
+        ``None``, it will contain a :exc:`PublishError` that was encountered
+        while fetching records, which must be re-raised by the caller at some
+        point. But if :meth:`fetch_zone_ipv6s` is implemented and fails, or
+        neither :meth:`fetch_zone_ipv6s` nor :meth:`fetch_subdomain_ipv6s` are
+        implemented, an exception will be raised instead.
 
         :param zone: Zone to fetch records for
         :param subdomains: Subdomains to fetch
-        :return: ``(records_by_subdomain, by_zone|PublishError)``
-        :raises PublishError: if there was a problem fetching records
+        :return: ``(records_by_subdomain, by_zone, PublishError)``
+        :raises PublishError: if :meth:`fetch_zone_ipv6s` raised one
         :raises FatalPublishError: if necessary methods are not implemented
         """
         # First try using fetch_zone_ipv6s
@@ -1117,9 +1135,10 @@ class TwoWayZoneUpdater(Updater):
             self.log.debug("fetch_zone_ipv6s not implemented, will fall "
                            "back to fetching by domain")
         else:
-            records = self._verify_and_group_addrs_by_host(zone, records,
-                                                           subdomains)
-            return records, True
+            records, error = self._verify_and_group_addrs_by_host(
+                zone, records, subdomains
+            )
+            return records, True, error
 
         # Use fetch_subdomain_ipv6s if it didn't work
         records = dict()
@@ -1137,18 +1156,24 @@ class TwoWayZoneUpdater(Updater):
                 # Subclass should already log, so use debug here
                 self.log.debug("Could not fetch AAAA records for domain "
                                f"{self.fqdn_of(subdomain, zone)}: %s", e)
-                if error is None:
-                    error = e
+                error = _pick_error(error, e)
                 continue
+
+            if len(domain_records) == 0:
+                # Well-behaved subclasses should raise PublishError, but in
+                # case they don't, handle the case where they return []
+                self.log.error("No AAAA records for domain "
+                               f"{self.fqdn_of(subdomain, zone)}")
+                if error is None:
+                    error = PublishError("No AAAA records for domain "
+                                         f"{self.fqdn_of(subdomain, zone)} in "
+                                         f"updater {self.name}")
 
             ttl = min((rec[1] for rec in domain_records if rec[1] is not None),
                       default=None)
             domain_record_addrs = [rec[0] for rec in domain_records]
             records[subdomain] = (domain_record_addrs, ttl)
-        if error is None:
-            return records, False
-        else:
-            return records, error
+        return records, False, error
 
     def _put_ipv6_records(
         self,
@@ -1194,8 +1219,7 @@ class TwoWayZoneUpdater(Updater):
                 # Subclass should already log, so use debug here
                 self.log.debug("Could not put AAAA record for domain "
                                f"{self.fqdn_of(subdomain, zone)}: %s", e)
-                if error is None:
-                    error = e
+                error = _pick_error(error, e)
                 continue
         if error is not None:
             raise error
@@ -1209,15 +1233,13 @@ class TwoWayZoneUpdater(Updater):
             # Fetch zone's records
             self.log.debug("Fetching AAAA records")
             try:
-                records, by_zone = self._get_ipv6_records(zone, subdomains)
+                records, by_zone, err = self._get_ipv6_records(zone,
+                                                               subdomains)
             except PublishError as e:
-                if error is None:
-                    error = e
+                error = _pick_error(error, e)
                 continue
-            if isinstance(by_zone, PublishError):
-                if error is None:
-                    error = by_zone
-                by_zone = False
+            if err is not None:
+                error = _pick_error(error, err)
 
             # Update records
             for subdomain in subdomains:
@@ -1227,22 +1249,13 @@ class TwoWayZoneUpdater(Updater):
                     addrs = [self.replace_ipv6_prefix(network, addr)
                              for addr in addrs]
                     records[subdomain] = (addrs, ttl)
-                elif by_zone:
-                    fqdn = self.fqdn_of(subdomain, zone)
-                    self.log.warning("Updater did not find AAAA record for %s",
-                                     fqdn)
-                    if error is None:
-                        error = PublishError(f"Updater {self.name} did not "
-                                             "find AAAA record for domain "
-                                             f"{fqdn}")
 
             # Put zone's records
             self.log.debug("Putting AAAA records")
             try:
                 self._put_ipv6_records(zone, subdomains, records, by_zone)
             except PublishError as e:
-                if error is None:
-                    error = e
+                error = _pick_error(error, e)
                 continue
 
         if error is not None:
@@ -1811,8 +1824,7 @@ class OneWayUpdater(Updater):
             try:
                 self.publish_ipv4_one_host(host, address)
             except PublishError as e:
-                if error is None:
-                    error = e
+                error = _pick_error(error, e)
         if error is not None:
             raise error
 
@@ -1845,8 +1857,7 @@ class OneWayUpdater(Updater):
                 new_ipv6 = self.replace_ipv6_prefix(network, current_ip)
                 self.publish_ipv6_one_host(host, new_ipv6)
             except PublishError as e:
-                if error is None:
-                    error = e
+                error = _pick_error(error, e)
         if error is not None:
             raise error
 

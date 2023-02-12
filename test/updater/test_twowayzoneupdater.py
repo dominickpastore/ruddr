@@ -7,20 +7,6 @@ import ruddr
 from ruddr import PublishError
 
 
-# Publish IPv4:
-# - Organize hosts into zones
-#   - Hosts with hardcoded zone are in that zone
-#   - For others, first try fetching zone
-#   - If not implemented, use public suffix list
-# - For each zone:
-#   - Fetch A records for zone
-#     - First try fetching entire zone
-#     - If not implemented, fetch records for individual hosts
-#   - Replace records for specified hosts, if they exist (error if no existing
-#     record, but not if multiple existing records)
-#   - Write A records for zone
-
-
 @pytest.fixture(scope='session')
 def data_dir(tmp_path_factory):
     return str(tmp_path_factory.mktemp('data'))
@@ -366,12 +352,140 @@ class TestGetZones:
         ])
 
 
-# TODO fetch_zone_ipv4s implemented, all single records updated, put_zone_ipv4s
-#  and put_subdomain_ipv4 implemented, put_zone_ipv4s preferred (and
-#  fetch_subdomain_ipv4s implemented too but not preferred)
-# TODO fetch_zone_ipv4s implemented, extra records left alone
-# TODO fetch_zone_ipv4s implemented, missing record is PublishError, other
-#  zones and other records still updated
+class TestFetchZoneIPv4sImplemented:
+    def test_fetch_and_put_zone_preferred(self, empty_addrfile, data_dir):
+        """Test that fetch_zone_ipv4s and put_zone_ipv4s are preferred over
+        fetch_subdomain_ipv4s and put_subdomain_ipv4 when all are
+        implemented"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv4s_result={
+                'example.com': [
+                    ('', ipaddress.IPv4Address('1.2.3.4'), 1),
+                    ('foo', ipaddress.IPv4Address('1.2.3.4'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv4Address('1.2.3.4'), 3),
+                ],
+            },
+            fetch_subdomain_ipv4s_result={
+                ('', 'example.com'): [
+                    (ipaddress.IPv4Address('1.2.3.4'), 1),
+                ],
+                ('foo', 'example.com'): [
+                    (ipaddress.IPv4Address('1.2.3.4'), 2),
+                ],
+                ('bar', 'example.net'): [
+                    (ipaddress.IPv4Address('1.2.3.4'), 3),
+                ],
+            },
+            put_zone_ipv4s_result={'example.com': None,
+                                   'example.net': None},
+            put_subdomain_ipv4_result={('', 'example.com'): None,
+                                       ('foo', 'example.com'): None,
+                                       ('bar', 'example.net'): None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv4(ipaddress.IPv4Address('5.6.7.8'))
+
+        assert updater.fetch_zone_ipv4s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv4s_calls == []
+        assert updater.put_zone_ipv4s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv4Address('5.6.7.8')], 1),
+                'foo': ([ipaddress.IPv4Address('5.6.7.8')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv4Address('5.6.7.8')], 3),
+            }),
+        ]
+        assert updater.put_subdomain_ipv4_calls == []
+
+    def test_extra_records_untouched(self, empty_addrfile, data_dir):
+        """Test extra records from fetch_zone_ipv4s are passed to
+        put_zone_ipv4s untouched"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv4s_result={
+                'example.com': [
+                    ('', ipaddress.IPv4Address('1.2.3.4'), 1),
+                    ('foo', ipaddress.IPv4Address('1.2.3.4'), 2),
+                    ('bar', ipaddress.IPv4Address('1.2.3.4'), 4),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv4Address('1.2.3.4'), 3),
+                    ('baz', ipaddress.IPv4Address('3.4.5.6'), 5),
+                ],
+            },
+            put_zone_ipv4s_result={'example.com': None,
+                                   'example.net': None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv4(ipaddress.IPv4Address('5.6.7.8'))
+
+        assert updater.fetch_zone_ipv4s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv4s_calls == []
+        assert updater.put_zone_ipv4s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv4Address('5.6.7.8')], 1),
+                'foo': ([ipaddress.IPv4Address('5.6.7.8')], 2),
+                'bar': ([ipaddress.IPv4Address('1.2.3.4')], 4),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv4Address('5.6.7.8')], 3),
+                'baz': ([ipaddress.IPv4Address('3.4.5.6')], 5),
+            }),
+        ]
+        assert updater.put_subdomain_ipv4_calls == []
+
+    def test_missing_record(self, empty_addrfile, data_dir):
+        """Test missing record from fetch_zone_ipv4s is PublishError but other
+        records still updated"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv4s_result={
+                'example.com': [
+                    ('foo', ipaddress.IPv4Address('1.2.3.4'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv4Address('1.2.3.4'), 3),
+                ],
+            },
+            put_zone_ipv4s_result={'example.com': None,
+                                   'example.net': None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        with pytest.raises(PublishError):
+            updater.publish_ipv4(ipaddress.IPv4Address('5.6.7.8'))
+
+        assert updater.fetch_zone_ipv4s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv4s_calls == []
+        assert updater.put_zone_ipv4s_calls == [
+            ('example.com', {
+                'foo': ([ipaddress.IPv4Address('5.6.7.8')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv4Address('5.6.7.8')], 3),
+            }),
+        ]
+        assert updater.put_subdomain_ipv4_calls == []
+
+
 # TODO fetch_zone_ipv4s implemented, multiple records on each host replaced
 #  with single (extra records left alone)
 # TODO fetch_zone_ipv4s implemented, put_zone_ipv4s raises PublishError, other
