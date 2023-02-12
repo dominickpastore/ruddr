@@ -6,7 +6,16 @@ import itertools
 from typing import List, Tuple, Set, Optional, Dict
 
 import ruddr
+import ruddr.util
 from ruddr import NotifierSetupError, Addrfile, PublishError
+
+
+def raise_or_return(result):
+    if isinstance(result, BaseException):
+        raise result
+    if isinstance(result, type) and issubclass(result, BaseException):
+        raise result
+    return result
 
 
 class BrokenFile:
@@ -37,6 +46,24 @@ class BrokenFile:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
+
+
+class MockZoneSplitter(ruddr.util.ZoneSplitter):
+    """A mock ZoneSplitter that tracks the domains that have been split"""
+
+    split_domains: Optional[List[str]] = []
+
+    def __init__(self, datadir: str):
+        super().__init__(datadir)
+        #: List of domains that have been split by this instance
+
+    def split(self, domain: str) -> Tuple[str, str]:
+        self.split_domains.append(domain)
+        return super().split(domain)
+
+    @classmethod
+    def clear_domains(cls):
+        cls.split_domains = []
 
 
 class FakeNotifier(ruddr.BaseNotifier):
@@ -251,7 +278,7 @@ class MockOneWayUpdater(ruddr.OneWayUpdater):
 class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
     """Mock TwoWayZoneUpdater that tracks calls to its abstract methods"""
 
-    def __init__(self, name: str, addrfile: Addrfile, datadir,
+    def __init__(self, name: str, addrfile: Addrfile, datadir: str,
                  get_zones_result=None,
                  fetch_zone_ipv4s_result=None,
                  fetch_zone_ipv6s_result=None,
@@ -261,7 +288,7 @@ class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
                  put_zone_ipv6s_result=None,
                  put_subdomain_ipv4_result=None,
                  put_subdomain_ipv6s_result=None):
-        super().__init__(name, addrfile, str(datadir))
+        super().__init__(name, addrfile, datadir)
 
         self.get_zones_result = get_zones_result
         self.fetch_zone_ipv4s_result = fetch_zone_ipv4s_result
@@ -287,7 +314,7 @@ class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
         self.get_zones_call_count += 1
         if self.get_zones_result is None:
             raise NotImplementedError
-        return self.get_zones_result
+        return raise_or_return(self.get_zones_result)
 
     def fetch_zone_ipv4s(
         self, zone: str
@@ -296,9 +323,7 @@ class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
         if self.fetch_zone_ipv4s_result is None:
             raise NotImplementedError
         result = self.fetch_zone_ipv4s_result[zone]
-        if isinstance(result, Exception):
-            raise result
-        return result
+        return raise_or_return(result)
 
     def fetch_zone_ipv6s(
         self, zone: str
@@ -307,9 +332,7 @@ class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
         if self.fetch_zone_ipv6s_result is None:
             raise NotImplementedError
         result = self.fetch_zone_ipv6s_result[zone]
-        if isinstance(result, Exception):
-            raise result
-        return result
+        return raise_or_return(result)
 
     def fetch_subdomain_ipv4s(
         self, subdomain: str, zone: str
@@ -318,9 +341,7 @@ class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
         if self.fetch_subdomain_ipv4s_result is None:
             raise NotImplementedError
         result = self.fetch_subdomain_ipv4s_result[(subdomain, zone)]
-        if isinstance(result, Exception):
-            raise result
-        return result
+        return raise_or_return(result)
 
     def fetch_subdomain_ipv6s(
         self, subdomain: str, zone: str
@@ -329,9 +350,7 @@ class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
         if self.fetch_subdomain_ipv6s_result is None:
             raise NotImplementedError
         result = self.fetch_subdomain_ipv6s_result[(subdomain, zone)]
-        if isinstance(result, Exception):
-            raise result
-        return result
+        return raise_or_return(result)
 
     def put_zone_ipv4s(
         self,
@@ -342,9 +361,7 @@ class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
         if self.put_zone_ipv4s_result is None:
             raise NotImplementedError
         result = self.put_zone_ipv4s_result[zone]
-        if isinstance(result, Exception):
-            raise result
-        return result
+        return raise_or_return(result)
 
     def put_zone_ipv6s(
         self,
@@ -355,9 +372,7 @@ class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
         if self.put_zone_ipv6s_result is None:
             raise NotImplementedError
         result = self.put_zone_ipv6s_result[zone]
-        if isinstance(result, Exception):
-            raise result
-        return result
+        return raise_or_return(result)
 
     def put_subdomain_ipv4(self, subdomain: str, zone: str,
                            address: ipaddress.IPv4Address, ttl: Optional[int]):
@@ -365,9 +380,7 @@ class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
         if self.put_subdomain_ipv4_result is None:
             raise NotImplementedError
         result = self.put_subdomain_ipv4_result[(subdomain, zone)]
-        if isinstance(result, Exception):
-            raise result
-        return result
+        return raise_or_return(result)
 
     def put_subdomain_ipv6s(self, subdomain: str, zone: str,
                             addresses: List[ipaddress.IPv6Address],
@@ -377,6 +390,4 @@ class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
         if self.put_subdomain_ipv6s_result is None:
             raise NotImplementedError
         result = self.put_subdomain_ipv6s_result[(subdomain, zone)]
-        if isinstance(result, Exception):
-            raise result
-        return result
+        return raise_or_return(result)

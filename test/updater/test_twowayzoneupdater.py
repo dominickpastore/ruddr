@@ -1,6 +1,11 @@
+import ipaddress
+
 import pytest
 
+import doubles
 import ruddr
+from ruddr import PublishError
+
 
 # Publish IPv4:
 # - Organize hosts into zones
@@ -17,21 +22,349 @@ import ruddr
 
 
 @pytest.fixture(scope='session')
-def data_dir(tmp_path):
-    return tmp_path / 'data'
+def data_dir(tmp_path_factory):
+    return str(tmp_path_factory.mktemp('data'))
 
 
-# TODO All hosts have hardcoded zones, zones not fetched
-# TODO some hosts have hardcoded zones, those are left alone when fetching
-#  zones
-# TODO get_zones is implemented, but raises PublishError
-# TODO get_zones not implemented, PSL is used
-# TODO Host does not fit into one of the fetched zones, PublishError
-# TODO Host is 'foo.bar.example.com' and zones include 'bar.example.com' and
-#  'example.com', actual zone used is 'bar.example.com' no matter the order
-# TODO Host is 'bar.example.com' and zones include 'bar.example.com' and
-#  'example.com', actual zone used is 'bar.example.com' no matter the order
-#  (can probably be combined with previous with parameterization)
+@pytest.fixture
+def mock_zone_splitter(mocker):
+    doubles.MockZoneSplitter.clear_domains()
+    mocker.patch("ruddr.util.ZoneSplitter", new=doubles.MockZoneSplitter)
+    return doubles.MockZoneSplitter
+
+
+class TestGetZones:
+    def test_hardcoded_zones(
+        self, empty_addrfile, data_dir, mock_zone_splitter
+    ):
+        """Test zones not fetched when all hosts have hardcoded zones"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv4s_result={
+                'example.com': [
+                    ('', ipaddress.IPv4Address('1.2.3.4'), 1),
+                    ('foo', ipaddress.IPv4Address('1.2.3.4'), 2),
+                ],
+            },
+            put_zone_ipv4s_result={'example.com': None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com/example.com foo.example.com/example.com"
+        )
+        updater.publish_ipv4(ipaddress.IPv4Address('5.6.7.8'))
+
+        assert updater.get_zones_call_count == 0
+        assert mock_zone_splitter.split_domains == []
+        assert updater.fetch_zone_ipv4s_calls == ['example.com']
+        assert updater.put_zone_ipv4s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv4Address('5.6.7.8')], 1),
+                'foo': ([ipaddress.IPv4Address('5.6.7.8')], 2),
+            }),
+        ]
+
+    def test_some_hardcoded(
+        self, empty_addrfile, data_dir, mock_zone_splitter
+    ):
+        """Test hardcoded zones left untouched when others need to be
+        fetched"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv4s_result={
+                'example.com': [
+                    ('', ipaddress.IPv4Address('1.2.3.4'), 1),
+                    ('foo', ipaddress.IPv4Address('1.2.3.4'), 2),
+                ],
+                'bar.example.com': [
+                    ('foo', ipaddress.IPv4Address('1.2.3.4'), 3),
+                ],
+            },
+            put_zone_ipv4s_result={'example.com': None,
+                                   'bar.example.com': None},
+            get_zones_result=['example.com', 'bar.example.com'],
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.com/bar.example.com foo.example.com"
+        )
+        updater.publish_ipv4(ipaddress.IPv4Address('5.6.7.8'))
+
+        assert updater.get_zones_call_count == 1
+        assert mock_zone_splitter.split_domains == []
+        assert updater.fetch_zone_ipv4s_calls == [
+            'example.com',
+            'bar.example.com',
+        ]
+        assert updater.put_zone_ipv4s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv4Address('5.6.7.8')], 1),
+                'foo': ([ipaddress.IPv4Address('5.6.7.8')], 2),
+            }),
+            ('bar.example.com', {
+                'foo': ([ipaddress.IPv4Address('5.6.7.8')], 3),
+            }),
+        ]
+
+    def test_no_hardcoded(
+        self, empty_addrfile, data_dir, mock_zone_splitter
+    ):
+        """Test zones are fetched when no zones are hardcoded"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv4s_result={
+                'example.com': [
+                    ('', ipaddress.IPv4Address('1.2.3.4'), 1),
+                    ('foo', ipaddress.IPv4Address('1.2.3.4'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv4Address('1.2.3.4'), 3),
+                ],
+            },
+            put_zone_ipv4s_result={'example.com': None,
+                                   'example.net': None},
+            get_zones_result=['example.com', 'example.net'],
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv4(ipaddress.IPv4Address('5.6.7.8'))
+
+        assert updater.get_zones_call_count == 1
+        assert mock_zone_splitter.split_domains == []
+        assert updater.fetch_zone_ipv4s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.put_zone_ipv4s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv4Address('5.6.7.8')], 1),
+                'foo': ([ipaddress.IPv4Address('5.6.7.8')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv4Address('5.6.7.8')], 3),
+            }),
+        ]
+
+    def test_get_zones_not_implemented(
+        self, empty_addrfile, data_dir, mock_zone_splitter
+    ):
+        """Test zones are fetched from Public Suffix List when get_zones is not
+        implemented"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv4s_result={
+                'example.com': [
+                    ('', ipaddress.IPv4Address('1.2.3.4'), 1),
+                    ('foo', ipaddress.IPv4Address('1.2.3.4'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv4Address('1.2.3.4'), 3),
+                ],
+            },
+            put_zone_ipv4s_result={'example.com': None,
+                                   'example.net': None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv4(ipaddress.IPv4Address('5.6.7.8'))
+
+        assert updater.get_zones_call_count == 1
+        assert mock_zone_splitter.split_domains == [
+            'example.com',
+            'foo.bar.example.net',
+            'foo.example.com',
+        ]
+        assert updater.fetch_zone_ipv4s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.put_zone_ipv4s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv4Address('5.6.7.8')], 1),
+                'foo': ([ipaddress.IPv4Address('5.6.7.8')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv4Address('5.6.7.8')], 3),
+            }),
+        ]
+
+    def test_publish_error(
+        self, empty_addrfile, data_dir, mock_zone_splitter
+    ):
+        """Test publish_ipv4 stops and raises PublishError when get_zones
+        raises PublishError"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv4s_result={
+                'example.com': [
+                    ('', ipaddress.IPv4Address('1.2.3.4'), 1),
+                    ('foo', ipaddress.IPv4Address('1.2.3.4'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv4Address('1.2.3.4'), 3),
+                ],
+            },
+            put_zone_ipv4s_result={'example.com': None,
+                                   'example.net': None},
+            get_zones_result=PublishError,
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        with pytest.raises(PublishError):
+            updater.publish_ipv4(ipaddress.IPv4Address('5.6.7.8'))
+
+        assert updater.get_zones_call_count == 1
+        assert mock_zone_splitter.split_domains == []
+        assert updater.fetch_zone_ipv4s_calls == []
+        assert updater.put_zone_ipv4s_calls == []
+
+    def test_no_matching_zone(
+        self, empty_addrfile, data_dir, mock_zone_splitter
+    ):
+        """Test PublishError is raised when one of the configured hosts does
+        not match any zone"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv4s_result={
+                'example.com': [
+                    ('', ipaddress.IPv4Address('1.2.3.4'), 1),
+                    ('foo', ipaddress.IPv4Address('1.2.3.4'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv4Address('1.2.3.4'), 3),
+                ],
+            },
+            put_zone_ipv4s_result={'example.com': None,
+                                   'example.net': None},
+            get_zones_result=['example.com', 'example.net'],
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com bar.example.org"
+        )
+        with pytest.raises(PublishError):
+            updater.publish_ipv4(ipaddress.IPv4Address('5.6.7.8'))
+
+        assert updater.get_zones_call_count == 1
+        assert mock_zone_splitter.split_domains == []
+        assert updater.fetch_zone_ipv4s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.put_zone_ipv4s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv4Address('5.6.7.8')], 1),
+                'foo': ([ipaddress.IPv4Address('5.6.7.8')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv4Address('5.6.7.8')], 3),
+            }),
+        ]
+
+    def test_extra_zone(
+        self, empty_addrfile, data_dir, mock_zone_splitter
+    ):
+        """Test extra zones that don't match any host are present from
+        get_zones and their records are not fetched"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv4s_result={
+                'example.com': [
+                    ('', ipaddress.IPv4Address('1.2.3.4'), 1),
+                    ('foo', ipaddress.IPv4Address('1.2.3.4'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv4Address('1.2.3.4'), 3),
+                ],
+            },
+            put_zone_ipv4s_result={'example.com': None,
+                                   'example.net': None},
+            get_zones_result=['example.com', 'example.net', 'example.org'],
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv4(ipaddress.IPv4Address('5.6.7.8'))
+
+        assert updater.get_zones_call_count == 1
+        assert mock_zone_splitter.split_domains == []
+        assert updater.fetch_zone_ipv4s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.put_zone_ipv4s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv4Address('5.6.7.8')], 1),
+                'foo': ([ipaddress.IPv4Address('5.6.7.8')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv4Address('5.6.7.8')], 3),
+            }),
+        ]
+
+    @pytest.mark.parametrize(('host', 'zones', 'subdomain', 'zone'), [
+        ('bar.example.com',
+         ['example.com', 'bar.example.com', 'example.net'],
+         '',
+         'bar.example.com'),
+        ('bar.example.com',
+         ['bar.example.com', 'example.com', 'example.net'],
+         '',
+         'bar.example.com'),
+        ('foo.bar.example.com',
+         ['example.com', 'bar.example.com', 'example.net'],
+         'foo',
+         'bar.example.com'),
+        ('foo.bar.example.com',
+         ['bar.example.com', 'example.com', 'example.net'],
+         'foo',
+         'bar.example.com'),
+    ])
+    def test_longest_zone_matched(
+        self, host, zones, subdomain, zone,
+        empty_addrfile, data_dir, mock_zone_splitter,
+    ):
+        """Test that a host is always matched with the longest zone possible"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv4s_result={
+                'example.com': [
+                    ('', ipaddress.IPv4Address('1.2.3.4'), 1),
+                    ('foo', ipaddress.IPv4Address('1.2.3.4'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv4Address('1.2.3.4'), 3),
+                ],
+                zone: [
+                    (subdomain, ipaddress.IPv4Address('1.2.3.4'), 4),
+                ]
+            },
+            put_zone_ipv4s_result={'example.com': None,
+                                   'example.net': None,
+                                   zone: None},
+            get_zones_result=zones,
+        )
+        updater.init_hosts_and_zones(
+            f"example.com foo.bar.example.net foo.example.com {host}"
+        )
+        updater.publish_ipv4(ipaddress.IPv4Address('5.6.7.8'))
+
+        assert updater.get_zones_call_count == 1
+        assert mock_zone_splitter.split_domains == []
+        assert sorted(updater.fetch_zone_ipv4s_calls) == sorted(zones)
+        assert sorted(updater.put_zone_ipv4s_calls) == sorted([
+            ('example.com', {
+                '': ([ipaddress.IPv4Address('5.6.7.8')], 1),
+                'foo': ([ipaddress.IPv4Address('5.6.7.8')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv4Address('5.6.7.8')], 3),
+            }),
+            (zone, {
+                subdomain: ([ipaddress.IPv4Address('5.6.7.8')], 4),
+            }),
+        ])
+
 
 # TODO fetch_zone_ipv4s implemented, all single records updated, put_zone_ipv4s
 #  and put_subdomain_ipv4 implemented, put_zone_ipv4s preferred (and

@@ -16,8 +16,7 @@ else:
 
 from . import Addrfile
 from . import configuration
-from .exceptions import (RuddrException, NotifierSetupError, ConfigError,
-                         RuddrSetupError)
+from .exceptions import NotifierSetupError, ConfigError, RuddrSetupError
 from . import notifiers
 from ruddr.util import sdnotify
 from . import updaters

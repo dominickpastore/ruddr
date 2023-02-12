@@ -11,14 +11,14 @@ import types
 # NOT use ABCMeta or inherit from ABC.
 from abc import abstractmethod
 from typing import (Union, Tuple, List, Optional, Dict, TypeVar, Sequence,
-                    Mapping, Callable)
+                    Mapping, Callable, cast)
 
 import dns.exception    # type: ignore
 import dns.resolver     # type: ignore
 
 from ruddr.addrfile import Addrfile
 from ruddr.exceptions import PublishError, FatalPublishError, ConfigError
-from ruddr.util import ZoneSplitter
+import ruddr.util
 
 
 Addr = TypeVar('Addr', ipaddress.IPv4Address, ipaddress.IPv6Address)
@@ -396,7 +396,7 @@ class TwoWayZoneUpdater(Updater):
         self._hosts: List[Tuple[str, Optional[str]]] = []
 
         #: Used by :func:`_get_subdomain_and_zone_for`
-        self._zone_splitter: Optional[ZoneSplitter] = None
+        self._zone_splitter: Optional[ruddr.util.ZoneSplitter] = None
         self._datadir: str = datadir
 
     def init_hosts_and_zones(
@@ -799,7 +799,7 @@ class TwoWayZoneUpdater(Updater):
         self,
         fqdn: str,
         zones: Optional[List[str]],
-    ) -> Tuple[str, str]:
+    ) -> Tuple[str, Optional[str]]:
         """Find the zone the FQDN belongs to and return that and the subdomain
         portion.
 
@@ -807,18 +807,20 @@ class TwoWayZoneUpdater(Updater):
         verify that the zone is present). If not, use the `publix suffix list`_
         to determine the zone.
 
+        If a zone list is given and the FQDN does not belong to any of them,
+        returns ``None`` as the zone.
+
         .. _public suffix list: https://publicsuffix.org/
 
         :param fqdn: Domain name to split into subdomain and zone
         :param zones: List of zones, or ``None``
 
-        :return: A 2-tuple ``(subdomain, zone)``
-        :raise PublishError: if the given FQDN is not in any of the given zones
+        :return: A 2-tuple ``(subdomain, zone)`` or ``(fqdn, None)``
         """
         if zones is None:
             # Use public suffix list
             if self._zone_splitter is None:
-                self._zone_splitter = ZoneSplitter(self._datadir)
+                self._zone_splitter = ruddr.util.ZoneSplitter(self._datadir)
             return self._zone_splitter.split(fqdn)
 
         for zone in zones:
@@ -827,15 +829,17 @@ class TwoWayZoneUpdater(Updater):
             except ValueError:
                 continue
             return (subdomain, zone)
-        self.log.error("Domain '%s' not in any available zone")
-        raise PublishError(f"Domain {fqdn} not in any zone available to "
-                           f"updater {self.name}")
+        return (fqdn, None)
 
-    def _get_hosts_by_zone(self) -> Dict[str, List[str]]:
+    def _get_hosts_by_zone(self) -> Dict[Optional[str], List[str]]:
         """Get a list of subdomains to be updated, sorted into zones
 
         :return: A dict with zones as keys and lists of subdomains as values,
-                 with the root of the zone represented by an empty string
+                 with the root of the zone represented by an empty string. Any
+                 domains for which no matching zone exists (if
+                 :meth:`get_zones` is implemented) will be placed under key
+                 ``None``.
+        :raises PublishError: if :meth:`get_zones` raises :exc:`PublishError`
         """
         self.log.debug("Assembling a dict of hosts by zone")
         result = dict()
@@ -848,16 +852,42 @@ class TwoWayZoneUpdater(Updater):
                     self.log.debug("Fetching zones")
                     try:
                         zones = self.get_zones()
-                        # TODO Sort zones by longest first
+                        # Need longest zones first
+                        zones.sort(key=lambda z: z.count('.') + (len(z) > 0),
+                                   reverse=True)
                     except NotImplementedError:
                         self.log.debug("get_zones() not implemented, will use"
                                        "PSL")
+                    zones_fetched = True
                 subdomain, zone = self._get_subdomain_and_zone_for(host, zones)
             else:
                 subdomain = self.subdomain_of(host, zone)
             result.setdefault(zone, []).append(subdomain)
 
         return result
+
+    def _check_for_missing_zones(
+        self,
+        hosts_by_zone: Dict[Optional[str], List[str]]
+    ) -> Tuple[Dict[str, List[str]], Optional[PublishError]]:
+        """Check if any of the zones are None. If so, remove it from the dict
+        and return an error with the dict. Otherwise, return the dict untouched
+        and no error.
+
+        :param hosts_by_zone: The dict of hosts to check
+        :return: ``(hosts_by_zone, None)`` or ``(hosts_by_zone, error)``
+        """
+        try:
+            zoneless_hosts = hosts_by_zone[None]
+        except KeyError:
+            return (cast(Dict[str, List[str]], hosts_by_zone), None)
+        del hosts_by_zone[None]
+        self.log.error(f'Domains {", ".join(zoneless_hosts)} not in any '
+                       'available zone')
+        return (cast(Dict[str, List[str]], hosts_by_zone), PublishError(
+            f'Domains {", ".join(zoneless_hosts)} in updater {self.name} not '
+            'in any available zone'
+        ))
 
     def _verify_and_group_addrs_by_host(
         self,
@@ -1017,8 +1047,8 @@ class TwoWayZoneUpdater(Updater):
     def publish_ipv4(self, address: ipaddress.IPv4Address):
         """:meta private:"""
         hosts_by_zone = self._get_hosts_by_zone()
+        hosts_by_zone, error = self._check_for_missing_zones(hosts_by_zone)
 
-        error = None
         for zone, subdomains in hosts_by_zone.items():
             # Fetch zone's records
             self.log.debug("Fetching A records")
@@ -1173,8 +1203,8 @@ class TwoWayZoneUpdater(Updater):
     def publish_ipv6(self, network: ipaddress.IPv6Network):
         """:meta private:"""
         hosts_by_zone = self._get_hosts_by_zone()
+        hosts_by_zone, error = self._check_for_missing_zones(hosts_by_zone)
 
-        error = None
         for zone, subdomains in hosts_by_zone.items():
             # Fetch zone's records
             self.log.debug("Fetching AAAA records")
