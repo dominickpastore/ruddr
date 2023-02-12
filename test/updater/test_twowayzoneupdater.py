@@ -7,11 +7,6 @@ import ruddr
 from ruddr import PublishError, FatalPublishError
 
 
-@pytest.fixture(scope='session')
-def data_dir(tmp_path_factory):
-    return str(tmp_path_factory.mktemp('data'))
-
-
 @pytest.fixture
 def mock_zone_splitter(mocker):
     doubles.MockZoneSplitter.clear_domains()

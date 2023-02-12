@@ -391,3 +391,106 @@ class MockTwoWayZoneUpdater(ruddr.TwoWayZoneUpdater):
             raise NotImplementedError
         result = self.put_subdomain_ipv6s_result[(subdomain, zone)]
         return raise_or_return(result)
+
+
+class MockTwoWayUpdater(ruddr.TwoWayUpdater):
+    """Mock TwoWayUpdater that tracks calls to its abstract methods"""
+
+    def __init__(self, name: str, addrfile: Addrfile, datadir: str,
+                 fetch_all_ipv4s_result=None,
+                 fetch_all_ipv6s_result=None,
+                 fetch_domain_ipv4s_result=None,
+                 fetch_domain_ipv6s_result=None,
+                 put_all_ipv4s_result=None,
+                 put_all_ipv6s_result=None,
+                 put_domain_ipv4_result=None,
+                 put_domain_ipv6s_result=None):
+        super().__init__(name, addrfile, datadir)
+
+        self.fetch_all_ipv4s_result = fetch_all_ipv4s_result
+        self.fetch_all_ipv6s_result = fetch_all_ipv6s_result
+        self.fetch_domain_ipv4s_result = fetch_domain_ipv4s_result
+        self.fetch_domain_ipv6s_result = fetch_domain_ipv6s_result
+        self.put_all_ipv4s_result = put_all_ipv4s_result
+        self.put_all_ipv6s_result = put_all_ipv6s_result
+        self.put_domain_ipv4_result = put_domain_ipv4_result
+        self.put_domain_ipv6s_result = put_domain_ipv6s_result
+
+        self.fetch_all_ipv4s_count = 0
+        self.fetch_all_ipv6s_count = 0
+        self.fetch_domain_ipv4s_calls = []
+        self.fetch_domain_ipv6s_calls = []
+        self.put_all_ipv4s_calls = []
+        self.put_all_ipv6s_calls = []
+        self.put_domain_ipv4_calls = []
+        self.put_domain_ipv6s_calls = []
+
+    def fetch_all_ipv4s(
+        self
+    ) -> List[Tuple[str, ipaddress.IPv4Address, Optional[int]]]:
+        self.fetch_all_ipv4s_count += 1
+        if self.fetch_all_ipv4s_result is None:
+            raise NotImplementedError
+        return raise_or_return(self.fetch_all_ipv4s_result)
+
+    def fetch_all_ipv6s(
+        self
+    ) -> List[Tuple[str, ipaddress.IPv6Address, Optional[int]]]:
+        self.fetch_all_ipv6s_count += 1
+        if self.fetch_all_ipv6s_result is None:
+            raise NotImplementedError
+        return raise_or_return(self.fetch_all_ipv6s_result)
+
+    def fetch_domain_ipv4s(
+        self, domain: str
+    ) -> List[Tuple[ipaddress.IPv4Address, Optional[int]]]:
+        self.fetch_domain_ipv4s_calls.append(domain)
+        if self.fetch_domain_ipv4s_result is None:
+            raise NotImplementedError
+        result = self.fetch_domain_ipv4s_result[domain]
+        return raise_or_return(result)
+
+    def fetch_domain_ipv6s(
+        self, domain: str
+    ) -> List[Tuple[ipaddress.IPv6Address, Optional[int]]]:
+        self.fetch_domain_ipv6s_calls.append(domain)
+        if self.fetch_domain_ipv6s_result is None:
+            raise NotImplementedError
+        result = self.fetch_domain_ipv6s_result[domain]
+        return raise_or_return(result)
+
+    def put_all_ipv4s(
+        self,
+        records: Dict[str, Tuple[List[ipaddress.IPv4Address], Optional[int]]]
+    ):
+        self.put_all_ipv4s_calls.append(records)
+        if self.put_all_ipv4s_result is None:
+            raise NotImplementedError
+        return raise_or_return(self.put_all_ipv4s_result)
+
+    def put_all_ipv6s(
+        self,
+        records: Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]]
+    ):
+        self.put_all_ipv6s_calls.append(records)
+        if self.put_all_ipv6s_result is None:
+            raise NotImplementedError
+        return raise_or_return(self.put_all_ipv6s_result)
+
+    def put_domain_ipv4(self, domain: str,
+                        address: ipaddress.IPv4Address,
+                        ttl: Optional[int]):
+        self.put_domain_ipv4_calls.append((domain, address, ttl))
+        if self.put_domain_ipv4_result is None:
+            raise NotImplementedError
+        result = self.put_domain_ipv4_result[domain]
+        return raise_or_return(result)
+
+    def put_domain_ipv6s(self, domain: str,
+                         addresses: List[ipaddress.IPv6Address],
+                         ttl: Optional[int]):
+        self.put_domain_ipv6s_calls.append((domain, addresses, ttl))
+        if self.put_domain_ipv6s_result is None:
+            raise NotImplementedError
+        result = self.put_domain_ipv6s_result[domain]
+        return raise_or_return(result)

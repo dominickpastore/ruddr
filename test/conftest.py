@@ -162,3 +162,8 @@ def mock_updater(updater_factory):
 def empty_addrfile(tmp_path):
     """Fixture creating an empty :class:`~ruddr.Addrfile`"""
     return ruddr.addrfile.Addrfile(tmp_path / 'addrfile')
+
+
+@pytest.fixture(scope='session')
+def data_dir(tmp_path_factory):
+    return str(tmp_path_factory.mktemp('data'))
