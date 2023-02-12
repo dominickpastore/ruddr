@@ -1248,7 +1248,11 @@ class TwoWayZoneUpdater(Updater):
                     addrs = records[subdomain][0]
                     addrs = [self.replace_ipv6_prefix(network, addr)
                              for addr in addrs]
-                    records[subdomain] = (addrs, ttl)
+                    addrs_no_duplicates = []
+                    for addr in addrs:
+                        if addr not in addrs_no_duplicates:
+                            addrs_no_duplicates.append(addr)
+                    records[subdomain] = (addrs_no_duplicates, ttl)
 
             # Put zone's records
             self.log.debug("Putting AAAA records")

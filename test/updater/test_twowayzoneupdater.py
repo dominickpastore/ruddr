@@ -504,7 +504,7 @@ class TestFetchZoneIPv4sImplemented:
                 ],
                 'example.net': [
                     ('foo.bar', ipaddress.IPv4Address('1.2.3.4'), 3),
-                    ('foo.bar', ipaddress.IPv4Address('2.3.4.5'), 32),
+                    ('foo.bar', ipaddress.IPv4Address('2.3.4.5'), 33),
                     ('baz', ipaddress.IPv4Address('3.4.5.6'), 5),
                     ('baz', ipaddress.IPv4Address('4.5.6.7'), 55),
                 ],
@@ -788,7 +788,7 @@ class TestFetchZoneIPv4sImplemented:
                 ],
                 'example.net': [
                     ('foo.bar', ipaddress.IPv4Address('1.2.3.4'), 3),
-                    ('foo.bar', ipaddress.IPv4Address('2.3.4.5'), 32),
+                    ('foo.bar', ipaddress.IPv4Address('2.3.4.5'), 33),
                     ('baz', ipaddress.IPv4Address('3.4.5.6'), 5),
                     ('baz', ipaddress.IPv4Address('4.5.6.7'), 55),
                 ],
@@ -1206,52 +1206,908 @@ def test_fetch_zone_and_subdomain_ipv4_not_implemented(empty_addrfile,
         updater.publish_ipv4(ipaddress.IPv4Address('5.6.7.8'))
 
 
-# TODO fetch_zone_ipv6s implemented, all single records updated, put_zone_ipv6s
-#  and put_subdomain_ipv6s implemented, put_zone_ipv6s preferred (and
-#  fetch_subdomain_ipv6s implemented too but not preferred)
-# TODO fetch_zone_ipv6s implemented, extra records left alone
-# TODO fetch_zone_ipv6s implemented, missing record is PublishError, other
-#  zones and other records still updated
-# TODO fetch_zone_ipv6s implemented, multiple records on each host replaced
-#  (extra records left alone)
-# TODO fetch_zone_ipv6s implemented, put_zone_ipv6s raises PublishError, other
-#  zones still updated
-# TODO fetch_zone_ipv6s raises PublishError, other zones still updated
-# TODO fetch_zone_ipv6s implemented, put_zone_ipv6s not implemented,
-#  put_subdomain_ipv6s called instead (all single records)
-# TODO fetch_zone_ipv6s implemented, put_zone_ipv6s not implemented,
-#  put_subdomain_ipv6s called instead, but not for extra records
-# TODO fetch_zone_ipv6s implemented, put_zone_ipv6s not implemented,
-#  put_subdomain_ipv6s is implemented, missing record is PublishError, other
-#  zones and other records still updated
-# TODO fetch_zone_ipv6s implemented, put_zone_ipv6s not implemented,
-#  put_subdomain_ipv6s called instead, only once when multiple records on hosts
-# TODO fetch_zone_ipv6s implemented, put_zone_ipv6s not implemented,
-#  put_subdomain_ipv6s raises PublishError, other domains in zone still updated
-#  and other zones still updated
-# TODO fetch_zone_ipv6s raises PublishError, put_zone_ipv6s not implemented,
-#  other zones still updated
-# TODO fetch_zone_ipv6s implemented, neither put_zone_ipv6s nor
-#  put_subdomain_ipv6s implemented, raise FatalPublishError
+class TestFetchZoneIPv6sImplemented:
+    def test_fetch_and_put_zone_preferred(self, empty_addrfile, data_dir):
+        """Test that fetch_zone_ipv6s and put_zone_ipv6s are preferred over
+        fetch_subdomain_ipv6s and put_subdomain_ipv6 when all are
+        implemented"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    ('', ipaddress.IPv6Address('1234::1'), 1),
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                ],
+            },
+            fetch_subdomain_ipv6s_result={
+                ('', 'example.com'): [
+                    (ipaddress.IPv6Address('1234::1'), 1),
+                ],
+                ('foo', 'example.com'): [
+                    (ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                ('foo.bar', 'example.net'): [
+                    (ipaddress.IPv6Address('1234::3'), 3),
+                ],
+            },
+            put_zone_ipv6s_result={'example.com': None,
+                                   'example.net': None},
+            put_subdomain_ipv6s_result={('', 'example.com'): None,
+                                        ('foo', 'example.com'): None,
+                                        ('foo.bar', 'example.net'): None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
 
-# TODO fetch_zone_ipv6s not implemented, fetch_subdomain_ipv6s used instead,
-#  all single records updated, put_zone_ipv6s and put_subdomain_ipv6s
-#  implemented, put_subdomain_ipv6s called only
-# TODO fetch_zone_ipv6s not implemented, fetch_subdomain_ipv6s used instead,
-#  put_zone_ipv6s implemented but put_subdomain_ipv6s not, FatalPublishError
-# TODO fetch_zone_ipv6s not implemented, fetch_subdomain_ipv6s used instead,
-#  multiple records on each host replaced with single
-# TODO fetch_zone_ipv6s not implemented, fetch_subdomain_ipv6s used instead,
-#  fetch_subdomain_ipv6s raises PublishError, other subdomains and zones still
-#  fetched and updated
-# TODO fetch_zone_ipv6s not implemented, fetch_subdomain_ipv6s used instead,
-#  put_subdomain_ipv6s raises PublishError, other hosts and zones still updated
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == []
+        assert updater.put_zone_ipv6s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv6Address('5678::1')], 1),
+                'foo': ([ipaddress.IPv6Address('5678::2')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv6Address('5678::3')], 3),
+            }),
+        ]
+        assert updater.put_subdomain_ipv6s_calls == []
 
-# TODO neither fetch_zone_ipv6s nor fetch_subdomain_ipv6s implemented, raise
-#  FatalPublishError
+    def test_extra_records_untouched(self, empty_addrfile, data_dir):
+        """Test extra records from fetch_zone_ipv6s are passed to
+        put_zone_ipv6s untouched"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    ('', ipaddress.IPv6Address('1234::1'), 1),
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                    ('bar', ipaddress.IPv6Address('1234::4'), 4),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                    ('baz', ipaddress.IPv6Address('3456::5'), 5),
+                ],
+            },
+            put_zone_ipv6s_result={'example.com': None,
+                                   'example.net': None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
 
-# TODO Test init_hosts_and_zones with structured hosts, and do an IPv6 update
-#  to confirm it works (all others tests will use string hosts)
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == []
+        assert updater.put_zone_ipv6s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv6Address('5678::1')], 1),
+                'foo': ([ipaddress.IPv6Address('5678::2')], 2),
+                'bar': ([ipaddress.IPv6Address('1234::4')], 4),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv6Address('5678::3')], 3),
+                'baz': ([ipaddress.IPv6Address('3456::5')], 5),
+            }),
+        ]
+        assert updater.put_subdomain_ipv6s_calls == []
+
+    def test_missing_record(self, empty_addrfile, data_dir):
+        """Test missing record from fetch_zone_ipv6s is PublishError but other
+        records still updated"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                ],
+            },
+            put_zone_ipv6s_result={'example.com': None,
+                                   'example.net': None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        with pytest.raises(PublishError):
+            updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == []
+        assert updater.put_zone_ipv6s_calls == [
+            ('example.com', {
+                'foo': ([ipaddress.IPv6Address('5678::2')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv6Address('5678::3')], 3),
+            }),
+        ]
+        assert updater.put_subdomain_ipv6s_calls == []
+
+    def test_multiple_records(self, empty_addrfile, data_dir):
+        """Test when multiple records are set for a host, they are all
+        replaced, but multiple records on irrelevant hosts are left alone."""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    # Different TTL within an RR set is not valid, but some
+                    # providers may support it anyway. We take the minimum.
+                    ('', ipaddress.IPv6Address('1234::1'), 1),
+                    ('', ipaddress.IPv6Address('2345::1'), 11),
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                    ('foo', ipaddress.IPv6Address('1234::22'), 22),
+                    ('bar', ipaddress.IPv6Address('1234::4'), 4),
+                    ('bar', ipaddress.IPv6Address('2345::4'), 44),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                    ('foo.bar', ipaddress.IPv6Address('2345::33'), 33),
+                    ('baz', ipaddress.IPv6Address('3456::5'), 5),
+                    ('baz', ipaddress.IPv6Address('3456::55'), 55),
+                ],
+            },
+            put_zone_ipv6s_result={'example.com': None,
+                                   'example.net': None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv6(ipaddress.IPv6Network('5678::/63'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == []
+        assert updater.put_zone_ipv6s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv6Address('5678::1')], 1),
+                'foo': ([ipaddress.IPv6Address('5678::2'),
+                         ipaddress.IPv6Address('5678::22')], 2),
+                'bar': ([ipaddress.IPv6Address('1234::4'),
+                         ipaddress.IPv6Address('2345::4')], 4),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv6Address('5678::3'),
+                             ipaddress.IPv6Address('5678::33')], 3),
+                'baz': ([ipaddress.IPv6Address('3456::5'),
+                         ipaddress.IPv6Address('3456::55')], 5),
+            }),
+        ]
+        assert updater.put_subdomain_ipv6s_calls == []
+
+    @pytest.mark.parametrize(('zone', 'error'), [
+        ('example.com', PublishError),
+        ('example.com', FatalPublishError),
+        ('example.net', PublishError),
+        ('example.net', FatalPublishError),
+    ])
+    def test_put_zone_publish_error(self, empty_addrfile, data_dir,
+                                    zone, error):
+        """Test other zones are still published after PublishError for one
+        zone's put_zone_ipv6s"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    ('', ipaddress.IPv6Address('1234::1'), 1),
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                ],
+            },
+            put_zone_ipv6s_result={'example.com': None,
+                                   'example.net': None,
+                                   zone: error},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        with pytest.raises(error):
+            updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == []
+        assert updater.put_zone_ipv6s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv6Address('5678::1')], 1),
+                'foo': ([ipaddress.IPv6Address('5678::2')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv6Address('5678::3')], 3),
+            }),
+        ]
+        assert updater.put_subdomain_ipv6s_calls == []
+
+    @pytest.mark.parametrize(('zone', 'error'), [
+        ('example.com', PublishError),
+        ('example.com', FatalPublishError),
+        ('example.net', PublishError),
+        ('example.net', FatalPublishError),
+    ])
+    def test_fetch_zone_publish_error(self, empty_addrfile, data_dir,
+                                      zone, error):
+        """Test other zones still updated when fetch_zone_ipv6s raises
+        PublishError for one zone"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    ('', ipaddress.IPv6Address('1234::1'), 1),
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                ],
+                zone: error,
+            },
+            put_zone_ipv6s_result={'example.com': None,
+                                   'example.net': None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        with pytest.raises(error):
+            updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == []
+        calls = [
+            ('example.com', {
+                '': ([ipaddress.IPv6Address('5678::1')], 1),
+                'foo': ([ipaddress.IPv6Address('5678::2')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv6Address('5678::3')], 3),
+            }),
+        ]
+        assert updater.put_zone_ipv6s_calls == [
+            c for c in calls if c[0] != zone
+        ]
+        assert updater.put_subdomain_ipv6s_calls == []
+
+    def test_put_zone_not_implemented(self, empty_addrfile, data_dir):
+        """Test that put_subdomain_ipv6s is used when fetch_zone_ipv6s is
+        implemented but put_zone_ipv6 is not"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    ('', ipaddress.IPv6Address('1234::1'), 1),
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                ],
+            },
+            put_subdomain_ipv6s_result={('', 'example.com'): None,
+                                        ('foo', 'example.com'): None,
+                                        ('foo.bar', 'example.net'): None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == []
+        assert updater.put_zone_ipv6s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv6Address('5678::1')], 1),
+                'foo': ([ipaddress.IPv6Address('5678::2')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv6Address('5678::3')], 3),
+            }),
+        ]
+        assert updater.put_subdomain_ipv6s_calls == [
+            ('', 'example.com', [ipaddress.IPv6Address('5678::1')], 1),
+            ('foo', 'example.com', [ipaddress.IPv6Address('5678::2')], 2),
+            ('foo.bar', 'example.net', [ipaddress.IPv6Address('5678::3')], 3),
+        ]
+
+    def test_put_zone_not_implemented_extra_records(self, empty_addrfile,
+                                                    data_dir):
+        """Test that put_subdomain_ipv6s is not called for extra records
+        returned by fetch_zone_ipv6s"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    ('', ipaddress.IPv6Address('1234::1'), 1),
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                    ('bar', ipaddress.IPv6Address('1234::4'), 4),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                    ('baz', ipaddress.IPv6Address('3456::5'), 5),
+                ],
+            },
+            put_subdomain_ipv6s_result={('', 'example.com'): None,
+                                        ('foo', 'example.com'): None,
+                                        ('foo.bar', 'example.net'): None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == []
+        assert updater.put_zone_ipv6s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv6Address('5678::1')], 1),
+                'foo': ([ipaddress.IPv6Address('5678::2')], 2),
+                'bar': ([ipaddress.IPv6Address('1234::4')], 4),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv6Address('5678::3')], 3),
+                'baz': ([ipaddress.IPv6Address('3456::5')], 5),
+            }),
+        ]
+        assert updater.put_subdomain_ipv6s_calls == [
+            ('', 'example.com', [ipaddress.IPv6Address('5678::1')], 1),
+            ('foo', 'example.com', [ipaddress.IPv6Address('5678::2')], 2),
+            ('foo.bar', 'example.net', [ipaddress.IPv6Address('5678::3')], 3),
+        ]
+
+    def test_put_zone_not_implemented_missing_record(self, empty_addrfile,
+                                                     data_dir):
+        """Test missing record from fetch_zone_ipv6s is PublishError but other
+        records still updated with put_subdomain_ipv6s when put_zone_ipv6s not
+        implemented"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                ],
+            },
+            put_subdomain_ipv6s_result={('foo', 'example.com'): None,
+                                        ('foo.bar', 'example.net'): None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        with pytest.raises(PublishError):
+            updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == []
+        assert updater.put_zone_ipv6s_calls == [
+            ('example.com', {
+                'foo': ([ipaddress.IPv6Address('5678::2')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv6Address('5678::3')], 3),
+            }),
+        ]
+        assert updater.put_subdomain_ipv6s_calls == [
+            ('foo', 'example.com', [ipaddress.IPv6Address('5678::2')], 2),
+            ('foo.bar', 'example.net', [ipaddress.IPv6Address('5678::3')], 3),
+        ]
+
+    def test_put_zone_not_implemented_multiple_records(
+        self, empty_addrfile, data_dir
+    ):
+        """Test when multiple records are set for a host and put_zone_ipv6s is
+        not implemented, put_subdomain_ipv6s is called exactly once for each
+        relevant host and not at all for irrelevant hosts"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    # Different TTL within an RR set is not valid, but some
+                    # providers may support it anyway. We take the minimum.
+                    ('', ipaddress.IPv6Address('1234::1'), 1),
+                    ('', ipaddress.IPv6Address('2345::1'), 11),
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                    ('foo', ipaddress.IPv6Address('1234::22'), 22),
+                    ('bar', ipaddress.IPv6Address('1234::4'), 4),
+                    ('bar', ipaddress.IPv6Address('2345::4'), 44),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                    ('foo.bar', ipaddress.IPv6Address('2345::33'), 33),
+                    ('baz', ipaddress.IPv6Address('3456::5'), 5),
+                    ('baz', ipaddress.IPv6Address('3456::55'), 55),
+                ],
+            },
+            put_subdomain_ipv6s_result={('', 'example.com'): None,
+                                        ('foo', 'example.com'): None,
+                                        ('foo.bar', 'example.net'): None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == []
+        assert updater.put_zone_ipv6s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv6Address('5678::1')], 1),
+                'foo': ([ipaddress.IPv6Address('5678::2'),
+                         ipaddress.IPv6Address('5678::22')], 2),
+                'bar': ([ipaddress.IPv6Address('1234::4'),
+                         ipaddress.IPv6Address('2345::4')], 4),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv6Address('5678::3'),
+                             ipaddress.IPv6Address('5678::33')], 3),
+                'baz': ([ipaddress.IPv6Address('3456::5'),
+                         ipaddress.IPv6Address('3456::55')], 5),
+            }),
+        ]
+        assert updater.put_subdomain_ipv6s_calls == [
+            ('', 'example.com', [ipaddress.IPv6Address('5678::1')], 1),
+            ('foo', 'example.com', [ipaddress.IPv6Address('5678::2'),
+                                    ipaddress.IPv6Address('5678::22')], 2),
+            ('foo.bar', 'example.net', [ipaddress.IPv6Address('5678::3'),
+                                        ipaddress.IPv6Address('5678::33')], 3),
+        ]
+
+    @pytest.mark.parametrize(('subdomain', 'zone', 'error'), [
+        ('', 'example.com', PublishError),
+        ('', 'example.com', FatalPublishError),
+        ('foo', 'example.com', PublishError),
+        ('foo', 'example.com', FatalPublishError),
+        ('foo.bar', 'example.net', PublishError),
+        ('foo.bar', 'example.net', FatalPublishError),
+    ])
+    def test_put_zone_not_implemented_put_subdomain_publish_error(
+        self, empty_addrfile, data_dir, subdomain, zone, error
+    ):
+        """Test that remaining subdomains and zones are still published when
+        put_subdomain_ipv6s has a PublishError"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    ('', ipaddress.IPv6Address('1234::1'), 1),
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                ],
+            },
+            put_subdomain_ipv6s_result={('', 'example.com'): None,
+                                        ('foo', 'example.com'): None,
+                                        ('foo.bar', 'example.net'): None,
+                                        (subdomain, zone): error},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        with pytest.raises(error):
+            updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == []
+        assert updater.put_zone_ipv6s_calls == [
+            ('example.com', {
+                '': ([ipaddress.IPv6Address('5678::1')], 1),
+                'foo': ([ipaddress.IPv6Address('5678::2')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv6Address('5678::3')], 3),
+            }),
+        ]
+        assert updater.put_subdomain_ipv6s_calls == [
+            ('', 'example.com', [ipaddress.IPv6Address('5678::1')], 1),
+            ('foo', 'example.com', [ipaddress.IPv6Address('5678::2')], 2),
+            ('foo.bar', 'example.net', [ipaddress.IPv6Address('5678::3')], 3),
+        ]
+
+    @pytest.mark.parametrize(('zone', 'error'), [
+        ('example.com', PublishError),
+        ('example.com', FatalPublishError),
+        ('example.net', PublishError),
+        ('example.net', FatalPublishError),
+    ])
+    def test_put_zone_not_implemented_fetch_zone_publish_error(
+        self, empty_addrfile, data_dir, zone, error
+    ):
+        """Test other zones still updated when fetch_zone_ipv4s raises
+        PublishError for one zone and put_zone_ipv4s not implemented"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    ('', ipaddress.IPv6Address('1234::1'), 1),
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                ],
+                zone: error,
+            },
+            put_subdomain_ipv6s_result={('', 'example.com'): None,
+                                        ('foo', 'example.com'): None,
+                                        ('foo.bar', 'example.net'): None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        with pytest.raises(error):
+            updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == []
+        calls = [
+            ('example.com', {
+                '': ([ipaddress.IPv6Address('5678::1')], 1),
+                'foo': ([ipaddress.IPv6Address('5678::2')], 2),
+            }),
+            ('example.net', {
+                'foo.bar': ([ipaddress.IPv6Address('5678::3')], 3),
+            }),
+        ]
+        assert updater.put_zone_ipv6s_calls == [
+            c for c in calls if c[0] != zone
+        ]
+        calls = [
+            ('', 'example.com', [ipaddress.IPv6Address('5678::1')], 1),
+            ('foo', 'example.com', [ipaddress.IPv6Address('5678::2')], 2),
+            ('foo.bar', 'example.net', [ipaddress.IPv6Address('5678::3')], 3),
+        ]
+        assert updater.put_subdomain_ipv6s_calls == [
+            c for c in calls if c[1] != zone
+        ]
+
+    def test_put_zone_and_subdomain_not_implemented(self, empty_addrfile,
+                                                    data_dir):
+        """Test that FatalPublishError is raised when neither put_zone_ipv6s
+        nor put_subdomain_ipv6s are implemented"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_zone_ipv6s_result={
+                'example.com': [
+                    ('', ipaddress.IPv6Address('1234::1'), 1),
+                    ('foo', ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                'example.net': [
+                    ('foo.bar', ipaddress.IPv6Address('1234::3'), 3),
+                ],
+            },
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        with pytest.raises(FatalPublishError):
+            updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+
+class TestFetchZoneIPv6sNotImplemented:
+    def test_put_subdomain_preferred(self, empty_addrfile, data_dir):
+        """Test that put_subdomain_ipv6s is used when fetch_zone_ipv6s is not
+        implemented"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_subdomain_ipv6s_result={
+                ('', 'example.com'): [
+                    (ipaddress.IPv6Address('1234::1'), 1),
+                ],
+                ('foo', 'example.com'): [
+                    (ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                ('foo.bar', 'example.net'): [
+                    (ipaddress.IPv6Address('1234::3'), 3),
+                ],
+            },
+            put_zone_ipv6s_result={'example.com': None,
+                                   'example.net': None},
+            put_subdomain_ipv6s_result={('', 'example.com'): None,
+                                        ('foo', 'example.com'): None,
+                                        ('foo.bar', 'example.net'): None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == [
+            ('', 'example.com'),
+            ('foo', 'example.com'),
+            ('foo.bar', 'example.net'),
+        ]
+        assert updater.put_zone_ipv6s_calls == []
+        assert updater.put_subdomain_ipv6s_calls == [
+            ('', 'example.com', [ipaddress.IPv6Address('5678::1')], 1),
+            ('foo', 'example.com', [ipaddress.IPv6Address('5678::2')], 2),
+            ('foo.bar', 'example.net', [ipaddress.IPv6Address('5678::3')], 3),
+        ]
+
+    def test_put_subdomain_not_implemented(self, empty_addrfile, data_dir):
+        """Test that when fetch_zone_ipv6s is not implemented,
+        put_subdomain_ipv6s not implemented is a FatalPublishError even if
+        put_zone_ipv6s is implemented"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_subdomain_ipv6s_result={
+                ('', 'example.com'): [
+                    (ipaddress.IPv6Address('1234::1'), 1),
+                ],
+                ('foo', 'example.com'): [
+                    (ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                ('foo.bar', 'example.net'): [
+                    (ipaddress.IPv6Address('1234::3'), 3),
+                ],
+            },
+            put_zone_ipv6s_result={'example.com': None,
+                                   'example.net': None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        with pytest.raises(FatalPublishError):
+            updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+    def test_multiple_records(self, empty_addrfile, data_dir):
+        """Test that multiple records for a host from fetch_subdomain_ipv6s
+        still lead to a single call to put_subdomain_ipv6s"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_subdomain_ipv6s_result={
+                # Different TTL within an RR set is not valid, but some
+                # providers may support it anyway. We take the minimum.
+                ('', 'example.com'): [
+                    (ipaddress.IPv6Address('1234::1'), 1),
+                    (ipaddress.IPv6Address('3456::1'), 11),
+                ],
+                ('foo', 'example.com'): [
+                    (ipaddress.IPv6Address('1234::2'), 2),
+                    (ipaddress.IPv6Address('1234::22'), 22),
+                ],
+                ('foo.bar', 'example.net'): [
+                    (ipaddress.IPv6Address('1234::3'), 3),
+                    (ipaddress.IPv6Address('3456::33'), 33),
+                ],
+            },
+            put_subdomain_ipv6s_result={('', 'example.com'): None,
+                                        ('foo', 'example.com'): None,
+                                        ('foo.bar', 'example.net'): None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == [
+            ('', 'example.com'),
+            ('foo', 'example.com'),
+            ('foo.bar', 'example.net'),
+        ]
+        assert updater.put_zone_ipv6s_calls == []
+        assert updater.put_subdomain_ipv6s_calls == [
+            ('', 'example.com', [ipaddress.IPv6Address('5678::1')], 1),
+            ('foo', 'example.com', [ipaddress.IPv6Address('5678::2'),
+                                    ipaddress.IPv6Address('5678::22')], 2),
+            ('foo.bar', 'example.net', [ipaddress.IPv6Address('5678::3'),
+                                        ipaddress.IPv6Address('5678::33')], 3),
+        ]
+
+    @pytest.mark.parametrize(('subdomain', 'zone', 'error'), [
+        ('', 'example.com', PublishError),
+        ('', 'example.com', FatalPublishError),
+        ('foo', 'example.com', PublishError),
+        ('foo', 'example.com', FatalPublishError),
+        ('foo.bar', 'example.net', PublishError),
+        ('foo.bar', 'example.net', FatalPublishError),
+    ])
+    def test_fetch_subdomain_publish_error(self, empty_addrfile, data_dir,
+                                           subdomain, zone, error):
+        """Test that remaining hosts are still updated when
+        fetch_subdomain_ipv6s raises a PublishError for one of them"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_subdomain_ipv6s_result={
+                ('', 'example.com'): [
+                    (ipaddress.IPv6Address('1234::1'), 1),
+                ],
+                ('foo', 'example.com'): [
+                    (ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                ('foo.bar', 'example.net'): [
+                    (ipaddress.IPv6Address('1234::3'), 3),
+                ],
+                (subdomain, zone): error,
+            },
+            put_subdomain_ipv6s_result={('', 'example.com'): None,
+                                        ('foo', 'example.com'): None,
+                                        ('foo.bar', 'example.net'): None},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        with pytest.raises(error):
+            updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == [
+            ('', 'example.com'),
+            ('foo', 'example.com'),
+            ('foo.bar', 'example.net'),
+        ]
+        assert updater.put_zone_ipv6s_calls == []
+        calls = [
+            ('', 'example.com', [ipaddress.IPv6Address('5678::1')], 1),
+            ('foo', 'example.com', [ipaddress.IPv6Address('5678::2')], 2),
+            ('foo.bar', 'example.net', [ipaddress.IPv6Address('5678::3')], 3),
+        ]
+        assert updater.put_subdomain_ipv6s_calls == [
+            c for c in calls if c[0:2] != (subdomain, zone)
+        ]
+
+    @pytest.mark.parametrize(('subdomain', 'zone', 'error'), [
+        ('', 'example.com', PublishError),
+        ('', 'example.com', FatalPublishError),
+        ('foo', 'example.com', PublishError),
+        ('foo', 'example.com', FatalPublishError),
+        ('foo.bar', 'example.net', PublishError),
+        ('foo.bar', 'example.net', FatalPublishError),
+    ])
+    def test_put_subdomain_publish_error(self, empty_addrfile, data_dir,
+                                         subdomain, zone, error):
+        """Test that remaining hosts are still updated when put_subdomain_ipv6s
+        raises a PublishError for one of them"""
+        updater = doubles.MockTwoWayZoneUpdater(
+            'test_updater', empty_addrfile, data_dir,
+            fetch_subdomain_ipv6s_result={
+                ('', 'example.com'): [
+                    (ipaddress.IPv6Address('1234::1'), 1),
+                ],
+                ('foo', 'example.com'): [
+                    (ipaddress.IPv6Address('1234::2'), 2),
+                ],
+                ('foo.bar', 'example.net'): [
+                    (ipaddress.IPv6Address('1234::3'), 3),
+                ],
+            },
+            put_subdomain_ipv6s_result={('', 'example.com'): None,
+                                        ('foo', 'example.com'): None,
+                                        ('foo.bar', 'example.net'): None,
+                                        (subdomain, zone): error},
+        )
+        updater.init_hosts_and_zones(
+            "example.com foo.bar.example.net foo.example.com"
+        )
+        with pytest.raises(error):
+            updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+        assert updater.fetch_zone_ipv6s_calls == [
+            'example.com',
+            'example.net',
+        ]
+        assert updater.fetch_subdomain_ipv6s_calls == [
+            ('', 'example.com'),
+            ('foo', 'example.com'),
+            ('foo.bar', 'example.net'),
+        ]
+        assert updater.put_zone_ipv6s_calls == []
+        assert updater.put_subdomain_ipv6s_calls == [
+            ('', 'example.com', [ipaddress.IPv6Address('5678::1')], 1),
+            ('foo', 'example.com', [ipaddress.IPv6Address('5678::2')], 2),
+            ('foo.bar', 'example.net', [ipaddress.IPv6Address('5678::3')], 3),
+        ]
+
+
+def test_fetch_zone_and_subdomain_ipv6_not_implemented(empty_addrfile,
+                                                       data_dir):
+    """Test that it's a FatalPublishError when neither fetch_zone_ipv6s nor
+    fetch_subdomain_ipv6s are implemented"""
+    updater = doubles.MockTwoWayZoneUpdater(
+        'test_updater', empty_addrfile, data_dir,
+        put_zone_ipv6s_result={'example.com': None,
+                               'example.net': None},
+        put_subdomain_ipv6s_result={('', 'example.com'): None,
+                                    ('foo', 'example.com'): None,
+                                    ('foo.bar', 'example.net'): None},
+    )
+    updater.init_hosts_and_zones(
+        "example.com foo.bar.example.net foo.example.com"
+    )
+    with pytest.raises(FatalPublishError):
+        updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+
+def test_init_hosts_and_zones_structured(empty_addrfile, data_dir):
+    """Test init_hosts_and_zones with structured input instead of raw string"""
+    updater = doubles.MockTwoWayZoneUpdater(
+        'test_updater', empty_addrfile, data_dir,
+        fetch_zone_ipv6s_result={
+            'example.com': [
+                ('', ipaddress.IPv6Address('1234::1'), 1),
+                ('bar', ipaddress.IPv6Address('1234::4'), 4),
+                ('foo', ipaddress.IPv6Address('1234::2'), 2),
+            ],
+            'bar.example.net': [
+                ('foo', ipaddress.IPv6Address('1234::3'), 3),
+            ],
+        },
+        put_zone_ipv6s_result={'example.com': None,
+                               'bar.example.net': None},
+    )
+    updater.init_hosts_and_zones([
+        ('example.com', None),
+        ('foo.bar.example.net', 'bar.example.net'),
+        ('bar.example.com', 'example.com'),
+        ('foo.example.com', None),
+    ])
+    updater.publish_ipv6(ipaddress.IPv6Network('5678::/64'))
+
+    assert updater.fetch_zone_ipv6s_calls == [
+        'example.com',
+        'bar.example.net',
+    ]
+    assert updater.fetch_subdomain_ipv6s_calls == []
+    assert updater.put_zone_ipv6s_calls == [
+        ('example.com', {
+            '': ([ipaddress.IPv6Address('5678::1')], 1),
+            'bar': ([ipaddress.IPv6Address('5678::4')], 4),
+            'foo': ([ipaddress.IPv6Address('5678::2')], 2),
+        }),
+        ('bar.example.net', {
+            'foo': ([ipaddress.IPv6Address('5678::3')], 3),
+        }),
+    ]
+    assert updater.put_subdomain_ipv6s_calls == []
 
 
 # fqdn, zone, subdomain
