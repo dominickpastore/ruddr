@@ -389,6 +389,8 @@ Low-Level Updater Base Classes
 .. autoclass:: BaseUpdater
    :members:
 
+.. _using custom:
+
 Using your Custom Updater or Notifier
 -------------------------------------
 
@@ -410,6 +412,8 @@ For example, suppose you have an updater class ``MyUpdater`` in a file named
     module = myupdater
     type = MyUpdater
     # ...
+
+.. _second way:
 
 **The second way** to start using it is by creating a Python package with a
 ``ruddr.updater`` or ``ruddr.notifier`` entry point. This requires slightly
@@ -504,10 +508,6 @@ See the next section for the APIs involved.
 
 .. TODO Can do_notify raise errors?
 
-.. TODO Note that while exceptions do carry messages, errors are always logged,
-   more reliable because can have multiple errors but only one exception and
-   they are attached to specific loggers
-
 Manager and Config API
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -580,6 +580,8 @@ Assuming you have a shell open in the repo::
 The ``dev`` extra includes everything required to check style, check types,
 run unit tests, and regenerate the documentation.
 
+.. _testing:
+
 Running Tests
 ~~~~~~~~~~~~~
 
@@ -628,39 +630,99 @@ distribution to be installed). The output will be in docs/_build/<format>/.
 Contributions
 -------------
 
-.. TODO note that issues and feature requests are also helpful, send to
-   appropriate section on help page
+If you have code you would like to contribute, please feel free to `submit a
+pull request on GitHub <pull request>`_. (Note that :ref:`issues` and
+:ref:`feature requests` are also helpful and very much appreciated!)
 
-.. TODO Design philosophy:
-   - Try to do useful work even if there are errors. E.g. if one zone is
-     misconfigured, still try to update the others.
-   - Exceptions are used to control contingency behavior in the event of a
-     problem. The exception message is, for the most part, ignored. That's not
-     to say there shouldn't be an appropriate message in exceptions, but the
-     primary way errors are actually reported to the user is through logging.
-     If there is a problem, an error should always be logged, and a warning
-     should be logged for potential problems.
+There are a few guidelines that make it more likely a PR can be accepted:
+
+- Generally speaking, development happens on the ``dev`` branch. The ``master``
+  branch is reserved for released code only. (If you submit a pull request to
+  ``master``, we will change it to ``dev``.)
+
+- The automated test suite should run when pull requests are submitted. If
+  there are any problems, you should do your best to fix them (or explain why
+  the test is flagging when it shouldn't). Code that passes has a much higher
+  chance of being accepted than code that fails. See :ref:`testing` above.
+
+- Pay attention to code style. Flake8 runs as part of the test suite. ``#noqa``
+  is allowed, but with good reason.
+
+- If you add new functionality, it has a higher chance of being accepted if you
+  add additional documentation and tests to go with it. The automated test
+  suite generates a code coverage report, both locally and online at TODO.
+
+- Pull requests need not be related to an existing issue, but if you submit one
+  that is, you should reference the issue number somewhere in the pull request.
+
+None of these are automatic deal breakers if you do not follow them, but
+following them does increase the chances of your pull request being accepted.
+
+All merged code contributions will be mentioned in the `CHANGELOG`_ with
+attribution to the contributor.
+
+.. TODO add link to code coverage report
 
 Contributing Updaters and Notifiers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. TODO How to add to repo, run tests, add docs ideally, then open pull request
-.. TODO If do not want to merge code into Ruddr, can also upload to PyPI with
-        entry points. Will be supported soon.
-.. TODO Some things to think about:
-   - Do useful work whenever possible. If one part fails, still try to complete
-     the others.
-   - Log all problems. Warning level if it may be a problem, error level if
-     it's definitely a problem, critical level if it's a problem that's fatal
-     to the updater or notifier.
-   - Don't trust any input, whether from users or APIs. For example, improperly
-     formatted IP addresses should be caught, logged, and an appropriate
-     :ref:`Ruddr exception <exceptions>` should be raised, preventing a
-     :exc:`ValueError` from crashing the whole program.
+If you have written a new updater or notifier and wish to share it with the
+community, you have two options:
 
-Other Code Contributions
-~~~~~~~~~~~~~~~~~~~~~~~~
+1. Contribute it for inclusion in Ruddr itself. To do this:
 
-.. TODO
+   a. Add a new .py file with your updater/notifier under the appropriate
+      package in the Ruddr sources (``src/ruddr/updaters`` or
+      ``src/ruddr/notifiers``)
+   b. Add a new entry to the :data:`~ruddr.updaters.updaters` or
+      :data:`~ruddr.notifiers.notifiers` dict in the ``__init__.py`` file in
+      the same directory. The key will become the built-in type name of the
+      updater or notifier, used for the ``type =`` config option. The value
+      must be the class for the new updater/notifier.
+   c. Add documentation for the new updater/notifier. Add a new section to
+      ``docs/updaters.rst`` or ``docs/notifiers.rst`` listing the name, a brief
+      description of the updater/notifier, a sample config snippet, and a
+      detailed list of the configuration options it accepts.
+   d. Open a `pull request`_.
+
+2. If you would prefer to independently maintain your updater or notifier, you
+   can publish it to PyPI with a ``ruddr.updater`` or ``ruddr.notifier`` entry
+   point. Anyone who installs your updater/notifier from PyPI will then be able
+   to use that entry point name as a ``type=`` option in their config.
+
+   For example, if you declare this entry point in your ``pyproject.toml``::
+
+       [project.entry-points."ruddr.updater"]
+       my_updater = "myupdater:MyUpdater"
+
+   then someone can use your ``myupdater.MyUpdater`` class as an updater with
+   this Ruddr config snippet::
+
+       [updater.foo]
+       type = my_updater
+       # ... other config for the updater
+
+   For more information on publishing an updater like this, see the
+   :ref:`second method <second way>` under :ref:`using custom`.
+
+Some conventions when developing updaters or notifiers for inclusion in Ruddr:
+
+- Make liberal use of the logger, especially when there is a problem. In
+  particular, Ruddr uses exceptions mainly to control contingency behavior
+  when there is a problem. The exception message is, for the most part,
+  ignored. That's not to say exceptions shouldn't carry an appropriate message,
+  but the primary way errors are communicated to the user is through logging.
+  If there is a problem, an error should always be logged (critical if the
+  problem is fatal to the updater/notifier), and a warning should be logged for
+  potential problems.
+- Do as much useful work as possible, even if errors require skipping some
+  parts. For example, if an updater can't update one domain due to a typo in
+  its name, it should still update the rest of the configured domains.
+- Don't trust any input, whether from user config or API calls. For example, an
+  improperly formatted IP address should be caught, logged, and an appropriate
+  :ref:`Ruddr exception <exceptions>` raised, preventing a :exc:`ValueError`
+  from crashing the whole program.
 
 .. _GitHub: https://github.com/dominickpastore/ruddr
+.. _pull request: https://github.com/dominickpastore/ruddr/pulls
+.. _CHANGELOG: https://github.com/dominickpastore/ruddr/blob/master/CHANGELOG.md

@@ -123,6 +123,8 @@ the syslog by default). Ruddr will log a message at the warning level if there
 is a potential problem and at the error or critical level if there is a
 definite problem.
 
+.. _issues:
+
 Issues and Bugs
 ---------------
 
@@ -151,15 +153,17 @@ Of course, not all of the above will apply to all types of issues. And just to
 reiterate, *all* issues and bug reports are welcome, even if they are light on
 details.
 
+.. _feature requests:
+
 Feature Requests
 ----------------
 
 If there is a feature missing from Ruddr that you would like to see added, or
-a provider that you would like to see support for, feel free to `submit an
-issue`_ on GitHub for that as well. Alternatively, you can post on the
-discussions_ tab if you prefer.
+a DDNS provider that you would like to see support for, feel free to `submit an
+issue`_ on GitHub. Alternatively, you can post on the discussions_ tab if you
+prefer.
 
-Suggestions for improving the documentation are also very welcome. You can
+Suggestions for improving this documentation are also very welcome. You can
 `submit an issue`_ or post on the discussions_ tab for that as well.
 
 Additional Help
