@@ -492,7 +492,7 @@ class Notifier(BaseNotifier):
         self.log.info("Stopping notifier")
         with self._lock:
             if not self._started:
-                self.log.warning("Not stopping notifier: Already stopped")
+                self.log.info("Not stopping notifier: Already stopped")
                 return
 
             # Stop a scheduled retry or check

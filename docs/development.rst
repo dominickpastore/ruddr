@@ -13,7 +13,8 @@ contributing to the project. In any case, this page is for you.
 
    .. _discussion on GitHub: https://github.com/dominickpastore/ruddr/discussions
 
-.. contents::
+.. contents:: Contents
+   :local:
    :backlinks: none
 
 .. module:: ruddr
@@ -520,6 +521,8 @@ Manager and Config API
 .. autoclass:: DDNSManager
    :members:
 
+.. _exceptions:
+
 Ruddr Exceptions
 ----------------
 
@@ -628,12 +631,32 @@ Contributions
 .. TODO note that issues and feature requests are also helpful, send to
    appropriate section on help page
 
+.. TODO Design philosophy:
+   - Try to do useful work even if there are errors. E.g. if one zone is
+     misconfigured, still try to update the others.
+   - Exceptions are used to control contingency behavior in the event of a
+     problem. The exception message is, for the most part, ignored. That's not
+     to say there shouldn't be an appropriate message in exceptions, but the
+     primary way errors are actually reported to the user is through logging.
+     If there is a problem, an error should always be logged, and a warning
+     should be logged for potential problems.
+
 Contributing Updaters and Notifiers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. TODO How to add to repo, run tests, add docs ideally, then open pull request
 .. TODO If do not want to merge code into Ruddr, can also upload to PyPI with
         entry points. Will be supported soon.
+.. TODO Some things to think about:
+   - Do useful work whenever possible. If one part fails, still try to complete
+     the others.
+   - Log all problems. Warning level if it may be a problem, error level if
+     it's definitely a problem, critical level if it's a problem that's fatal
+     to the updater or notifier.
+   - Don't trust any input, whether from users or APIs. For example, improperly
+     formatted IP addresses should be caught, logged, and an appropriate
+     :ref:`Ruddr exception <exceptions>` should be raised, preventing a
+     :exc:`ValueError` from crashing the whole program.
 
 Other Code Contributions
 ~~~~~~~~~~~~~~~~~~~~~~~~

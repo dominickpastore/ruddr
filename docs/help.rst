@@ -1,8 +1,17 @@
 Help Resources
 ==============
 
+.. contents:: Contents
+   :local:
+   :depth: 1
+   :backlinks: none
+
 Frequently Asked Questions
 --------------------------
+
+.. contents::
+   :local:
+   :backlinks: none
 
 Why another dynamic DNS client?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -89,7 +98,7 @@ I disabled IPv6. Why is Ruddr leaving my IPv6 address set?
 
 Ruddr does not unpublish any address without a new one to publish in its place.
 (If it does unpublish an address, that is a bug, and you should `report it
-<submit an issue>`_.) There are two reasons for this:
+<submit an issue>`_.) There are two reasons for that:
 
 - Ruddr avoids touching any addresses it's not configured to touch, in order to
   avoid unexpectedly breaking non-dynamic addresses. This includes not touching
@@ -100,6 +109,19 @@ Ruddr does not unpublish any address without a new one to publish in its place.
   obtain an IPv6 address, Ruddr assumes it may be a transient issue (e.g. a
   link is down). In that case, the last address may still be valid, and Ruddr
   does not want to risk unsetting a potentially valid address.
+
+How can I tell if something went wrong?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ruddr does its best to do some useful work even when there are problems. For
+example, if an updater is configured to update two domain names, and one has a
+typo, Ruddr will generally still update the other. This does have the effect
+that a small problem may not be obvious, since Ruddr will keep chugging along.
+
+The best way to tell if there's a problem is to monitor the logs (which go to
+the syslog by default). Ruddr will log a message at the warning level if there
+is a potential problem and at the error or critical level if there is a
+definite problem.
 
 Issues and Bugs
 ---------------
@@ -121,15 +143,13 @@ can do to help things move more smoothly:
 
 - Paste a copy of the configuration you are using.
 
-- Include any other information you think might be relevant (e.g. your OS and
-  CPU architecture, concerning log messages, etc.)
+- Attach log messages leading up to the problem
 
-Of course, not all of the above will apply to all types of issues. For example,
-if you are having a problem with installation, it does not make sense to
-include your Ruddr configuration.
+- Include any other information you think might be relevant
 
-But just to reiterate, *all* issues and bug reports are welcome, event if they
-are light on details.
+Of course, not all of the above will apply to all types of issues. And just to
+reiterate, *all* issues and bug reports are welcome, even if they are light on
+details.
 
 Feature Requests
 ----------------

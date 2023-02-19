@@ -129,8 +129,8 @@ class DDNSManager:
             try:
                 notifier.start()
             except NotifierSetupError:
-                log.error("Notifier %s failed to start. Stopping all "
-                          "notifiers.", name)
+                log.critical("Notifier %s failed to start. Stopping all "
+                             "notifiers.", name)
                 for running_notifier in self.notifiers.values():
                     running_notifier.stop()
                 raise

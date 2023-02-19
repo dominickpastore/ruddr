@@ -96,8 +96,8 @@ class SystemdNotifier(Notifier):
                 ipv4 = ipv4s[0]
             except IndexError:
                 got_ipv4 = False
-                self.log.info("Interface %s has no IPv4 assigned",
-                              self.iface)
+                self.log.debug("Interface %s has no IPv4 assigned",
+                               self.iface)
             else:
                 got_ipv4 = True
                 self.notify_ipv4(ipv4)
@@ -107,8 +107,8 @@ class SystemdNotifier(Notifier):
                 ipv6 = ipv6s[0]
             except IndexError:
                 got_ipv6 = False
-                self.log.info("Interface %s has no IPv6 assigned",
-                              self.iface)
+                self.log.debug("Interface %s has no IPv6 assigned",
+                               self.iface)
             else:
                 ipv6 = ipaddress.IPv6Interface(
                     (ipv6, self.ipv6_prefix)).network
@@ -117,14 +117,20 @@ class SystemdNotifier(Notifier):
 
         # Error if no wanted address was found
         if not (got_ipv4 or got_ipv6):
+            self.log.warning("Interface %s has no address assigned" %
+                             self.iface)
             raise NotifyError("Interface %s has no address assigned" %
                               self.iface)
 
         # Error for any missing wanted and needed addresses
         if self.need_ipv4() and not got_ipv4:
+            self.log.warning("Interface %s has no IPv4 address assigned" %
+                             self.iface)
             raise NotifyError("Interface %s has no IPv4 assigned" %
                               self.iface)
         if self.need_ipv6() and not got_ipv6:
+            self.log.warning("Interface %s has no IPv6 address assigned" %
+                             self.iface)
             raise NotifyError("Interface %s has no IPv6 assigned" %
                               self.iface)
 
@@ -153,15 +159,15 @@ class SystemdNotifier(Notifier):
         # properties on DBus.
         #
         # TODO Look into this more in the future. Maybe it will be better
-        # documented.
+        #  documented.
 
         # Look up interface name
         try:
             iface_name = socket.if_indextoname(iface_idx)
         except OSError as e:
-            self.log.warning("Received updates for interface index %d but "
-                             "cannot lookup interface name, so skipping: %s",
-                             iface_idx, e)
+            self.log.error("Received updates for interface index %d but "
+                           "cannot lookup interface name, so skipping: %s",
+                           iface_idx, e)
             return
 
         # Check if interface is the one we care about, check address and send

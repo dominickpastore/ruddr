@@ -95,7 +95,7 @@ class Retry:
             self.func(obj, *args, **kwargs)
         except FatalPublishError:
             self.retrying = False
-            obj.log.error("Update error was fatal. This updater will halt.")
+            obj.log.critical("Update error was fatal. This updater will halt.")
             obj.halt = True
         except PublishError:
             self.retrying = True
@@ -1812,8 +1812,8 @@ class OneWayUpdater(Updater):
             try:
                 ip_lookup = ipaddress.IPv6Address(ip_lookup)
             except ValueError:
-                self.log.info("hosts entry '/%s' is not an IPv6 address; "
-                              "treating as an fqdn", ip_lookup)
+                self.log.debug("hosts entry '/%s' is not an IPv6 address; "
+                               "treating as an fqdn", ip_lookup)
 
             # If ip_lookup was not converted to an IPv6Address, assume it's an
             # FQDN
