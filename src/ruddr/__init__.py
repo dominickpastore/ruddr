@@ -5,7 +5,7 @@ updaters.
 """
 
 from .addrfile import Addrfile
-from .configuration import Config, read_file, read_file_from_path
+from .configuration import Config, read_config, read_config_from_path
 from .exceptions import (RuddrException, RuddrSetupError, ConfigError,
                          NotifierSetupError, NotStartedError, NotifyError,
                          PublishError, FatalPublishError)

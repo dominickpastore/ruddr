@@ -6,8 +6,7 @@ Configuration and Usage
    continuing.
 
 Ruddr must be configured before it can be used. After that, it's meant to be
-run as a service (e.g. with systemd), but it can be run in single-shot mode to
-do a single, immediate update as well.
+run as a service (i.e. a daemon, in Unix terminology).
 
 Quick Start Guide
 -----------------
@@ -90,7 +89,7 @@ Here is a sample config::
   type = iface
   iface = eth0
 
-  [updater.dynu]
+  [updater.duck]
   ## Every updater must specify a type as well, which determines the protocol
   ## it uses to communicate with your DDNS provider. See the "Updaters" section
   ## of the documentation for a list of built-in updater types and their
@@ -102,7 +101,7 @@ Here is a sample config::
   ##
   ##  module = myupdater
   ##  type = MyUpdaterClass
-  type = standard
+  type = duckdns
 
   ## Each updater can specify its own notifier, like below. Otherwise, it will
   ## use the default notifier from the [ruddr] section.
@@ -111,11 +110,11 @@ Here is a sample config::
   #notifier4 = icanhazip
   #notifier6 = wan_ip
 
-  ## Most updaters will require extra config. See the "updaters" page in the
-  ## documentation for details on the options available.
-  server = api.dynu.com
-  username = ...
-  password = ...
+  ## Most updaters will require extra config, like a list of hosts or domain
+  ## names to update. See the "updaters" page in the documentation for details
+  ## on the options available.
+  token = ...
+  hosts = example1 example2
 
 The basic format is similar to Microsoft INI files:
 
@@ -130,11 +129,10 @@ The basic format is similar to Microsoft INI files:
 - Trailing spaces will be trimmed from the end of a line
 
 - Leading spaces are trimmed, but keys in a section should all have the same
-  level of indentation (otherwise they may be interpreted as multi=line values)
+  level of indentation (otherwise they may be interpreted as multi-line values)
 
 - Values can span multiple lines by indenting them more than the key (though
-  this is rarely necessary). The indentation will be trimmed, but the resulting
-  value will contain newlines.
+  this is rarely necessary).
 
 - Lines starting with ``#`` or ``;`` are comments
 
@@ -184,7 +182,8 @@ and the ``web`` notifier periodically checks a "what is my IP" style website.
 
 The ``skip_ipv4``, ``skip_ipv6``, ``ipv4_required``, and ``ipv6_required``
 options are used to control whether the notifier tries to fetch IPv4 and/or
-IPv6 addresses and if it should consider it a problem when it can't.
+IPv6 addresses and if it should consider it an error if it can't (which affects
+how it retries).
 
 .. note::
    The default settings try to fetch both IPv4 and IPv6 addresses, but consider
@@ -268,21 +267,21 @@ option equal to the name of the notifier. If you want to set different
 notifiers for the IPv4 and IPv6 address, use ``notifier4`` and ``notifier6``
 instead.
 
+Alternatively, if you leave out *all* ``notifier``, ``notifier4``, and
+``notifier6`` options, Ruddr will use the default
+``notifier``/``notifier4``/``notifier6`` options from the ``[ruddr]`` section.
+
 .. note::
    If you *only* want to check and update IPv4 addresses, use *only*
    ``notifier4``. The same goes for IPv6 addresses only and ``notifier6``.
    Alternatively, you can specify ``skip_ipv4`` or ``skip_ipv6`` on the
    notifier and use regular ``notifier`` in the updater.
 
-Alternatively, if you leave out *all* ``notifier``, ``notifier4``, and
-``notifier6`` options, Ruddr will use the default
-``notifier``/``notifier4``/``notifier6`` options from the ``[ruddr]`` section.
-
 Most updaters will require some extra configuration specific to that type of
 updater. For example, the ``standard`` updater needs a server address,
-username, and password. See the :doc:`updaters` page for lists of configuration
-options for the built-in updaters and sample configurations for popular DDNS
-providers.
+username, password, and a list of domain names to update. See the
+:doc:`updaters` page for lists of configuration options for the built-in
+updaters and sample configurations for popular DDNS providers.
 
 Global Config
 ~~~~~~~~~~~~~
@@ -291,21 +290,27 @@ The optional ``[ruddr]`` section contains a few configuration options that
 apply to Ruddr as a whole::
 
   [ruddr]
-  addrfile = /var/lib/misc/ruddr.addrfile
+  datadir = /var/lib/ruddr
   notifier = <notifier name>
   log = <file path or syslog or stderr>
 
-The ``addrfile`` option allows you to change the path to the addrfile, a file
-where Ruddr keeps track of the IP address currently published with each
-provider. The default is ``/var/lib/misc/ruddr.addrfile``.
+The ``datadir`` option specifies the path to a directory where Ruddr can keep
+runtime data, including:
+
+- The addrfile, where Ruddr keeps track of the IP address currently published
+  with each provider
+- The Public Suffix List cache, used to infer zones from fully-qualified domain
+  names, if necessary (only used for certain types of updaters)
+
+The default ``datadir`` is ``/var/lib/ruddr``.
 
 The ``notifier`` option allows you to specify a default notifier. This is the
 notifier that gets used for updaters that don't specify their own notifier. It
 can be useful if you have multiple updaters that all need to get their IP
 address from the same source. You can also use one or both of ``notifier4``
 and ``notifier6`` in place of ``notifier``, as described under
-:ref:`updater_config`. None of these options are required if your updaters all
-specify their own notifiers.
+:ref:`updater_config`. None of these ``notifier`` options are required if your
+updaters all specify their own notifiers.
 
 The ``log`` option allows you to specify where Ruddr should log to. The choices
 are ``syslog`` (the default), ``stderr``, or a path to a logfile. (Note that
@@ -317,20 +322,16 @@ Usage
 -----
 
 Normal usage of Ruddr involves configuring it to run as a service (see
-:ref:`service`); however, it can be run at the command line for debugging or
-for single-shot updates.
+:ref:`service`); however, it can be run at the command line for debugging.
 
 After Ruddr is installed, the ``ruddr`` command is available to run it from the
-command line. If you installed it in a virtual environment, it will need to be
-activated first.
+command line. If you installed it in a virtual environment, that environment
+will need to be activated first.
 
 There are a few command line options:
 
 ``-h``/``--help``
    Display all the command line options and exit.
-
-``-1``/``--single-shot``
-   Run in single shot mode. Do a single update and exit.
 
 ``-c``/``--configfile``
    Use the given config file instead of ``/etc/ruddr.conf``.
@@ -346,13 +347,12 @@ There are a few command line options:
 Running as a Service
 --------------------
 
-Generally speaking, any system that can start a Python script at boot and
-ideally send a SIGTERM at shutdown can run Ruddr as a service. Instructions for
-setting this up with systemd, one of the most widely used init systems on Linux
-servers, are below.
+Once Ruddr is configured, it needs to be set up to run as a service. The
+``ruddr`` script needs to be executed at startup and SIGTERM sent to it at
+shutdown. Instructions for setting this up with systemd, one of the most widely
+used init systems on Linux systems, are below.
 
-If you are familiar with setting up services on other systems, documentation
-contributions are welcome.
+We hope to add instructions for more systems in the future.
 
 Systemd
 ~~~~~~~

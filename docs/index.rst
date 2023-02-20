@@ -29,12 +29,13 @@ behind network address translation (NAT).
 Quick Links
 -----------
 
-.. TODO PyPI
-
+- `PyPI <https://https://pypi.org/project/ruddr/>`_
 - `This documentation <https://ruddr.dcpx.org/>`_
 - `GitHub, README <https://github.com/dominickpastore/ruddr>`_
 - `Changelog
   <https://github.com/dominickpastore/ruddr/blob/master/CHANGELOG.md>`_
+- `Issues <https://github.com/dominickpastore/ruddr/issues>`_
+- `Discussion <https://github.com/dominickpastore/ruddr/discussion>`_
 
 Table of Contents
 -----------------

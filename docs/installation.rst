@@ -1,6 +1,9 @@
 Installation
 ============
 
+At this time, Ruddr runs on Linux and possibly other Unix-like platforms.
+Non-Unix-like platforms may be supported in the future.
+
 Basic Installation
 ------------------
 

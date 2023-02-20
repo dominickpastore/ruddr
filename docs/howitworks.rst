@@ -7,10 +7,6 @@ but others will be new.
 
 The diagram below represents an example Ruddr configuration:
 
-.. TODO change edge labels to actual IP addresses, since it looks like the
-   notifiers communicate with updaters using IPv4 and IPv6, which is not the
-   case.
-
 .. graphviz::
     :alt: Example Config
 
@@ -31,10 +27,11 @@ The diagram below represents an example Ruddr configuration:
         updater1 [label="Standard updater"]
         updater2 [label="FreeDNS updater"]
 
-        edge [label="IPv4"];
+        edge [label="192.0.2.47"];
         notifier4 -> updater1;
+        edge [label="\n192.0.2.47"];
         notifier4 -> updater2;
-        edge [label="IPv6"];
+        edge [label="2001:db8:47::/64"];
         notifier6 -> updater2;
 
         edge [label=""];
@@ -75,7 +72,7 @@ WAN interface periodically.
 
 However, if Ruddr is running on a host inside your LAN, behind NAT, you can use
 the the web notifier. It can check the public IP address using a website like
-icanhazip.com.
+`icanhazip.com <https://icanhazip.com>`_.
 
 Tying Them Together
 -------------------
@@ -87,12 +84,13 @@ goes like this:
 1. A notifier checks the current IP address and provides it to Ruddr.
 2. For each updater configured to use this notifier:
 
-   a. Ruddr checks the last IP address published by this updater. If it
-      matches, it skips steps (b) and (c).
-   b. Ruddr sends the IP address to the updater for publishing.
-   c. The updater reports whether it successfully published the IP address. If
-      so, Ruddr stores the new IP address for the next time step (a) runs. If
-      not, Ruddr schedules a retry for later. [#updatefail]_
+   a. Ruddr sends the IP address to the updater for publishing.
+   b. The updater checks the last IP address it published. If it matches, it
+      skips steps (c) and (d).
+   c. The updater sends the new IP address to the provider.
+   d. The updater reports whether it was successful. If so, it stores the new
+      IP address for the next time step (b) runs. If not, Ruddr schedules a
+      retry for later. [#updatefail]_
 
 Handling IPv6
 -------------
@@ -105,18 +103,18 @@ your ISP will assign you a prefix, and every device in your network will pick a
 public, globally-routable address with that prefix.
 
 Ruddr was designed to handle this situation. Notifiers only monitor the
-prefix portion of addresses, since that's the only part changed by the ISP.
-Updaters assume there may be multiple addresses to update, and they
+prefix portion of IPv6 addresses, since that's the only part changed by the
+ISP. Updaters assume there may be multiple addresses to update, and they
 change only the prefix on each one. This way, even if you need to support IPv6,
 you can still have centralized DDNS management.
 
 .. rubric:: Footnotes
 
 .. [#updatefail] There's technically more nuance to this: When an update fails,
-   Ruddr "forgets" the last published IP address, since it has no way of
+   the updater "forgets" the last published IP address, since it has no way of
    knowing whether the old IP address is still published or not (e.g. the new
    IP could be published, but updater's connection broke and it never received
    the success response from the provider). That way, if the notifier sends a
    new IP address before a successful retry, it will *always* proceed to step
-   (b). (Ruddr also cancels any pending retries whenever the notifier sends a
+   (c). (Ruddr also cancels any pending retries whenever the notifier sends a
    new IP address, as those retries now contain a stale IP address.)

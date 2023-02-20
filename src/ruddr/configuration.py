@@ -24,7 +24,7 @@ DEFAULT_DATA_DIR = '/var/lib/ruddr'
 class Config:
     """Contains all Ruddr configuration required by
     :class:`~ruddr.DDNSManager`. Normally, this would be created from a
-    configuration file by :func:`read_file` or :func:`read_file_from_path`,
+    configuration file by :func:`read_config` or :func:`read_config_from_path`,
     but it can also be created directly when using Ruddr as a library.
 
     Note that all configuration values should be strings, as they would be from
@@ -275,7 +275,7 @@ def _process_config(config: configparser.ConfigParser) -> Config:
     return Config(main, notifiers, updaters)
 
 
-def read_file_from_path(filename: Union[str, pathlib.Path]) -> Config:
+def read_config_from_path(filename: Union[str, pathlib.Path]) -> Config:
     """Read configuration from the named file or :class:`~pathlib.Path`
 
     :param filename: Filename or path to read from
@@ -285,13 +285,13 @@ def read_file_from_path(filename: Union[str, pathlib.Path]) -> Config:
     """
     try:
         with open(filename, 'r') as f:
-            return read_file(f)
+            return read_config(f)
     except OSError as e:
         raise ConfigError("Could not read config file %s: %s" %
                           (filename, e.strerror)) from e
 
 
-def read_file(configfile: Iterable[str]) -> Config:
+def read_config(configfile: Iterable[str]) -> Config:
     """Read configuration in from the given file-like object opened in text
     mode
 

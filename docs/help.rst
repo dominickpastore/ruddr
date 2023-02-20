@@ -17,17 +17,17 @@ Why another dynamic DNS client?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This project started as a way to scratch a personal itch: Existing dynamic DNS
-clients don't support IPv6 in a very useful way (if at all).
+clients didn't support IPv6 in a very useful way (if at all).
 
-Existing clients check the public address of the current host and keep that
-address updated at your dynamic DNS provider. That works well for IPv4, where
-network address translation is the norm, since that one address is shared by
-the entire network. For IPv6, that same strategy *can* work, but since ISPs
+Existing clients checked the public address of the current host and kept that
+address updated at your dynamic DNS provider. For IPv4, where network address
+translation is the norm, that worked well. That one address would be shared by
+the entire network. For IPv6, that same strategy *could* work, but since ISPs
 typically delegate an entire IPv6 prefix to your network, each host generally
-has its own globally-routable IPv6 address. If you have more than one host,
-that means each one has to run its own DDNS client.
+had its own globally-routable IPv6 address. With existing clients, if there
+were more than one host, that meant each one had to run its own DDNS client.
 
-Ruddr works like most clients for IPv4, but takes a different strategy for
+Ruddr works like most clients did for IPv4, but takes a different strategy for
 IPv6: It monitors only the network prefix portion of the address. When it
 detects a change, it updates the address for multiple hosts by replacing only
 their prefixes, preserving the existing host portions. That way, it can update
@@ -38,11 +38,11 @@ What if I don't want IPv6?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If hosts in your network don't receive IPv6 addresses (other than link-local
-addresses, which Ruddr always ignores), Ruddr will usually do the right thing
-be default: If no IPv6 addresses are found, it won't publish any. However,
-being explicit will ensure Ruddr doesn't waste resources looking for an IPv6
-address when it doesn't need to (and ensures there are no surprises if a host
-does happen to obtain an IPv6 address somehow).
+addresses, which Ruddr ignores), Ruddr will usually do the right thing by
+default: If no IPv6 addresses are found, it won't publish any. However, being
+explicit will ensure Ruddr doesn't waste resources looking for an IPv6 address
+when it doesn't need to (and ensures there are no surprises if a host does
+happen to obtain an IPv6 address somehow).
 
 There are two ways to explicitly disable publishing IPv6 addresses:
 
@@ -145,9 +145,9 @@ can do to help things move more smoothly:
 
 - Paste a copy of the configuration you are using.
 
-- Attach log messages leading up to the problem
+- Attach log messages leading up to the problem.
 
-- Include any other information you think might be relevant
+- Include any other information you think might be relevant.
 
 Of course, not all of the above will apply to all types of issues. And just to
 reiterate, *all* issues and bug reports are welcome, even if they are light on

@@ -72,7 +72,7 @@ to implement all three styles of notifier. It boils down to a few core methods:
    periodically with :meth:`~Notifier.set_check_intervals`.
 
 :meth:`~Notifier.set_check_intervals`
-   This provides a way to set :class:`~Notifier.check_once` to run
+   This provides a way to set :meth:`~Notifier.check_once` to run
    automatically on an interval. It also allows you to set the retry delay for
    when it fails (whether it's scheduled to run automatically or not). Call it
    in the constructor of your notifier, if necessary.
@@ -116,8 +116,8 @@ those is an API reference for the :class:`Notifier` class.
    **Handling IPv4 vs. IPv6 Addressing**
 
    Different networks will have different requirements for IPv4 vs. IPv6
-   addressing: Some may require an address type, some may not, some may want to
-   ignore an address type. Notifiers must handle this properly, and the
+   addressing: Some may require one or both, some may not, some may want to
+   ignore one or both. Notifiers must handle this properly, and the
    :class:`Notifier` class has methods to help.
 
    - If your notifier has config that's required only for IPv4 or only for
@@ -132,10 +132,10 @@ those is an API reference for the :class:`Notifier` class.
    - Even if an address type is wanted, it may or may not be an error if your
      notifier can't obtain it. If :meth:`~Notifier.need_ipv4` returns ``True``
      but :meth:`~Notifier.check_once` cannot currently obtain an IPv4 address,
-     it should raise :exc:`NotifyError` (after notifying for the other address
-     type, if necessary). The same goes for :meth:`~Notifier.need_ipv6` and
-     IPv6 addressing. (This bullet point does not apply if
-     :meth:`~Notifier.check_once` is not implemented.)
+     your notifier should raise :exc:`NotifyError` (after notifying for the
+     other address type, if necessary). The same goes for
+     :meth:`~Notifier.need_ipv6` and IPv6 addressing. (This bullet point does
+     not apply if :meth:`~Notifier.check_once` is not implemented.)
 
 .. _event-based notifier:
 
@@ -184,9 +184,9 @@ your needs)::
                              success_interval=10800,
                              config=config)
 
-The first three parameters are defaults, and the last one provides the config
-dict, which will override the defaults with any entries that match (see the
-API documentation for :meth:`~Notifier.set_check_interval`).
+The first three parameters set default values, and the last one provides the
+config dict, which will override those defaults with any entries that match
+(see the API documentation for :meth:`~Notifier.set_check_interval`).
 
 The important part there is that ``success_interval`` is set to a default other
 than zero. That causes the notifier to automatically call
@@ -301,9 +301,10 @@ An updater in Ruddr is, at its core, a class that provides two methods: one to
 update the IPv4 address and one to update the IPv6 address(es). That being
 said, those methods are actually responsible for quite a bit, such as detecting
 duplicate notifies, working with the addrfile, and retrying failed updates.
-Ruddr provides a few base classes that handle all those functions and lay the
-groundwork for several common types of APIs. Each of them provides certain
-abstract methods appropriate to the specific style of API they support.
+Ruddr provides a few base classes that handle all those responsibilities and
+lay the groundwork for several common types of dynamic DNS provider APIs. Each
+of them provides certain abstract methods appropriate to the specific style of
+API they support.
 
 To create an updater, create a class that inherits from one of those base
 classes, listed below, and implement its abstract methods as described under
@@ -361,8 +362,8 @@ A few additional guidelines and tips:
   (directly or indirectly), makes the ``self.name`` and ``self.log`` member
   variables available. ``self.name`` is a :class:`str` with the updater name
   and ``self.log`` is a Python logger named after the updater. You may use
-  either of these whenever convenient, but you are especially encouraged to use
-  ``self.log`` often.
+  either of these variables whenever convenient, but you are especially
+  encouraged to use ``self.log`` often.
 
 .. _high level updaters:
 
@@ -479,7 +480,7 @@ Ruddr's primary use case is as a standalone service, but it can be integrated
 into other Python programs as a library as well. The steps boil down to this:
 
 1. First, create an instance of :class:`Config`. It can be created directly, or
-   you may use :func:`read_file` or :func:`read_file_from_path`.
+   you may use :func:`read_config` or :func:`read_config_from_path`.
 
 2. Use the :class:`Config` to create a :class:`DDNSManager`.
 
@@ -506,14 +507,12 @@ See the next section for the APIs involved.
    ready to handle those exceptions. Both of them can be caught under
    :exc:`RuddrSetupError`.
 
-.. TODO Can do_notify raise errors?
-
 Manager and Config API
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: read_file
+.. autofunction:: read_config
 
-.. autofunction:: read_file_from_path
+.. autofunction:: read_config_from_path
 
 .. autoclass:: Config
    :members:
@@ -621,11 +620,11 @@ build the docs in ``docs/`` as usual for Sphinx::
     cd docs
     make html
 
-Open docs/_build/html/index.html to read them.
+Open ``docs/_build/html/index.html`` to read them.
 
 You can also generate other formats with ``make <format>``, provided the
 necessary tools are available (e.g. ``make latexpdf`` requires a LaTeX
-distribution to be installed). The output will be in docs/_build/<format>/.
+distribution to be installed). The output will be in ``docs/_build/<format>/``.
 
 Contributions
 -------------
@@ -677,7 +676,7 @@ community, you have two options:
    b. Add a new entry to the :data:`~ruddr.updaters.updaters` or
       :data:`~ruddr.notifiers.notifiers` dict in the ``__init__.py`` file in
       the same directory. The key will become the built-in type name of the
-      updater or notifier, used for the ``type =`` config option. The value
+      updater or notifier, used for the ``type=`` config option. The value
       must be the class for the new updater/notifier.
    c. Add documentation for the new updater/notifier. Add a new section to
       ``docs/updaters.rst`` or ``docs/notifiers.rst`` listing the name, a brief

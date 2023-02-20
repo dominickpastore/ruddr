@@ -1,9 +1,9 @@
 Updaters
 ========
 
-Updaters are the modules in Ruddr that interface with your dynamic DNS
-provider. Different providers use different protocols and APIs, which
-correspond with the various updater types available.
+Updaters are the parts of Ruddr that interface with your dynamic DNS provider.
+Different providers use different protocols and APIs, which correspond with the
+various updater types available.
 
 Sample configurations are provided for some popular DDNS providers. However, if
 none of the built-in updaters below are compatible with your provider, you can
@@ -15,7 +15,7 @@ Standard Updater
 Type: ``standard``
 
 This updater is compatible with a wide variety of providers that mimic an API
-first introduced by DynDNS (dyn.com, now owned by Oracle). Despite the
+first introduced by Dyn (previously DynDNS, now owned by Oracle). Despite the
 updater's name, the API is not officially standardized. However, it has
 effectively become a de facto standard. If your provider supports updates via a
 URL that looks like ``http[s]://<hostname>/nic/update?myip=<IP address>`` or
@@ -56,7 +56,7 @@ provider isn't listed above, but does use an update URL that looks like
 ``http[s]://<username>:<password>@<hostname>/nic/update?myip=<IP address>``,
 there's a good chance you can create a working config using these options.
 
-.. TODO Note about how to send documentation updates
+.. TODO Note about how to send documentation updates?
 
 ::
 
@@ -106,7 +106,8 @@ there's a good chance you can create a working config using these options.
     This option is used only if you used the ``<hostname>/<fqdn>`` format
     for any of the entries in ``hosts``. It allows you to specify a specific
     nameserver to query. You can specify your provider's nameserver here to
-    ensure Ruddr gets the most up-to-date result directly from them.
+    ensure Ruddr gets the most up-to-date result directly from them. If not
+    provided, your system's default DNS server(s) will be used.
 
 ``ipv6_dialect``
     The DynDNS API was originally designed for IPv4 only. As a result,

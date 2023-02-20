@@ -23,7 +23,7 @@ def configfile_factory(tmp_path):
 def config_factory(configfile_factory):
     def factory(contents):
         configfile = configfile_factory(contents)
-        config = ruddr.configuration.read_file_from_path(configfile.filename)
+        config = ruddr.configuration.read_config_from_path(configfile.filename)
         config.finalize(lambda mod, typ: True, lambda mod, typ: True)
         return config
     return factory
@@ -32,23 +32,23 @@ def config_factory(configfile_factory):
 def test_nonexistent_file(tmp_path):
     """Test opening a nonexistent path raises ConfigError"""
     with pytest.raises(ruddr.ConfigError):
-        ruddr.configuration.read_file_from_path(
+        ruddr.configuration.read_config_from_path(
             tmp_path / 'nonexistent_config.ini'
         )
 
 
-def test_read_file_read_error():
-    """Test read error for read_file"""
+def test_read_config_read_error():
+    """Test read error for read_config"""
     f = doubles.BrokenFile()
 
     with pytest.raises(ruddr.ConfigError):
-        ruddr.configuration.read_file(f)
+        ruddr.configuration.read_config(f)
 
 
-def test_read_file_from_path_read_error(tmp_path):
-    """Test read error for read_file_from_path"""
+def test_read_config_from_path_read_error(tmp_path):
+    """Test read error for read_config_from_path"""
     with pytest.raises(ruddr.ConfigError):
-        ruddr.configuration.read_file_from_path(tmp_path / 'bad_config.ini')
+        ruddr.configuration.read_config_from_path(tmp_path / 'bad_config.ini')
 
 
 def test_config_keys(config_factory):
@@ -374,7 +374,7 @@ def test_notifier_invalid_type_1(configfile_factory):
         notifier = test_notifier
         """
     )
-    config = ruddr.configuration.read_file_from_path(configfile.filename)
+    config = ruddr.configuration.read_config_from_path(configfile.filename)
 
     with pytest.raises(ruddr.ConfigError):
         config.finalize(
@@ -396,7 +396,7 @@ def test_notifier_invalid_type_2(configfile_factory):
         notifier = test_notifier
         """
     )
-    config = ruddr.configuration.read_file_from_path(configfile.filename)
+    config = ruddr.configuration.read_config_from_path(configfile.filename)
 
     with pytest.raises(ruddr.ConfigError):
         config.finalize(
@@ -417,7 +417,7 @@ def test_updater_invalid_type_1(configfile_factory):
         notifier = test_notifier
         """
     )
-    config = ruddr.configuration.read_file_from_path(configfile.filename)
+    config = ruddr.configuration.read_config_from_path(configfile.filename)
 
     with pytest.raises(ruddr.ConfigError):
         config.finalize(
@@ -439,7 +439,7 @@ def test_updater_invalid_type_2(configfile_factory):
         notifier = test_notifier
         """
     )
-    config = ruddr.configuration.read_file_from_path(configfile.filename)
+    config = ruddr.configuration.read_config_from_path(configfile.filename)
 
     with pytest.raises(ruddr.ConfigError):
         config.finalize(

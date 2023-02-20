@@ -29,10 +29,6 @@ interface. This is a good choice when Ruddr is running on your router itself.
     #retry_min_interval = 10
     #retry_max_interval = 600
     #allow_private = no
-    #skip_ipv4 = no
-    #skip_ipv6 = no
-    #ipv4_required = yes
-    #ipv6_required = no
 
 **Configuration options:**
 
@@ -42,12 +38,11 @@ interface. This is a good choice when Ruddr is running on your router itself.
 ``ipv6_prefix``
    Number of bits that make up the network prefix of the IPv6 address. This is
    the part of the IPv6 address Ruddr will monitor for changes, and the part
-   that will be updated by any attached updaters. The bits after the prefix
-   will not be monitored, nor will they be changed by any attached notifier.
-   The default is 64, but note that many ISPs will delegate a larger block of
-   addresses (often an entire 56-bit prefix). You should check what prefix size
-   your ISP delegates. Note that this only applies to IPv6 addresses; Ruddr
-   always monitors and updates entire IPv4 addresses.
+   that will be updated by any attached updaters. The bits after the prefix are
+   ignored. The default is 64, but note that many ISPs will delegate a larger
+   block of addresses (often an entire 56-bit prefix). You should check what
+   prefix size your ISP delegates. Note that this only applies to IPv6
+   addresses; Ruddr always monitors and updates entire IPv4 addresses.
 
 ``interval``
    The number of seconds between IP address checks under normal conditions.
@@ -66,10 +61,10 @@ interface. This is a good choice when Ruddr is running on your router itself.
    explanation.
 
 ``allow_private``
-   Ruddr always ignores link-local (sometimes called APIPA) IPv4 and IPv6
-   addresses (169.254.0.0/16, fe80::/10). By default, it also ignores private
-   network addresses (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fd00::/8),
-   but if this option is true/on/yes/1, it does not.
+   The notifier always ignores link-local (sometimes called APIPA) IPv4 and
+   IPv6 addresses (169.254.0.0/16, fe80::/10). By default, it also ignores
+   private network addresses (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16,
+   fd00::/8), but if this option is true/on/yes/1, it does not.
 
 Systemd Notifier
 ----------------
@@ -77,10 +72,11 @@ Systemd Notifier
 Type: ``systemd``
 
 A systemd notifier is *very* similar to an iface notifier, with just one
-additional feature: It ties in to systemd-networkd via DBus to detect when
-interfaces go up or down immediately. On systems where systemd-networkd manages
-the network config, this should help minimize the delay between an IP address
-change and Ruddr detecting the change.
+additional feature: It ties in to systemd-networkd via DBus to immediately
+detect when interfaces go up or down, and does an additional notify at that
+point. On systems where systemd-networkd manages the network config, it should
+help minimize the delay between an IP address change and Ruddr detecting the
+change.
 
 **Sample config (with defaults commented)**::
 
@@ -92,10 +88,6 @@ change and Ruddr detecting the change.
     #retry_min_interval = 10
     #retry_max_interval = 600
     #allow_private = no
-    #skip_ipv4 = no
-    #skip_ipv6 = no
-    #ipv4_required = yes
-    #ipv6_required = no
 
 **Configuration options:**
 
@@ -109,12 +101,11 @@ systemd-networkd.
 ``ipv6_prefix``
    Number of bits that make up the network prefix of the IPv6 address. This is
    the part of the IPv6 address Ruddr will monitor for changes, and the part
-   that will be updated by any attached updaters. The bits after the prefix
-   will not be monitored, nor will they be changed by any attached notifier.
-   The default is 64, but note that many ISPs will delegate a larger block of
-   addresses (often an entire 56-bit prefix). You should check what prefix size
-   your ISP delegates. Note that this only applies to IPv6 addresses; Ruddr
-   always monitors and updates entire IPv4 addresses.
+   that will be updated by any attached updaters. The bits after the prefix are
+   ignored. The default is 64, but note that many ISPs will delegate a larger
+   block of addresses (often an entire 56-bit prefix). You should check what
+   prefix size your ISP delegates. Note that this only applies to IPv6
+   addresses; Ruddr always monitors and updates entire IPv4 addresses.
 
 ``interval``
    The number of seconds between IP address checks under normal conditions.
@@ -133,10 +124,10 @@ systemd-networkd.
    explanation.
 
 ``allow_private``
-   Ruddr always ignores link-local (sometimes called APIPA) IPv4 and IPv6
-   addresses (169.254.0.0/16, fe80::/10). By default, it also ignores private
-   network addresses (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fd00::/8),
-   but if this option is true/on/yes/1, it does not.
+   The notifier always ignores link-local (sometimes called APIPA) IPv4 and
+   IPv6 addresses (169.254.0.0/16, fe80::/10). By default, it also ignores
+   private network addresses (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16,
+   fd00::/8), but if this option is true/on/yes/1, it does not.
 
 Web Notifier
 ------------
@@ -145,7 +136,7 @@ Type: ``web``
 
 A web notifier periodically queries a public webpage or API to obtain the
 current public IP address. This is a great option for hosts behind a router
-doing network address translation (NAT).
+with network address translation (NAT).
 
 Currently, web notifiers are quite primitive: they assume the entire response
 is the IP address. There are public APIs that work well under that limitation
@@ -167,10 +158,6 @@ there are also plans to enhance its functionality (see `issue #9`_).
     #retry_min_interval = 60
     #retry_max_interval = 86400
     #allow_private = no
-    #skip_ipv4 = no
-    #skip_ipv6 = no
-    #ipv4_required = yes
-    #ipv6_required = no
 
 **Configuration options:**
 
@@ -202,12 +189,11 @@ there are also plans to enhance its functionality (see `issue #9`_).
 ``ipv6_prefix``
    Number of bits that make up the network prefix of the IPv6 address. This is
    the part of the IPv6 address Ruddr will monitor for changes, and the part
-   that will be updated by any attached updaters. The bits after the prefix
-   will not be monitored, nor will they be changed by any attached notifier.
-   The default is 64, but note that many ISPs will delegate a larger block of
-   addresses (often an entire 56-bit prefix). You should check what prefix size
-   your ISP delegates. Note that this only applies to IPv6 addresses; Ruddr
-   always monitors and updates entire IPv4 addresses.
+   that will be updated by any attached updaters. The bits after the prefix are
+   ignored. The default is 64, but note that many ISPs will delegate a larger
+   block of addresses (often an entire 56-bit prefix). You should check what
+   prefix size your ISP delegates. Note that this only applies to IPv6
+   addresses; Ruddr always monitors and updates entire IPv4 addresses.
 
 ``interval``
    The number of seconds between IP address checks under normal conditions.
@@ -231,7 +217,7 @@ Static Notifier
 Type: ``static``
 
 This is a basic notifier that always returns the address specified in its
-configuration. It is of limited use outside of testing purposes.
+configuration. It is of limited use other than for testing purposes.
 
 **Sample config (with defaults commented)**::
 
@@ -239,10 +225,6 @@ configuration. It is of limited use outside of testing purposes.
     type = static
     ipv4 = 198.51.100.1
     ipv6 = 2001:db8:0001::/48
-    #skip_ipv4 = no
-    #skip_ipv6 = no
-    #ipv4_required = yes
-    #ipv6_required = no
 
 **Configuration options:**
 

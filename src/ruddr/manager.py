@@ -269,7 +269,7 @@ def main(argv=None):
     """Main entry point when run as a standalone program"""
     args = parse_args(argv)
     try:
-        conf = configuration.read_file_from_path(args.configfile)
+        conf = configuration.read_config_from_path(args.configfile)
     except ConfigError as e:
         print("Config error:", e, file=sys.stderr)
         sys.exit(2)
@@ -305,7 +305,6 @@ def main(argv=None):
     # Do an immediate update on SIGUSR1
     def handle_sigusr1(sig, _):
         log.info("Received signal: %s", signal.Signals(sig).name)
-        # TODO can exceptions happen here?
         manager.do_notify()
     signal.signal(signal.SIGUSR1, handle_sigusr1)
 
@@ -313,7 +312,6 @@ def main(argv=None):
     def handle_signals(sig, _):
         log.info("Received signal: %s", signal.Signals(sig).name)
         sdnotify.stopping()
-        # TODO can exceptions happen here?
         manager.stop()
     signal.signal(signal.SIGINT, handle_signals)
     signal.signal(signal.SIGTERM, handle_signals)
