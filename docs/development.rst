@@ -18,6 +18,7 @@ contributing to the project. In any case, this page is for you.
    :backlinks: none
 
 .. module:: ruddr
+   :noindex:
 
 .. _notifier_dev:
 
