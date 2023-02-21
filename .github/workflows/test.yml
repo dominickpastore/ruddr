@@ -1,0 +1,30 @@
+# GitHub Actions workflow for test suite
+# vim: set ts=8 sts=2 sw=2:
+name: Test
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+
+jobs:
+  run_tests:
+    name: Run tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install Python versions
+        uses: actions/setup-python@v4
+        with:
+          python-version: |
+            3.7
+            3.9
+            3.10
+            3.11
+            3.8
+      - name: Install test tools
+        run: python3 -m pip install --upgrade pip tox
+      - name: Run tox
+        run: tox
