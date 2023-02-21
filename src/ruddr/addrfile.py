@@ -193,10 +193,7 @@ class Addrfile:
                  :class:`~ipaddress.IPv4Address`, or ``None`` if there
                  currently is no IPv4 address. ``is_current`` is a
                  :class:`bool` representing whether the current address is
-                 known to be published. Note that ``(None, True)`` *is* a valid
-                 response, and represents an intentional, known lack of IP
-                 address (e.g. if a host has *only* an IPv6 address and its
-                 IPv4 address is intentionally de-published).
+                 known to be published.
         """
         try:
             addrs = self._addresses[name]
@@ -223,10 +220,7 @@ class Addrfile:
                  :class:`~ipaddress.IPv6Network`, or ``None`` if there
                  currently is no IPv6 prefix. ``is_current`` is a
                  :class:`bool` representing whether the current prefix is
-                 known to be published. Note that ``(None, True)`` *is* a valid
-                 response, and represents an intentional, known lack of IP
-                 address (e.g. if a host has *only* an IPv4 address and its
-                 IPv6 prefix is intentionally de-published).
+                 known to be published.
         """
         try:
             addrs = self._addresses[name]
@@ -240,12 +234,11 @@ class Addrfile:
         except KeyError:
             return (None, False)
 
-    def set_ipv4(self, name: str, address: Optional[ipaddress.IPv4Address]):
+    def set_ipv4(self, name: str, address: ipaddress.IPv4Address):
         """Write the given updater's IPv4 address to the addrfile
 
         :param name: The name of the updater
-        :param address: The IPv4 address to write, or None if the IPv4 address
-                        was unpublished
+        :param address: The IPv4 address to write
 
         :raises OSError: if addrfile could not be written
         """
@@ -255,12 +248,11 @@ class Addrfile:
             self._addresses[name] = {'ipv4': (address, True)}
         self._write_addrfile()
 
-    def set_ipv6(self, name: str, prefix: Optional[ipaddress.IPv6Network]):
+    def set_ipv6(self, name: str, prefix: ipaddress.IPv6Network):
         """Write the given updater's IPv6 prefix to the addrfile
 
         :param name: The name of the updater
-        :param prefix: The IPv6 prefix to write, or None if the IPv6 prefix was
-                       unpublished
+        :param prefix: The IPv6 prefix to write
 
         :raises OSError: if addrfile could not be written
         """

@@ -159,7 +159,9 @@ class SystemdNotifier(Notifier):
         # properties on DBus.
         #
         # TODO Look into this more in the future. Maybe it will be better
-        #  documented.
+        #  documented. Edit: More info at
+        #  https://www.freedesktop.org/software/systemd/man/org.freedesktop.network1.html
+        #  but it's still not that well documented.
 
         # Look up interface name
         try:

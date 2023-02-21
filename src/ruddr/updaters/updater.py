@@ -148,13 +148,13 @@ class BaseUpdater:
         #: error and no more updates should be issued.
         self.halt: bool = False
 
-    def initial_update(self):
+    def initial_update(self) -> None:
         """Do the initial update: Check the addrfile, and if either address is
         defunct but has a last-attempted-address, try to publish it again.
         """
         raise NotImplementedError
 
-    def update_ipv4(self, address: ipaddress.IPv4Address):
+    def update_ipv4(self, address: ipaddress.IPv4Address) -> None:
         """Receive a new IPv4 address from the attached notifier. If it does
         not match the current address, call the subclass' publish function,
         update the addrfile if successful, and retry if not.
@@ -163,7 +163,7 @@ class BaseUpdater:
         """
         raise NotImplementedError
 
-    def update_ipv6(self, address: ipaddress.IPv6Network):
+    def update_ipv6(self, address: ipaddress.IPv6Network) -> None:
         """Receive a new IPv6 prefix from the attached notifier. If it does
         not match the current prefix, call the subclass' publish function,
         update the addrfile if successful, and retry if not.
@@ -190,7 +190,7 @@ class BaseUpdater:
 
     @staticmethod
     def pick_error(curr_err: Optional[PublishError],
-                   new_err: Optional[PublishError]):
+                   new_err: Optional[PublishError]) -> Optional[PublishError]:
         """Return the current error, unless there isn't one or new_err is a
         higher priority error"""
         if curr_err is None:
@@ -212,32 +212,29 @@ class Updater(BaseUpdater):
     def __init__(self, name: str, addrfile: Addrfile):
         super().__init__(name, addrfile)
 
-    def initial_update(self):
+    def initial_update(self) -> None:
         """:meta private:"""
         self.log.debug("Doing initial update")
         ipv4, is_current = self.addrfile.get_ipv4(self.name)
-        if not is_current:
+        if ipv4 is None:
+            self.log.info("No prior IPv4 attempt stored, no initial update")
+        elif not is_current:
             self.log.info("IPv4 not known to be current, doing initial update")
             self.update_ipv4(ipv4)
 
         ipv6, is_current = self.addrfile.get_ipv6(self.name)
+        if ipv6 is None:
+            self.log.info("No prior IPv6 attempt stored, no initial update")
         if not is_current:
             self.log.info("IPv6 not known to be current, doing initial update")
             self.update_ipv6(ipv6)
 
     @Retry
-    def update_ipv4(self, address: ipaddress.IPv4Address):
+    def update_ipv4(self, address: ipaddress.IPv4Address) -> None:
         """:meta private:"""
         if self.halt:
             return
 
-        # TODO This won't behave well and shouldn't be allowed. If an address
-        #  can't currently be found the notifier should just not notify.
-        # TODO Also update Addrfile.set_ipv4 not to accept None.
-        if address is None:
-            self.log.info("Skipping update with no address (will not try to "
-                          "de-publish)")
-            return
         if not self.addrfile.needs_ipv4_update(self.name, address):
             self.log.debug("Skipping update as %s is current address",
                            address.exploded)
@@ -270,18 +267,11 @@ class Updater(BaseUpdater):
                                     "IPv4 to addrfile") from e
 
     @Retry
-    def update_ipv6(self, prefix: ipaddress.IPv6Network):
+    def update_ipv6(self, prefix: ipaddress.IPv6Network) -> None:
         """:meta private:"""
         if self.halt:
             return
 
-        # TODO This won't behave well and shouldn't be allowed. If an address
-        #  can't currently be found the notifier should just not notify.
-        # TODO Also update Addrfile.set_ipv6 not to accept None.
-        if prefix is None:
-            self.log.info("Skipping update with no prefix (will not try to "
-                          "de-publish)")
-            return
         if not self.addrfile.needs_ipv6_update(self.name, prefix):
             self.log.debug("Skipping update as %s is current address",
                            prefix.compressed)
@@ -313,7 +303,7 @@ class Updater(BaseUpdater):
             raise FatalPublishError(f"Updater {self.name} could not write "
                                     "IPv6 to addrfile") from e
 
-    def publish_ipv4(self, address: ipaddress.IPv4Address):
+    def publish_ipv4(self, address: ipaddress.IPv4Address) -> None:
         """Publish a new IPv4 address to the appropriate DDNS provider. Will
         only be called if an update contains a new address or a previous update
         failed.
@@ -326,7 +316,7 @@ class Updater(BaseUpdater):
         """
         raise NotImplementedError("IPv4 publish function not provided")
 
-    def publish_ipv6(self, network: ipaddress.IPv6Network):
+    def publish_ipv6(self, network: ipaddress.IPv6Network) -> None:
         """Publish a new IPv6 prefix to the appropriate DDNS provider. Will
         only be called if an update contains a new address or a previous update
         failed.
@@ -414,7 +404,7 @@ class TwoWayZoneUpdater(Updater):
     def init_hosts_and_zones(
         self,
         hosts: Union[List[Tuple[str, Optional[str]]], str]
-    ):
+    ) -> None:
         """Provide the list of hosts to be updated, optionally with their zones
         if configured.
 
@@ -459,7 +449,7 @@ class TwoWayZoneUpdater(Updater):
                 self._check_zone_and_duplicates(fqdn, zone)
             self._hosts = hosts
 
-    def _check_zone_and_duplicates(self, fqdn: str, zone: str):
+    def _check_zone_and_duplicates(self, fqdn: str, zone: str) -> None:
         """Check if the given FQDN is in the given zone and that it is not a
         duplicate of any existing hosts
 
@@ -689,7 +679,7 @@ class TwoWayZoneUpdater(Updater):
         self,
         zone: str,
         records: Dict[str, Tuple[List[ipaddress.IPv4Address], Optional[int]]],
-    ):
+    ) -> None:
         """Publish A (IPv4) records for the given zone.
 
         **Implementing this method in subclasses is optional.** However, either
@@ -720,7 +710,7 @@ class TwoWayZoneUpdater(Updater):
         self,
         zone: str,
         records: Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]]
-    ):
+    ) -> None:
         """Publish AAAA (IPv6) records for the given zone.
 
         **Implementing this method in subclasses is optional.** However, either
@@ -748,7 +738,8 @@ class TwoWayZoneUpdater(Updater):
 
     @abstractmethod
     def put_subdomain_ipv4(self, subdomain: str, zone: str,
-                           address: ipaddress.IPv4Address, ttl: Optional[int]):
+                           address: ipaddress.IPv4Address,
+                           ttl: Optional[int]) -> None:
         """Publish an A (IPv4) record for the given domain.
 
         **Implementing this method in subclasses is optional.** However, it
@@ -779,7 +770,7 @@ class TwoWayZoneUpdater(Updater):
     @abstractmethod
     def put_subdomain_ipv6s(self, subdomain: str, zone: str,
                             addresses: List[ipaddress.IPv6Address],
-                            ttl: Optional[int]):
+                            ttl: Optional[int]) -> None:
         """Publish AAAA (IPv6) records for the given domain.
 
         **Implementing this method in subclasses is optional.** However, it
@@ -1024,7 +1015,7 @@ class TwoWayZoneUpdater(Updater):
         subdomains: List[str],
         records: Dict[str, Tuple[List[ipaddress.IPv4Address], Optional[int]]],
         by_zone: bool,
-    ):
+    ) -> None:
         """Publish the given IPv4 records by zone or by domain
 
         :param zone: The zone the records are for
@@ -1071,7 +1062,7 @@ class TwoWayZoneUpdater(Updater):
         if error is not None:
             raise error
 
-    def publish_ipv4(self, address: ipaddress.IPv4Address):
+    def publish_ipv4(self, address: ipaddress.IPv4Address) -> None:
         """:meta private:"""
         hosts_by_zone = self._get_hosts_by_zone()
         hosts_by_zone, error = self._check_for_missing_zones(hosts_by_zone)
@@ -1181,7 +1172,7 @@ class TwoWayZoneUpdater(Updater):
         subdomains: List[str],
         records: Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]],
         by_zone: bool,
-    ):
+    ) -> None:
         """Publish the given IPv6 records by zone or by domain
 
         :param zone: The zone the records are for
@@ -1224,7 +1215,7 @@ class TwoWayZoneUpdater(Updater):
         if error is not None:
             raise error
 
-    def publish_ipv6(self, network: ipaddress.IPv6Network):
+    def publish_ipv6(self, network: ipaddress.IPv6Network) -> None:
         """:meta private:"""
         hosts_by_zone = self._get_hosts_by_zone()
         hosts_by_zone, error = self._check_for_missing_zones(hosts_by_zone)
@@ -1355,7 +1346,7 @@ class TwoWayUpdater(TwoWayZoneUpdater):
     def __init__(self, name: str, addrfile: Addrfile, datadir: str):
         super().__init__(name, addrfile, datadir)
 
-    def init_hosts(self, hosts: Union[List[str], str]):
+    def init_hosts(self, hosts: Union[List[str], str]) -> None:
         """Provide the list of hosts to be updated.
 
         This is separate from :meth:`__init__` so subclasses can rely on the
@@ -1511,7 +1502,7 @@ class TwoWayUpdater(TwoWayZoneUpdater):
     def put_all_ipv4s(
         self,
         records: Dict[str, Tuple[List[ipaddress.IPv4Address], Optional[int]]],
-    ):
+    ) -> None:
         """Publish A (IPv4) records for the account.
 
         **Implementing this method in subclasses is optional.** However, either
@@ -1540,7 +1531,7 @@ class TwoWayUpdater(TwoWayZoneUpdater):
     def put_all_ipv6s(
         self,
         records: Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]],
-    ):
+    ) -> None:
         """Publish AAAA (IPv6) records for the account.
 
         **Implementing this method in subclasses is optional.** However, either
@@ -1567,7 +1558,8 @@ class TwoWayUpdater(TwoWayZoneUpdater):
 
     @abstractmethod
     def put_domain_ipv4(self, domain: str,
-                        address: ipaddress.IPv4Address, ttl: Optional[int]):
+                        address: ipaddress.IPv4Address,
+                        ttl: Optional[int]) -> None:
         """Publish an A (IPv4) record for the given domain.
 
         **Implementing this method in subclasses is optional.** However, it
@@ -1593,7 +1585,7 @@ class TwoWayUpdater(TwoWayZoneUpdater):
     @abstractmethod
     def put_domain_ipv6s(self, domain: str,
                          addresses: List[ipaddress.IPv6Address],
-                         ttl: Optional[int]):
+                         ttl: Optional[int]) -> None:
         """Publish AAAA (IPv6) records for the given domain.
 
         **Implementing this method in subclasses is optional.** However, it
@@ -1637,13 +1629,14 @@ class TwoWayUpdater(TwoWayZoneUpdater):
         self,
         zone: str,
         records: Dict[str, Tuple[List[ipaddress.IPv4Address], Optional[int]]]
-    ):
+    ) -> None:
         """:meta private:"""
         assert zone == ''
         self.put_all_ipv4s(records)
 
     def put_subdomain_ipv4(self, subdomain: str, zone: str,
-                           address: ipaddress.IPv4Address, ttl: Optional[int]):
+                           address: ipaddress.IPv4Address,
+                           ttl: Optional[int]) -> None:
         """:meta private:"""
         assert zone == ''
         self.put_domain_ipv4(subdomain, address, ttl)
@@ -1669,14 +1662,14 @@ class TwoWayUpdater(TwoWayZoneUpdater):
         self,
         zone: str,
         records: Dict[str, Tuple[List[ipaddress.IPv6Address], Optional[int]]]
-    ):
+    ) -> None:
         """:meta private:"""
         assert zone == ''
         self.put_all_ipv6s(records)
 
     def put_subdomain_ipv6s(self, subdomain: str, zone: str,
                             addresses: List[ipaddress.IPv6Address],
-                            ttl: Optional[int]):
+                            ttl: Optional[int]) -> None:
         """:meta private:"""
         assert zone == ''
         self.put_domain_ipv6s(subdomain, addresses, ttl)
@@ -1737,7 +1730,7 @@ class OneWayUpdater(Updater):
         ],
         nameserver: Optional[str] = None,
         min_retry=300
-    ):
+    ) -> None:
         """Initialize the hosts list, nameserver, and min retry interval.
 
         This is separate from :meth:`__init__` so subclasses can rely on the
@@ -1821,7 +1814,7 @@ class OneWayUpdater(Updater):
 
         return result
 
-    def publish_ipv4(self, address):
+    def publish_ipv4(self, address) -> None:
         """:meta private:"""
         error = None
         for host, _ in self._hosts:
@@ -1835,7 +1828,7 @@ class OneWayUpdater(Updater):
     @abstractmethod
     def publish_ipv4_one_host(self,
                               hostname: str,
-                              address: ipaddress.IPv4Address):
+                              address: ipaddress.IPv4Address) -> None:
         """Attempt to publish an IPv4 address for the given host.
 
         **Must be implemented by subclasses.**
@@ -1850,7 +1843,7 @@ class OneWayUpdater(Updater):
         """
         raise NotImplementedError
 
-    def publish_ipv6(self, network):
+    def publish_ipv6(self, network) -> None:
         """:meta private:"""
         error = None
         for host, ip_lookup in self._hosts:
@@ -1961,7 +1954,7 @@ class OneWayUpdater(Updater):
     @abstractmethod
     def publish_ipv6_one_host(self,
                               hostname: str,
-                              address: ipaddress.IPv6Address):
+                              address: ipaddress.IPv6Address) -> None:
         """Attempt to publish an IPv6 address for the given host.
 
         **Must be implemented by subclasses.**

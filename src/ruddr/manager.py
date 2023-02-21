@@ -316,10 +316,6 @@ def main(argv=None):
     signal.signal(signal.SIGINT, handle_signals)
     signal.signal(signal.SIGTERM, handle_signals)
 
-    # TODO Do we need this? If not, remove it
-    # while True:
-    #     time.sleep(60)
-
 
 if __name__ == '__main__':
     main()

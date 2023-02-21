@@ -47,10 +47,7 @@ def _notify(msg):
         sock_name = os.environ['NOTIFY_SOCKET']
     except KeyError:
         return
-    # TODO Remove comments if not needed
-    # sock_name = os.fsencode(sock_name)
-    if sock_name[0] == 0x40:    # 0x40 is @
-        # sock_name = b'\x00' + sock_name[1:]
+    if sock_name[0] == '@':
         sock_name = '\x00' + sock_name[1:]
 
     sock_type = socket.SOCK_DGRAM
