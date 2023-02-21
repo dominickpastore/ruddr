@@ -55,7 +55,7 @@ autodoc_member_order = 'bysource'
 # a list of builtin themes.
 html_theme = 'alabaster'
 html_theme_options = {
-    'description': 'Robotic Updater for Dynamic DNS Records',
+    'description': 'Steer DNS queries to the proper IP addresses',
     'show_relbar_bottom': True,
     'show_related': True,
     'fixed_sidebar': True
