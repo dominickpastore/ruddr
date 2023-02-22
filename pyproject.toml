@@ -195,16 +195,15 @@ exclude_lines = [
 
     # Don't complain if tests don't hit defensive assertion code:
     "raise AssertionError",
-    # TODO Revisit this, because we are sort of abusing NotImplementedError
-    #  (we sometimes do allow it to be raised intentionally)
+
+    # Don't complain about abstract methods (though we do sort of abuse
+    # NotImplementedError, we always override those methods in our test
+    # doubles, test the NotImplementedError behavior just by raising it in the
+    # mocks)
     "raise NotImplementedError",
 
     # Don't complain if non-runnable code isn't run:
     "if __name__ == .__main__.:",
-
-    # Don't complain about abstract methods, they aren't run:
-    # TODO revisit this, because we are sort of abusing @abstractmethod
-    "@(abc\\.)?abstractmethod",
 ]
 
 [tool.pytype]
@@ -212,10 +211,18 @@ exclude_lines = [
 inputs = [
     "src/ruddr"
 ]
-# Python version we are targeting
-python_version = "3.7"
+
+# We don't specify target python_version. It causes problems when it doesn't
+# match the version used to run Pytype. It uses the target version's
+# interpreter to resolve import paths, which doesn't work when the dependencies
+# are not installed for that version. This is especially a problem for venvs
+# and CI, where there are no external libs pre-installed except in the current
+# venv. The default is to target the version of Python that Pytype is running
+# in.
+
 # Run in parallel with same number of jobs as CPUs
 jobs = "auto"
+
 # Errors to ignore project-wide
 disable = [
     # We are abusing @abstractmethod for Sphinx documentation purposes. It's
