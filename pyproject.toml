@@ -154,6 +154,7 @@ skip_install = true
 commands =
     coverage report
     coverage html
+    coverage json
 
 [testenv:clean]
 depends =
