@@ -13,8 +13,8 @@ from abc import abstractmethod
 from typing import (Union, Tuple, List, Optional, Dict, TypeVar, Sequence,
                     Mapping, Callable, cast)
 
-import dns.exception    # type: ignore
-import dns.resolver     # type: ignore
+import dns.exception
+import dns.resolver
 
 from ruddr.addrfile import Addrfile
 from ruddr.exceptions import PublishError, FatalPublishError, ConfigError

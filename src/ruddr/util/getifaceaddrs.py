@@ -16,7 +16,7 @@ system's interfaces"""
 import ipaddress
 from typing import Tuple, List, cast, Dict
 
-import netifaces    # type: ignore
+import netifaces
 
 
 def _get_iface_addrs(

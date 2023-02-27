@@ -9,7 +9,7 @@ if sys.version_info < (3, 8):
 else:
     from typing import Protocol
 
-import tldextract   # type: ignore
+import tldextract
 
 
 class _TLDExtractor(Protocol):
