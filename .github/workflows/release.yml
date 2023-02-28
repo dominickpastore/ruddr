@@ -1,0 +1,86 @@
+# GitHub Actions workflow for test suite
+# vim: set ts=8 sts=2 sw=2:
+name: Release
+on:
+  push:
+    tags:
+      - v*.*.*
+
+jobs:
+  test:
+    # Note: This job matches what's in the test workflow
+    # TODO Use a reusable workflow for this
+    name: Run tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install Python versions
+        uses: actions/setup-python@v4
+        with:
+          python-version: |
+            3.7
+            3.9
+            3.10
+            3.11
+            3.8
+      - name: Install test tools
+        run: python3 -m pip install --upgrade pip tox
+      - name: Run tox
+        run: tox
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+
+  release:
+    name: Cut the release
+    environment:
+      name: pypi
+      url: ${{ steps.contents.outputs.url }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    needs:
+      - test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          # Ensure we get the tag itself, not just the commit. We need the tag
+          # message.
+          ref: ${{ github.ref }}
+      - name: Install build tools
+        run: python3 -m pip install --upgrade pip build setuptools_scm twine
+      - name: Build sdist and wheel
+        run: python3 -m build
+      - name: List artifacts
+        run: ls dist/
+      - name: Draft release contents
+        id: contents
+        run: |
+          version=$(python3 -m setuptools_scm)
+          url="https://pypi.org/project/ruddr/${version}/"
+          mkdir -p build/
+          notes="build/release_notes.md"
+          echo "version=${version}" >> $GITHUB_OUTPUT
+          echo "url=${url}" >> $GITHUB_OUTPUT
+          echo "notes=${notes}" >> $GITHUB_OUTPUT
+          git tag -l --format='name=%(contents:subject)' ${{ github.ref_name }} >> $GITHUB_OUTPUT
+          git tag -l --format='%(contents:body)' ${{ github.ref_name }} > $notes
+          echo >> $notes
+          echo "See the [CHANGELOG](https://github.com/dominickpastore/ruddr/blob/master/CHANGELOG.md) for more details." >> $notes
+          echo >> $notes
+          echo "This release is available on PyPI at <${url}>." >> $notes
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ steps.contents.outputs.name }}
+          prerelease: ${{ contains(steps.contents.outputs.version, 'a') || contains(steps.contents.outputs.version, 'b') || contains(steps.contents.outputs.version, 'rc') }}
+          files: dist/*
+          body_path: ${{ steps.contents.outputs.notes }}
+     #- name: Publish to PyPI
+     #  env:
+     #    TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+     #    TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+     #  run: twine upload --repository testpypi dist/*

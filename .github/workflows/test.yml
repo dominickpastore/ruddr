@@ -8,7 +8,7 @@ on:
   pull_request:
 
 jobs:
-  run_tests:
+  test:
     name: Run tests
     runs-on: ubuntu-latest
 
