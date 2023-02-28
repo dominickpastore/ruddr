@@ -27,7 +27,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install dependencies for docs
-        run: python3 -m pip install --upgrade .[docs]
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install .[docs]
       - name: Run Sphinx
         run: |
           cd docs
