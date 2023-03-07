@@ -65,8 +65,8 @@ jobs:
           prerelease: ${{ contains(steps.contents.outputs.version, 'a') || contains(steps.contents.outputs.version, 'b') || contains(steps.contents.outputs.version, 'rc') }}
           files: dist/*
           body_path: ${{ steps.contents.outputs.notes }}
-     #- name: Publish to PyPI
-     #  env:
-     #    TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-     #    TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-     #  run: twine upload --repository testpypi dist/*
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: twine upload --repository testpypi dist/*
