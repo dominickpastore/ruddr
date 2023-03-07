@@ -1,7 +1,7 @@
 Ruddr Documentation
 ===================
 
-- `PyPI <https://https://pypi.org/project/ruddr/>`_
+- `PyPI <https://pypi.org/project/ruddr/>`_
 - `This documentation <https://ruddr.dcpx.org/>`_
 - `GitHub, README <https://github.com/dominickpastore/ruddr>`_
 - `Changelog
