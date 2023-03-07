@@ -1,5 +1,13 @@
 # GitHub Actions workflow for test suite
 # vim: set ts=8 sts=2 sw=2:
+#
+# Usage:
+# Tag a release with the tag name format below. The tag message is used to form
+# the release, with the first line becoming the release title and the rest
+# becoming the release body (Markdown allowed). In addition, the release will
+# link the CHANGELOG, PyPI, and contain the source and binary distributions
+# uploaded to PyPI.
+
 name: Release
 on:
   push:
@@ -8,29 +16,7 @@ on:
 
 jobs:
   test:
-    # Note: This job matches what's in the test workflow
-    # TODO Use a reusable workflow for this
-    name: Run tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Install Python versions
-        uses: actions/setup-python@v4
-        with:
-          python-version: |
-            3.7
-            3.9
-            3.10
-            3.11
-            3.8
-      - name: Install test tools
-        run: python3 -m pip install --upgrade pip tox
-      - name: Run tox
-        run: tox
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v3
+    uses: ./.github/workflows/test.yml
 
   release:
     name: Cut the release
