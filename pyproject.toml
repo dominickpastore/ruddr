@@ -13,15 +13,14 @@ authors = [
 ]
 description = "Robotic Updater for Dynamic DNS Records"
 readme = "README.md"
-# TODO
-# license.file = "LICENSE.txt"
+license.file = "COPYING"
 classifiers = [
     "Environment :: No Input/Output (Daemon)",
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
     "Intended Audience :: System Administrators",
     "Intended Audience :: Telecommunications Industry",
-    "License :: Other/Proprietary License",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Operating System :: POSIX",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",

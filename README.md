@@ -117,7 +117,8 @@ It contains much more information, including the following:
 License
 -------
 
-TODO add license notice to files
+GNU General Public License version 3 or later. See the [COPYING][COPYING] file
+for the full license.
 
 Copyright &copy; 2023 Dominick C. Pastore
 
@@ -127,3 +128,4 @@ Copyright &copy; 2023 Dominick C. Pastore
 [changelog]: https://github.com/dominickpastore/ruddr/blob/master/CHANGELOG.md
 [issues]: https://github.com/dominickpastore/ruddr/issues
 [discussion]: https://github.com/dominickpastore/ruddr/discussion
+[COPYING]: https://github.com/dominickpastore/ruddr/blob/master/COPYING
