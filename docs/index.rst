@@ -7,7 +7,7 @@ Ruddr Documentation
 - `Changelog
   <https://github.com/dominickpastore/ruddr/blob/master/CHANGELOG.md>`_
 - `Issues <https://github.com/dominickpastore/ruddr/issues>`_
-- `Discussion <https://github.com/dominickpastore/ruddr/discussion>`_
+- `Discussion <https://github.com/dominickpastore/ruddr/discussions>`_
 
 Welcome to the full documentation for Ruddr, the Robotic Updater for Dynamic
 DNS Records.
