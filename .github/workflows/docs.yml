@@ -27,7 +27,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Install dependencies for docs
+      - name: Install Graphviz
+        run: |
+          sudo apt-get update
+          sudo apt-get install graphviz
+      - name: Install Python dependencies for docs
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install .[docs]
