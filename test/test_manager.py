@@ -363,6 +363,9 @@ class TestDDNSManager:
         manager = ruddr.manager.DDNSManager(config)
         notifier = manager.notifiers['test_notifier']
         updater = manager.updaters['test_updater']
+        assert updater.initial_update_calls == [
+            (True, False)
+        ]
         notifier.notify_ipv4(ipaddress.IPv4Address('1.2.3.4'))
         notifier.notify_ipv6(ipaddress.IPv6Network('1234::/64'))
         assert updater.published_addresses == [
@@ -389,6 +392,9 @@ class TestDDNSManager:
         manager = ruddr.manager.DDNSManager(config)
         notifier = manager.notifiers['test_notifier']
         updater = manager.updaters['test_updater']
+        assert updater.initial_update_calls == [
+            (False, True)
+        ]
         notifier.notify_ipv4(ipaddress.IPv4Address('1.2.3.4'))
         notifier.notify_ipv6(ipaddress.IPv6Network('1234::/64'))
         assert updater.published_addresses == [
@@ -416,6 +422,9 @@ class TestDDNSManager:
         manager = ruddr.manager.DDNSManager(config)
         notifier = manager.notifiers['test_notifier']
         updater = manager.updaters['test_updater']
+        assert updater.initial_update_calls == [
+            (True, True)
+        ]
         notifier.notify_ipv4(ipaddress.IPv4Address('1.2.3.4'))
         notifier.notify_ipv6(ipaddress.IPv6Network('1234::/64'))
         assert updater.published_addresses == [
@@ -448,6 +457,9 @@ class TestDDNSManager:
         notifier = manager.notifiers['test_notifier']
         notifier2 = manager.notifiers['test_notifier2']
         updater = manager.updaters['test_updater']
+        assert updater.initial_update_calls == [
+            (True, True)
+        ]
         notifier.notify_ipv4(ipaddress.IPv4Address('1.2.3.4'))
         notifier.notify_ipv6(ipaddress.IPv6Network('1234::/64'))
         notifier2.notify_ipv4(ipaddress.IPv4Address('5.6.7.8'))

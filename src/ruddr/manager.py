@@ -98,27 +98,38 @@ class DDNSManager:
                 updater_class = updaters.updaters[(module, updater_type)]
 
             updater = updater_class(name, self.addrfile, config)
-            updater.initial_update()
-            self._attach_updater_notifier(updater, config)
+            do_ipv4, do_ipv6 = self._attach_updater_notifier(updater, config)
+            updater.initial_update(do_ipv4, do_ipv6)
             updater_dict[name] = updater
         return updater_dict
 
-    def _attach_updater_notifier(self, updater, config):
+    def _attach_updater_notifier(
+        self, updater, config
+    ) -> Tuple[bool, bool]:
         """Attach the given :class:`~ruddr.Updater` to its notifier(s).
         Assumes config is valid; that is, notifiers all exist.
 
         :param updater: The :class:`~ruddr.Updater` to be attached
         :param config: That :class:`~ruddr.Updater`'s config
+
+        :return: 2-tuple (ipv4_attached, ipv6_attached)
         """
         ipv4_notifier_name = config.get('notifier4')
         ipv6_notifier_name = config.get('notifier6')
+        ipv4_attached = False
+        ipv6_attached = False
 
         if ipv4_notifier_name is not None:
             ipv4_notifier = self.notifiers[ipv4_notifier_name]
-            ipv4_notifier.attach_ipv4_updater(updater.update_ipv4)
+            ipv4_attached = ipv4_notifier.attach_ipv4_updater(
+                updater.update_ipv4
+            )
         if ipv6_notifier_name is not None:
             ipv6_notifier = self.notifiers[ipv6_notifier_name]
-            ipv6_notifier.attach_ipv6_updater(updater.update_ipv6)
+            ipv6_attached = ipv6_notifier.attach_ipv6_updater(
+                updater.update_ipv6
+            )
+        return ipv4_attached, ipv6_attached
 
     def _discard_unused_notifiers(self):
         """Remove notifiers that are not attached to an updater"""

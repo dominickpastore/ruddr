@@ -178,6 +178,7 @@ class MockBaseUpdater(ruddr.BaseUpdater):
         super().__init__(name, addrfile)
         self.config = config
         self.published_addresses = []
+        self.initial_update_calls: List[Tuple[bool, bool]] = []
 
         #: The order of successes and fails for retry_test. None means success,
         #: an error means raise that error
@@ -196,8 +197,8 @@ class MockBaseUpdater(ruddr.BaseUpdater):
         if error is not None:
             raise error
 
-    def initial_update(self):
-        pass
+    def initial_update(self, ipv4_attached: bool, ipv6_attached: bool):
+        self.initial_update_calls.append((ipv4_attached, ipv6_attached))
 
     def update_ipv4(self, address):
         self.published_addresses.append(address)

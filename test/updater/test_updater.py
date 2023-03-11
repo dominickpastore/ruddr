@@ -67,7 +67,7 @@ def test_initial_update_ipv4(mock_addrfile_factory, advance):
         test_updater_set6=ipaddress.IPv6Network('1234::/64'),
     )
     updater = doubles.MockUpdater('test_updater', addrfile)
-    updater.initial_update()
+    updater.initial_update(True, True)
 
     assert advance.count_running() == 0
     assert updater.ipv4s_published == [ipaddress.IPv4Address('1.2.3.4')]
@@ -89,7 +89,7 @@ def test_initial_update_ipv6(mock_addrfile_factory, advance):
         test_updater_inv6=ipaddress.IPv6Network('1234::/64'),
     )
     updater = doubles.MockUpdater('test_updater', addrfile)
-    updater.initial_update()
+    updater.initial_update(True, True)
 
     assert advance.count_running() == 0
     assert updater.ipv4s_published == []
@@ -104,6 +104,52 @@ def test_initial_update_ipv6(mock_addrfile_factory, advance):
     ]
 
 
+def test_initial_update_not_attached_ipv4(mock_addrfile_factory, advance):
+    """Test initial update does not update IPv4 when IPv4 not attached, even if
+    not current"""
+    addrfile = mock_addrfile_factory(
+        test_updater_inv4=ipaddress.IPv4Address('1.2.3.4'),
+        test_updater_inv6=ipaddress.IPv6Network('1234::/64'),
+    )
+    updater = doubles.MockUpdater('test_updater', addrfile)
+    updater.initial_update(False, True)
+
+    assert advance.count_running() == 0
+    assert updater.ipv4s_published == []
+    assert updater.ipv6s_published == [ipaddress.IPv6Network('1234::/64')]
+    assert addrfile.invalidate_ipv4.call_args_list == []
+    assert addrfile.invalidate_ipv6.call_args_list == [
+        (('test_updater', ipaddress.IPv6Network('1234::/64')),),
+    ]
+    assert addrfile.set_ipv4.call_args_list == []
+    assert addrfile.set_ipv6.call_args_list == [
+        (('test_updater', ipaddress.IPv6Network('1234::/64')),),
+    ]
+
+
+def test_initial_update_not_attached_ipv6(mock_addrfile_factory, advance):
+    """Test initial update does not update IPv6 when IPv6 not attached, even if
+    not current"""
+    addrfile = mock_addrfile_factory(
+        test_updater_inv4=ipaddress.IPv4Address('1.2.3.4'),
+        test_updater_inv6=ipaddress.IPv6Network('1234::/64'),
+    )
+    updater = doubles.MockUpdater('test_updater', addrfile)
+    updater.initial_update(True, False)
+
+    assert advance.count_running() == 0
+    assert updater.ipv4s_published == [ipaddress.IPv4Address('1.2.3.4')]
+    assert updater.ipv6s_published == []
+    assert addrfile.invalidate_ipv4.call_args_list == [
+        (('test_updater', ipaddress.IPv4Address('1.2.3.4')),),
+    ]
+    assert addrfile.invalidate_ipv6.call_args_list == []
+    assert addrfile.set_ipv4.call_args_list == [
+        (('test_updater', ipaddress.IPv4Address('1.2.3.4')),),
+    ]
+    assert addrfile.set_ipv6.call_args_list == []
+
+
 def test_initial_update_not_necessary(mock_addrfile_factory, advance):
     """Test initial update does no updates if current"""
     addrfile = mock_addrfile_factory(
@@ -111,7 +157,7 @@ def test_initial_update_not_necessary(mock_addrfile_factory, advance):
         test_updater_set6=ipaddress.IPv6Network('1234::/64'),
     )
     updater = doubles.MockUpdater('test_updater', addrfile)
-    updater.initial_update()
+    updater.initial_update(True, True)
 
     assert advance.count_running() == 0
     assert updater.ipv4s_published == []
@@ -131,7 +177,7 @@ def test_initial_update_retries_ipv4(mock_addrfile_factory, advance):
     )
     updater = doubles.MockUpdater('test_updater', addrfile,
                                   ipv4_errors=[PublishError, None])
-    updater.initial_update()
+    updater.initial_update(True, True)
 
     assert updater.ipv4s_published == [ipaddress.IPv4Address('1.2.3.4')]
     assert updater.ipv6s_published == [ipaddress.IPv6Network('1234::/64')]
@@ -176,7 +222,7 @@ def test_initial_update_retries_ipv6(mock_addrfile_factory, advance):
     )
     updater = doubles.MockUpdater('test_updater', addrfile,
                                   ipv6_errors=[PublishError, None])
-    updater.initial_update()
+    updater.initial_update(True, True)
 
     assert updater.ipv4s_published == [ipaddress.IPv4Address('1.2.3.4')]
     assert updater.ipv6s_published == [ipaddress.IPv6Network('1234::/64')]
@@ -223,7 +269,7 @@ def test_initial_update_no_retry_after_fatal_ipv4(mock_addrfile_factory,
     updater = doubles.MockUpdater('test_updater', addrfile,
                                   ipv4_errors=[FatalPublishError, None],
                                   ipv6_errors=[PublishError, None])
-    updater.initial_update()
+    updater.initial_update(True, True)
 
     # Don't assert IPv6 publish attempt was made for certain because it may not
     # happen until after IPv4 fatal error
@@ -260,7 +306,7 @@ def test_initial_update_no_retry_after_fatal_ipv6(mock_addrfile_factory,
     updater = doubles.MockUpdater('test_updater', addrfile,
                                   ipv4_errors=[PublishError, None],
                                   ipv6_errors=[FatalPublishError, None])
-    updater.initial_update()
+    updater.initial_update(True, True)
 
     # Don't assert IPv4 publish attempt was made for certain because it may not
     # happen until after IPv6 fatal error

@@ -184,7 +184,9 @@ def test_skip_ipv4_attach_ipv4(notifier_factory, mock_updater):
     """Test attaching an updater for IPv4 and notifying when IPv4 is skipped
     does nothing"""
     fake_notifier = notifier_factory(skip_ipv4='true')
-    fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
+    attached4 = fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
+    assert not attached4
+    assert not fake_notifier.want_ipv4()
     # Well-behaved notifiers wouldn't notify_ipv4 when want_ipv4 is false, but
     # it must not cause problems
     fake_notifier.notify_ipv4(ipaddress.IPv4Address('10.20.30.40'))
@@ -195,8 +197,10 @@ def test_skip_ipv4_attach_ipv4(notifier_factory, mock_updater):
 def test_skip_ipv4_attach_both(notifier_factory, mock_updater):
     """Test attaching an updater when IPv4 is skipped works for IPv6"""
     fake_notifier = notifier_factory(skip_ipv4='true')
-    fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
-    fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
+    attached4 = fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
+    attached6 = fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
+    assert not attached4
+    assert attached6
     # Well-behaved notifiers wouldn't notify_ipv4 when want_ipv4 is false, but
     # it must not cause problems
     fake_notifier.notify_ipv4(ipaddress.IPv4Address('10.20.30.40'))
@@ -214,7 +218,8 @@ def test_skip_ipv6_attach_ipv6(notifier_factory, mock_updater):
     """Test attaching an updater for IPv6 and notifying when IPv6 is skipped
     does nothing"""
     fake_notifier = notifier_factory(skip_ipv6='true')
-    fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
+    attached6 = fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
+    assert not attached6
     assert not fake_notifier.want_ipv6()
     # Well-behaved notifiers wouldn't notify_ipv6 when want_ipv6 is false, but
     # it must not cause problems
@@ -226,8 +231,10 @@ def test_skip_ipv6_attach_ipv6(notifier_factory, mock_updater):
 def test_skip_ipv6_attach_both(notifier_factory, mock_updater):
     """Test attaching an updater when IPv6 is skipped works for IPv4"""
     fake_notifier = notifier_factory(skip_ipv6='true')
-    fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
-    fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
+    attached4 = fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
+    attached6 = fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
+    assert attached4
+    assert not attached6
     fake_notifier.notify_ipv4(ipaddress.IPv4Address('10.20.30.40'))
     fake_notifier.notify_ipv4(ipaddress.IPv4Address('50.60.70.80'))
     # Well-behaved notifiers wouldn't notify_ipv6 when want_ipv6 is false, but
@@ -245,8 +252,10 @@ def test_ipv4_ready_false_and_skipped(notifier_factory, mock_updater):
     """Test attaching updater with ipv4_ready set to false but IPv4 skipped
     does not raise error"""
     fake_notifier = notifier_factory(skip_ipv4='true', ipv4_ready='false')
-    fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
-    fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
+    attached4 = fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
+    attached6 = fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
+    assert not attached4
+    assert attached6
     # Well-behaved notifiers wouldn't notify_ipv4 when want_ipv4 is false
     # (especially when IPv4 isn't ready), but it must not cause problems
     fake_notifier.notify_ipv4(ipaddress.IPv4Address('10.20.30.40'))
@@ -264,12 +273,14 @@ def test_ipv6_ready_false_and_skipped(notifier_factory, mock_updater):
     """Test attaching updater with ipv6_ready set to false but IPv6 skipped
     does not raise error"""
     fake_notifier = notifier_factory(skip_ipv6='true', ipv6_ready='false')
-    fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
-    fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
+    attached4 = fake_notifier.attach_ipv4_updater(mock_updater.update_ipv4)
+    attached6 = fake_notifier.attach_ipv6_updater(mock_updater.update_ipv6)
+    assert attached4
+    assert not attached6
     fake_notifier.notify_ipv4(ipaddress.IPv4Address('10.20.30.40'))
     fake_notifier.notify_ipv4(ipaddress.IPv4Address('50.60.70.80'))
-    # Well-behaved notifiers wouldn't notify_ipv4 when want_ipv4 is false
-    # (especially when IPv4 isn't ready), but it must not cause problems
+    # Well-behaved notifiers wouldn't notify_ipv6 when want_ipv6 is false
+    # (especially when IPv6 isn't ready), but it must not cause problems
     fake_notifier.notify_ipv6(ipaddress.IPv6Network('1234::/64'))
     fake_notifier.notify_ipv6(ipaddress.IPv6Network('5678::/64'))
 

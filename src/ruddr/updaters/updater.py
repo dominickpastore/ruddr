@@ -164,9 +164,16 @@ class BaseUpdater:
         #: error and no more updates should be issued.
         self.halt: bool = False
 
-    def initial_update(self) -> None:
+    def initial_update(self, ipv4_attached: bool, ipv6_attached: bool) -> None:
         """Do the initial update: Check the addrfile, and if either address is
         defunct but has a last-attempted-address, try to publish it again.
+
+        :param ipv4_attached: Whether this updater should do an initial update
+                              for IPv4 (that is, whether it is attached to a
+                              notifier for IPv4)
+        :param ipv6_attached: Whether this updater should do an initial update
+                              for IPv6 (that is, whether it is attached to a
+                              notifier for IPv6)
         """
         raise NotImplementedError
 
@@ -228,20 +235,24 @@ class Updater(BaseUpdater):
     def __init__(self, name: str, addrfile: Addrfile):
         super().__init__(name, addrfile)
 
-    def initial_update(self) -> None:
+    def initial_update(self, ipv4_attached: bool, ipv6_attached: bool) -> None:
         """:meta private:"""
         self.log.debug("Doing initial update")
         ipv4, is_current = self.addrfile.get_ipv4(self.name)
-        if ipv4 is None:
+        if not ipv4_attached:
+            self.log.debug("Skipping initial update for IPv4 as not attached")
+        elif ipv4 is None:
             self.log.info("No prior IPv4 attempt stored, no initial update")
         elif not is_current:
             self.log.info("IPv4 not known to be current, doing initial update")
             self.update_ipv4(ipv4)
 
         ipv6, is_current = self.addrfile.get_ipv6(self.name)
-        if ipv6 is None:
+        if not ipv6_attached:
+            self.log.debug("Skipping initial update for IPv6 as not attached")
+        elif ipv6 is None:
             self.log.info("No prior IPv6 attempt stored, no initial update")
-        if not is_current:
+        elif not is_current:
             self.log.info("IPv6 not known to be current, doing initial update")
             self.update_ipv6(ipv6)
 

@@ -144,7 +144,7 @@ class BaseNotifier:
 
     def attach_ipv4_updater(
         self, update_func: Callable[[ipaddress.IPv4Address], None],
-    ) -> None:
+    ) -> bool:
         """Attach an IPv4 update function to this notifier. No effect if IPv4
         is skipped for this notifier.
 
@@ -156,11 +156,13 @@ class BaseNotifier:
                             it fails), but this function should not block
                             longer than a single update attempt.
         :raises ConfigError: If config required for IPv4 notifying is missing
+
+        :return: ``True`` if attached, ``False`` if IPv4 is skipped
         """
         if self._skip_ipv4:
             self.log.info("Not attaching updater to notifier %s for skipped "
                           "IPv4", self.name)
-            return
+            return False
         self.log.debug("Attaching %s (IPv4) to notifier %s",
                        update_func.__name__, self.name)
         if len(self._ipv4_update_funcs) == 0 and not self.ipv4_ready():
@@ -169,10 +171,11 @@ class BaseNotifier:
             raise ConfigError("Notifier %s cannot be an IPv4 notifier without "
                               "required IPv4 config" % self.name)
         self._ipv4_update_funcs.append(update_func)
+        return True
 
     def attach_ipv6_updater(
         self, update_func: Callable[[ipaddress.IPv6Network], None]
-    ) -> None:
+    ) -> bool:
         """Attach an IPv6 update function to this notifier. No effect if IPv6
         is skipped for this notifier.
 
@@ -184,11 +187,13 @@ class BaseNotifier:
                             it fails), but this function should not block
                             longer than a single update attempt.
         :raises ConfigError: If config required for IPv6 notifying is missing
+
+        :return: ``True`` if attached, ``False`` if IPv6 is skipped
         """
         if self._skip_ipv6:
             self.log.info("Not attaching updater to notifier %s for skipped "
                           "IPv6", self.name)
-            return
+            return False
         self.log.debug("Attaching %s (IPv6) to notifier %s",
                        update_func.__name__, self.name)
         if len(self._ipv6_update_funcs) == 0 and not self.ipv6_ready():
@@ -197,6 +202,7 @@ class BaseNotifier:
             raise ConfigError("Notifier %s cannot be an IPv6 notifier without "
                               "required IPv6 config" % self.name)
         self._ipv6_update_funcs.append(update_func)
+        return True
 
     def notify_ipv4(self, address: ipaddress.IPv4Address) -> None:
         """Subclasses must call this to notify all the attached IPv4 updaters
