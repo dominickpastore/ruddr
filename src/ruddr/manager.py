@@ -16,12 +16,9 @@
 
 """DDNS Manager: Initializes notifiers and updaters and manages the addrfile"""
 
-import argparse
 import importlib
 import logging
-import logging.handlers
 import os.path
-import signal
 import sys
 from typing import Optional, Any, Union, Dict, Tuple, cast
 
@@ -32,13 +29,9 @@ else:
 
 from . import Addrfile
 from . import configuration
-from .exceptions import NotifierSetupError, ConfigError, RuddrSetupError
+from .exceptions import NotifierSetupError, ConfigError
 from . import notifiers
-from ruddr.util import sdnotify
 from . import updaters
-
-
-log = logging.getLogger('ruddr')
 
 
 class DDNSManager:
@@ -51,10 +44,12 @@ class DDNSManager:
     """
 
     def __init__(self, config: configuration.Config):
+        self.log = logging.getLogger('ruddr')
+
         try:
             config.finalize(validate_notifier_type, validate_updater_type)
         except ConfigError as e:
-            log.critical("Config error: %s", e)
+            self.log.critical("Config error: %s", e)
             raise
         self.config = config
 
@@ -130,7 +125,8 @@ class DDNSManager:
         for name in list(self.notifiers.keys()):
             if not (self.notifiers[name].want_ipv4() or
                     self.notifiers[name].want_ipv6()):
-                log.warning("Notifier %s not attached to any updater", name)
+                self.log.warning("Notifier %s not attached to any updater",
+                                 name)
                 del self.notifiers[name]
 
     def start(self):
@@ -139,19 +135,19 @@ class DDNSManager:
 
         :raises NotifierSetupError: if a notifier fails to start
         """
-        log.info("Starting all notifiers...")
+        self.log.info("Starting all notifiers...")
 
         for name, notifier in self.notifiers.items():
             try:
                 notifier.start()
             except NotifierSetupError:
-                log.critical("Notifier %s failed to start. Stopping all "
-                             "notifiers.", name)
+                self.log.critical("Notifier %s failed to start. Stopping all "
+                                  "notifiers.", name)
                 for running_notifier in self.notifiers.values():
                     running_notifier.stop()
                 raise
 
-        log.info("All notifiers started.")
+        self.log.info("All notifiers started.")
 
     def do_notify(self):
         """Do an on-demand notify from all notifiers.
@@ -160,10 +156,10 @@ class DDNSManager:
 
         Does not raise any exceptions.
         """
-        log.info("Checking once for all notifiers...")
+        self.log.info("Checking once for all notifiers...")
         for notifier in self.notifiers.values():
             notifier.do_notify()
-        log.info("Check for all notifiers complete.")
+        self.log.info("Check for all notifiers complete.")
 
     def stop(self):
         """Stop all running notifiers gracefully. This will allow Python to
@@ -171,10 +167,10 @@ class DDNSManager:
 
         Does not raise any exceptions, even if not yet started.
         """
-        log.info("Stopping all notifiers...")
+        self.log.info("Stopping all notifiers...")
         for notifier in self.notifiers.values():
             notifier.stop()
-        log.info("All notifiers stopped.")
+        self.log.info("All notifiers stopped.")
 
 
 def validate_notifier_type(module: Optional[str], type_: str) -> bool:
@@ -259,79 +255,3 @@ def _validate_updater_or_notifier_type(
         return False
     existing[cast(Tuple[str, str], (module, type_))] = imported_class
     return True
-
-
-def parse_args(argv):
-    """Parse command line arguments
-
-    :param argv: Either ``None`` or a list of arguments
-    :returns: a :class:`argparse.Namespace` containing the parsed arguments
-    """
-    parser = argparse.ArgumentParser(
-        description="Robotic Updater for Dynamic DNS Records",
-        epilog="SIGUSR1 will cause a running instance to immediately check and"
-               " update the current IP address(es) if possible",
-    )
-    parser.add_argument("-c", "--configfile", default="/etc/ruddr.conf",
-                        help="Path to the config file")
-    parser.add_argument("-d", "--debug-logs", action="store_true",
-                        help="Increase verbosity of logging significantly")
-    parser.add_argument("-s", "--stderr", action="store_true",
-                        help="Log to stderr instead of syslog or file")
-    return parser.parse_args(argv)
-
-
-def main(argv=None):
-    """Main entry point when run as a standalone program"""
-    args = parse_args(argv)
-    try:
-        conf = configuration.read_config_from_path(args.configfile)
-    except ConfigError as e:
-        print("Config error:", e, file=sys.stderr)
-        sys.exit(2)
-
-    # Set up logging handler
-    if args.stderr:
-        logfile = 'stderr'
-    else:
-        logfile = conf.main.get('log', 'syslog')
-    if logfile == 'syslog':
-        log_handler = logging.handlers.SysLogHandler()
-    elif logfile == 'stderr':
-        log_handler = logging.StreamHandler()
-    else:
-        log_handler = logging.FileHandler(logfile)
-    log.addHandler(log_handler)
-    if args.debug_logs:
-        log.setLevel(logging.DEBUG)
-    else:
-        log.setLevel(logging.INFO)
-
-    # Start up the actual DDNS code
-    try:
-        manager = DDNSManager(conf)
-        manager.start()
-    except RuddrSetupError:
-        log.critical("Ruddr failed to start.")
-        sys.exit(1)
-
-    # Notify systemd, if applicable
-    sdnotify.ready()
-
-    # Do an immediate update on SIGUSR1
-    def handle_sigusr1(sig, _):
-        log.info("Received signal: %s", signal.Signals(sig).name)
-        manager.do_notify()
-    signal.signal(signal.SIGUSR1, handle_sigusr1)
-
-    # Wait for SIGINT (^C) or SIGTERM
-    def handle_signals(sig, _):
-        log.info("Received signal: %s", signal.Signals(sig).name)
-        sdnotify.stopping()
-        manager.stop()
-    signal.signal(signal.SIGINT, handle_signals)
-    signal.signal(signal.SIGTERM, handle_signals)
-
-
-if __name__ == '__main__':
-    main()

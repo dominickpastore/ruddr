@@ -79,7 +79,7 @@ Changelog = "https://github.com/dominickpastore/ruddr/blob/master/CHANGELOG.md"
 Discussion = "https://github.com/dominickpastore/ruddr/discussions"
 
 [project.scripts]
-ruddr = "ruddr.manager:main"
+ruddr = "ruddr.main:main"
 
 # For unit tests only
 [project.entry-points."ruddr.notifier"]
