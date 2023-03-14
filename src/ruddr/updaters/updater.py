@@ -958,9 +958,9 @@ class TwoWayZoneUpdater(Updater):
         error = None
         for host in hosts:
             if host not in result:
-                self.log.error("No A record for subdomain %s in zone %s",
+                self.log.error("No records for subdomain %s in zone %s",
                                host, zone)
-                error = PublishError(f"Updater {self.name} found no A records "
+                error = PublishError(f"Updater {self.name} found no records "
                                      f"for subdomain {host} in zone {zone}")
                 break
 

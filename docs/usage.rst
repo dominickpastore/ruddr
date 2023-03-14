@@ -376,7 +376,7 @@ Create a new systemd unit file at ``/etc/systemd/system/ruddr.service``::
 is the full absolute path to the ``python`` executable in your virtual
 environment::
 
-  ExecStart=/path/to/venv/bin/python -m ruddr.manager
+  ExecStart=/path/to/venv/bin/python -m ruddr
 
 Then, simply enable and start the service (as root or with ``sudo``)::
 
