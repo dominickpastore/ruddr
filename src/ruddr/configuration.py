@@ -99,6 +99,15 @@ class Config:
         self._check_finalized()
         return self._updaters
 
+    # Logfile has special property since it must be accessed before finalizing
+    @property
+    def logfile(self):
+        return self._main.get('log', 'syslog')
+
+    @logfile.setter
+    def logfile(self, value: str):
+        self._main['log'] = value
+
     def _fill_defaults(self):
         """Fill in defaults if they are not yet set"""
         if 'datadir' not in self._main:

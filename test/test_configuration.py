@@ -950,3 +950,22 @@ def test_missing_notifier_on_one_updater(config_factory):
             notifier4 = test_notifier
             """
         )
+
+
+def test_logfile_property(config_factory):
+    """Test logfile property getter and setter"""
+    config = config_factory(
+        """[ruddr]
+        datadir = /var/lib/ruddr_data
+
+        [notifier.test_notifier]
+        type = iface
+
+        [updater.test_updater]
+        type = standard
+        notifier = test_notifier
+        """
+    )
+    assert config.logfile == 'syslog'
+    config.logfile = 'stderr'
+    assert config.logfile == 'stderr'

@@ -10,6 +10,10 @@ hyphenated "1.0.0-beta.1" form specified by Semantic Versioning.)
 [Unreleased]
 ------------
 
+### Fixed
+
+- No longer crashes at startup without `-s` option
+
 [0.0.1b1] - 2023-03-13
 ----------------------
 

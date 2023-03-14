@@ -57,19 +57,18 @@ def main(argv=None):
         print("Config error:", e, file=sys.stderr)
         sys.exit(2)
 
-    # Set up logging handler
     if args.stderr:
-        logfile = 'stderr'
-    else:
-        logfile = conf.main.get('log', 'syslog')
-    if logfile == 'syslog':
+        conf.logfile = 'stderr'
+
+    if conf.logfile == 'syslog':
         log_handler = logging.handlers.SysLogHandler()
-    elif logfile == 'stderr':
+    elif conf.logfile == 'stderr':
         log_handler = logging.StreamHandler()
     else:
-        log_handler = logging.FileHandler(logfile)
+        log_handler = logging.FileHandler(conf.logfile)
     log = logging.getLogger('ruddr')
     log.addHandler(log_handler)
+
     if args.debug_logs:
         log.setLevel(logging.DEBUG)
     else:
