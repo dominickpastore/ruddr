@@ -7,8 +7,8 @@ patch versions contain bugfixes. (There is one minor deviation: Pre-release
 versions will use [PEP 440][pep440] formatting, e.g.  "1.0.0b1", not the
 hyphenated "1.0.0-beta.1" form specified by Semantic Versioning.)
 
-[Unreleased]
-------------
+[0.0.1b3] - 2023-11-12
+----------------------
 
 ### Fixed
 
@@ -48,6 +48,7 @@ This is the initial beta release of Ruddr. It includes:
 [semver]: https://semver.org/
 [pep440]: https://www.python.org/dev/peps/pep-0440/#version-scheme
 
-[Unreleased]: https://github.com/dominickpastore/ruddr/compare/v0.0.1b2...dev
+[Unreleased]: https://github.com/dominickpastore/ruddr/compare/v0.0.1b3...dev
+[0.0.1b3]: https://github.com/dominickpastore/ruddr/compare/v0.0.1b2...v0.0.1b3
 [0.0.1b2]: https://github.com/dominickpastore/ruddr/compare/v0.0.1b1...v0.0.1b2
 [0.0.1b1]: https://github.com/dominickpastore/ruddr/compare/v0.0.0...v0.0.1b1
