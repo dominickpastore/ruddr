@@ -10,6 +10,11 @@ hyphenated "1.0.0-beta.1" form specified by Semantic Versioning.)
 [Unreleased]
 ------------
 
+### Fixed
+
+- Do not crash when systemd or iface notifier attempt to check the IP address
+  of an interface that currently has no address
+
 [0.0.1b2] - 2023-03-14
 ----------------------
 

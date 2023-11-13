@@ -507,6 +507,8 @@ class Notifier(BaseNotifier):
                 self.log.info("Not doing an immediate check as this notifier "
                               "does not support it")
         # Name is only used for testing purposes
+        # TODO If exception is raised in thread, it seems process will die with
+        #  a success code
         self.first_check = threading.Thread(target=first_check)
         self.first_check.start()
 

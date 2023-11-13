@@ -271,6 +271,8 @@ class SystemdNotifier(Notifier):
     def setup(self):
         # Start monitoring DBus
         self.log.debug("Starting to monitor DBus.")
+        # TODO If exception is raised in thread, it seems process will die with
+        #  a success code
         thread = threading.Thread(target=self._dbus_listen)
         thread.start()
 

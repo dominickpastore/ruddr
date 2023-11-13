@@ -48,8 +48,14 @@ def _get_iface_addrs(
     # Cast due to lack of type stubs for netifaces
     addresses = cast(Dict[int, List[Dict[str, str]]],
                      netifaces.ifaddresses(if_name))
-    ipv4 = [a['addr'] for a in addresses[netifaces.AF_INET]]
-    ipv6 = [a['addr'] for a in addresses[netifaces.AF_INET6]]
+    try:
+        ipv4 = [a['addr'] for a in addresses[netifaces.AF_INET]]
+    except KeyError:
+        ipv4 = []
+    try:
+        ipv6 = [a['addr'] for a in addresses[netifaces.AF_INET6]]
+    except KeyError:
+        ipv6 = []
 
     # ipaddress.IPv6Address gets upset when there is %ifacename at the end
     # of an address in Python < 3.9. Chop it off.
