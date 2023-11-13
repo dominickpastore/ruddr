@@ -7,6 +7,9 @@ patch versions contain bugfixes. (There is one minor deviation: Pre-release
 versions will use [PEP 440][pep440] formatting, e.g.  "1.0.0b1", not the
 hyphenated "1.0.0-beta.1" form specified by Semantic Versioning.)
 
+[Unreleased]
+------------
+
 [0.0.1b3] - 2023-11-12
 ----------------------
 
