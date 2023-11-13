@@ -256,7 +256,7 @@ class TestDDNSManager:
         )
         manager = ruddr.manager.DDNSManager(config)
         assert len(manager.notifiers) == 1
-        assert type(manager.notifiers['test_notifier']) == doubles.FakeNotifier
+        assert type(manager.notifiers['test_notifier']) is doubles.FakeNotifier
         assert manager.notifiers['test_notifier'].name == 'test_notifier'
         assert (manager.notifiers['test_notifier'].config['test_key'] ==
                 'test_val')
@@ -282,7 +282,7 @@ class TestDDNSManager:
         )
         manager = ruddr.manager.DDNSManager(config)
         assert len(manager.notifiers) == 1
-        assert (type(manager.notifiers['test_notifier']) ==
+        assert (type(manager.notifiers['test_notifier']) is
                 doubles.FakeNotifier)
         assert manager.notifiers['test_notifier'].name == 'test_notifier'
         assert (manager.notifiers['test_notifier'].config['test_key'] ==
@@ -308,7 +308,7 @@ class TestDDNSManager:
         )
         manager = ruddr.manager.DDNSManager(config)
         assert len(manager.updaters) == 1
-        assert (type(manager.updaters['test_updater']) ==
+        assert (type(manager.updaters['test_updater']) is
                 doubles.MockBaseUpdater)
         assert manager.updaters['test_updater'].name == 'test_updater'
         assert (manager.updaters['test_updater'].config['test_key'] ==
@@ -336,7 +336,7 @@ class TestDDNSManager:
         )
         manager = ruddr.manager.DDNSManager(config)
         assert len(manager.updaters) == 1
-        assert (type(manager.updaters['test_updater']) ==
+        assert (type(manager.updaters['test_updater']) is
                 doubles.MockBaseUpdater)
         assert manager.updaters['test_updater'].name == 'test_updater'
         assert (manager.updaters['test_updater'].config['test_key'] ==
